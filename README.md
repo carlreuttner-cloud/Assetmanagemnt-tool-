@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand: Phase 0 (Grundgerüst).** Login, Rollen, Mandantentrennung, Datenmodell und die leere Oberfläche stehen. Die Fachseiten folgen in den nächsten Phasen.
+**Stand:** Phase 0 (Grundgerüst) und Phase 1 (Gesellschaften und Kredite) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -87,6 +87,12 @@ src/
     auth/sichtbarkeit.ts Welche Häuser/Gesellschaften eingeschränkte Rollen sehen
     db/mandant.ts        Mandantenfilter und Änderungsprotokoll
     geld.ts              Rechnen, Einlesen und Formatieren von Beträgen
+    datum.ts             Kalenderdaten als "JJJJ-MM-TT", Monatsrechnung, Formatierung
+    kredit.ts            Restschuld, Zinssatz, Kapitaldienst, Zinsbindung, Tilgungspläne, Covenants
+    kennzahlen.ts        Kennzahlen je Haus, Gesellschaft und Portfolio (LTV, DSCR, Leerstand, Rendite)
+    daten/portfolio.ts   lädt die Rechengrundlage für den sichtbaren Ausschnitt des Mandanten
+    format.ts            Anzeigeformate (Beträge, Prozent, Fläche, Datum) je Mandant
+    formular.ts          Formularfelder in Server-Aktionen einlesen, Fehlermeldungen
     navigation.ts        Einträge der Seitenleiste
   i18n/                  Oberflächentexte (vorerst nur Deutsch)
 test/                    Tests
@@ -104,6 +110,14 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 **Mieten.** Ist- und Soll-Miete sind die Nettokaltmiete pro Monat. Überall, wo eine Miete angezeigt wird, zusätzlich die Jahresnettokaltmiete (× 12) anzeigen. Sie wird mit `jahresNettokaltmiete()` aus `@/lib/miete` berechnet und nie gespeichert.
 
 **Sprache und Währung.** Vorerst nur Deutsch und Euro. Vorbereitet ist: jeder Mandant hat `waehrung` und `sprache`, jeder Benutzer optional eine eigene `sprache`; alle Oberflächentexte liegen in `src/i18n/de.ts`. Für eine neue Sprache eine Datei mit derselben Struktur anlegen und in `src/i18n/index.ts` eintragen.
+
+**Kennzahlen.** Alle Berechnungen stehen als reine Funktionen in `src/lib/kredit.ts` und `src/lib/kennzahlen.ts` und werden in `test/kredit.test.ts` gegen die Sollwerte des Testdatengenerators geprüft. Festlegungen:
+- Restschuld: Saldo der jüngsten Buchung bis zum Stichtag, sonst Restschuld laut gültigem Tilgungsplan, sonst Ursprungsbetrag.
+- Variabler Zins: letzter Referenzzins bis heute, mindestens 0 % (Floor), plus Marge.
+- Kapitaldienst: Zins- und Tilgungsbuchungen der letzten 12 Monate ohne Sondertilgungen; fehlen sie, aus Rate und Zinssatz hochgerechnet.
+- LTV = Restschuld / Verkehrswert. DSCR (vereinfacht) = Ist-Jahresnettokaltmiete / Kapitaldienst, ohne Bewirtschaftungskosten.
+- Häuser tragen Kredite anteilig (`KreditHaus.anteilProzent`); Gesellschaft und Portfolio zählen ihre Kredite zu 100 %.
+- Covenants eines Kredits werden über alle Häuser geprüft, die er belastet, mit allen Krediten dieser Häuser.
 
 ## Betrieb auf einem Server (später)
 

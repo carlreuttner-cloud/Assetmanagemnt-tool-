@@ -8,6 +8,7 @@ import { hash } from "@node-rs/argon2";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { BANKEN, erzeugePortfolio, type TestPortfolio } from "./testdaten/portfolio";
+import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Der Seed löscht alle Daten und darf nicht in Produktion laufen.");
@@ -136,7 +137,8 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       sollzins: k.sollzins ? prozent(k.sollzins) : null, referenzzins: k.referenzzins,
       marge: k.marge ? prozent(k.marge) : null,
       zinsbindungBis: k.zinsbindungBis ? tag(k.zinsbindungBis) : null, laufzeitBis: k.laufzeitBis ? tag(k.laufzeitBis) : null,
-      notiz: k.notiz,
+      zahlweise: k.zahlweise, tilgungsart: k.tilgungsart, anfaenglicheTilgung: prozent(k.anfaenglicheTilgung),
+      ratenbetrag: geld(k.ratenbetrag), notiz: k.notiz,
     })),
   });
   await db.kreditHaus.createMany({
@@ -156,6 +158,18 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       betrag: geld(b.betrag), saldoNach: geld(b.saldoNach),
     }))),
   });
+
+  // Referenzzinsen (Näherungswerte aus dem Generator), monatlich ab 01/2024.
+  const referenzzinsen = [];
+  for (let monat = monatsNummer("2024-01-01"); monat <= monatsNummer("2026-11-01"); monat++) {
+    for (const referenz of ["3M-EURIBOR", "6M-EURIBOR"] as const) {
+      referenzzinsen.push({
+        mandantId, referenz, stichtag: tag(monatsanfang(monat)), satz: prozent(euribor(referenz, monat)),
+        quelle: "Testwert (Näherung)",
+      });
+    }
+  }
+  await db.referenzzinssatz.createMany({ data: referenzzinsen });
 
   const plaene = p.kredite.flatMap((k) => k.tilgungsplaene.map((t) => ({ k, t, id: randomUUID() })));
   await db.tilgungsplan.createMany({

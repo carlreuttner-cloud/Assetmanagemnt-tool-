@@ -229,6 +229,12 @@ export interface TestKredit {
   marge: Decimal | null;
   zinsbindungBis: string | null;
   laufzeitBis: string | null;
+  zahlweise: "MONATLICH" | "QUARTALSWEISE";
+  tilgungsart: "ANNUITAET" | "RATENTILGUNG";
+  /** Tilgung in Prozent p. a. (nach Nachverhandlung die neue) */
+  anfaenglicheTilgung: Decimal;
+  /** Annuität: Rate je Zahlung am Stichtag; Ratentilgung: Tilgungsbetrag je Zahlung */
+  ratenbetrag: Decimal;
   notiz: string | null;
   haeuser: { haus: string; anteilProzent: Decimal }[];
   restschuldStichtag: Decimal;
@@ -347,6 +353,9 @@ export function baueKredite(zielSchuld: Map<string, Decimal>, kaufpreis: Map<str
       notiz = "Gesamtgrundschuld auf beiden Häusern, Aufteilung nach Kaufpreisverhältnis.";
     }
 
+    const letzte = [...perioden].reverse().find((p) => p.datum <= STICHTAG)!;
+    const ratenbetrag = v.variabel ? aufCent(ursprung.times(v.tilgung).dividedBy(100 * (v.zahlweise === "QUARTALSWEISE" ? 4 : 12))) : letzte.zins.plus(letzte.tilgung);
+
     return {
       schluessel: v.schluessel,
       gesellschaft: v.gesellschaft,
@@ -362,6 +371,10 @@ export function baueKredite(zielSchuld: Map<string, Decimal>, kaufpreis: Map<str
       marge: v.variabel ? dezimal(v.variabel.marge) : null,
       zinsbindungBis,
       laufzeitBis,
+      zahlweise: v.zahlweise,
+      tilgungsart: v.variabel ? "RATENTILGUNG" : "ANNUITAET",
+      anfaenglicheTilgung: dezimal(v.nachverhandlung?.tilgung ?? v.tilgung),
+      ratenbetrag,
       notiz,
       haeuser: anteile.get(v.schluessel)!,
       restschuldStichtag: restschuldAm(perioden, ursprung, STICHTAG),

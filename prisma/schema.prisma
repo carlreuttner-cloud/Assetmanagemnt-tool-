@@ -54,6 +54,7 @@ model Mandant {
   kreditbuchungen         Kreditbuchung[]
   tilgungsplaene          Tilgungsplan[]
   tilgungsplanZeilen      TilgungsplanZeile[]
+  referenzzinssaetze      Referenzzinssatz[]
   investitionen           Investition[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
@@ -305,28 +306,51 @@ enum ZinsArt {
   VARIABEL
 }
 
+enum Zahlweise {
+  MONATLICH
+  QUARTALSWEISE
+  HALBJAEHRLICH
+  JAEHRLICH
+}
+
+enum Tilgungsart {
+  /// Gleichbleibende Rate (Zins + Tilgung); der Tilgungsanteil wächst.
+  ANNUITAET
+  /// Gleichbleibender Tilgungsbetrag; der Zins sinkt mit der Restschuld.
+  RATENTILGUNG
+  /// Nur Zinsen, Tilgung am Laufzeitende.
+  ENDFAELLIG
+}
+
 model Kredit {
-  id               String    @id @default(cuid())
-  mandantId        String
-  gesellschaftId   String
-  bezeichnung      String
-  bank             String?
-  kreditnummer     String?
-  iban             String?
-  ursprungsbetrag  Decimal   @db.Decimal(14, 2)
-  auszahlungsdatum DateTime? @db.Date
-  zinsArt          ZinsArt
+  id                  String      @id @default(cuid())
+  mandantId           String
+  gesellschaftId      String
+  bezeichnung         String
+  bank                String?
+  kreditnummer        String?
+  iban                String?
+  ursprungsbetrag     Decimal     @db.Decimal(14, 2)
+  auszahlungsdatum    DateTime?   @db.Date
+  zinsArt             ZinsArt
   /// Fester Sollzins in Prozent p. a. (bei FEST)
-  sollzins         Decimal?  @db.Decimal(9, 6)
+  sollzins            Decimal?    @db.Decimal(9, 6)
   /// Referenzzins bei VARIABEL, z. B. "3M-EURIBOR"
-  referenzzins     String?
+  referenzzins        String?
   /// Aufschlag auf den Referenzzins in Prozentpunkten
-  marge            Decimal?  @db.Decimal(9, 6)
-  zinsbindungBis   DateTime? @db.Date
-  laufzeitBis      DateTime? @db.Date
-  notiz            String?
-  erstelltAm       DateTime  @default(now())
-  geaendertAm      DateTime  @updatedAt
+  marge               Decimal?    @db.Decimal(9, 6)
+  zinsbindungBis      DateTime?   @db.Date
+  laufzeitBis         DateTime?   @db.Date
+  zahlweise           Zahlweise   @default(MONATLICH)
+  tilgungsart         Tilgungsart @default(ANNUITAET)
+  /// Anfängliche Tilgung in Prozent p. a. des Ursprungsbetrags
+  anfaenglicheTilgung Decimal?    @db.Decimal(9, 6)
+  /// Annuität: aktuelle Rate (Zins + Tilgung) je Zahlung.
+  /// Ratentilgung: Tilgungsbetrag je Zahlung. Endfällig: leer.
+  ratenbetrag         Decimal?    @db.Decimal(14, 2)
+  notiz               String?
+  erstelltAm          DateTime    @default(now())
+  geaendertAm         DateTime    @updatedAt
 
   mandant        Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft   Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
@@ -338,6 +362,25 @@ model Kredit {
 
   @@index([mandantId])
   @@index([gesellschaftId])
+}
+
+/// Stand eines Referenzzinses (z. B. 3M-EURIBOR) zu einem Stichtag. Daraus wird der
+/// aktuelle Zinssatz variabler Kredite berechnet (Referenzzins, mindestens 0 %, plus Marge).
+model Referenzzinssatz {
+  id         String   @id @default(cuid())
+  mandantId  String
+  /// gleiche Schreibweise wie Kredit.referenzzins, z. B. "3M-EURIBOR"
+  referenz   String
+  stichtag   DateTime @db.Date
+  /// in Prozentpunkten (2.13 = 2,13 %)
+  satz       Decimal  @db.Decimal(9, 6)
+  quelle     String?
+  erstelltAm DateTime @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+
+  @@unique([mandantId, referenz, stichtag])
+  @@index([mandantId])
 }
 
 enum CovenantVergleich {
