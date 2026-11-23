@@ -50,8 +50,8 @@ Passwort für alle: der Wert von `SEED_PASSWORT` aus deiner `.env`.
 |---|---|---|
 | admin@demo.local | Admin | alles; gehört zusätzlich zum Mandanten „Zweite Kunde AG“ (Wechsel unten in der Seitenleiste) |
 | mitarbeiter@demo.local | Mitarbeiter | alles außer Benutzerverwaltung |
-| hausverwaltung@demo.local | Hausverwaltung | nur Import, nur für das Haus Lindenstraße 12 |
-| investor@demo.local | Investor | nur lesen, nur die Gesellschaft „Demo Wohnen GmbH & Co. KG“ |
+| hausverwaltung@demo.local | Hausverwaltung | nur Import, nur für die Häuser Lindenhofstraße 12 (Berlin) und Rheinuferweg 18 (Köln) |
+| investor@demo.local | Investor | nur lesen, nur die Gesellschaft „Lindenhof Wohnen GmbH & Co. KG“ |
 
 ## Befehle
 
@@ -64,6 +64,7 @@ Passwort für alle: der Wert von `SEED_PASSWORT` aus deiner `.env`.
 | `npm run db:migrate -- --name <name>` | Nach Schemaänderung eine neue Migration erzeugen |
 | `npm run db:deploy` | Migrationen einspielen (Produktion, CI) |
 | `npm run db:seed` | Testdaten neu anlegen (löscht alles; in Produktion gesperrt) |
+| `npm run testdaten:csv` | Beispiel-CSVs unter `testdaten/` neu schreiben (nach Änderungen am Generator) |
 | `npm run db:studio` | Datenbank im Browser ansehen |
 
 ## Aufbau
@@ -72,7 +73,8 @@ Passwort für alle: der Wert von `SEED_PASSWORT` aus deiner `.env`.
 prisma/
   schema.prisma          Datenmodell (mit Kommentaren)
   migrations/            Datenbank-Migrationen
-  seed.ts                Testdaten
+  seed.ts                Testdaten (Demo-Benutzer und Testportfolio)
+  testdaten/             Generator für das Testportfolio
 src/
   auth.ts                Anmeldung (Auth.js)
   app/
@@ -88,6 +90,7 @@ src/
     navigation.ts        Einträge der Seitenleiste
   i18n/                  Oberflächentexte (vorerst nur Deutsch)
 test/                    Tests
+testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und Übersichten, siehe testdaten/README.md
 ```
 
 ## Wichtige Regeln für die Weiterentwicklung
