@@ -219,17 +219,20 @@ enum EinheitArt {
 }
 
 model Einheit {
-  id          String     @id @default(cuid())
-  mandantId   String
-  hausId      String
-  bezeichnung String
-  art         EinheitArt
+  id             String     @id @default(cuid())
+  mandantId      String
+  hausId         String
+  bezeichnung    String
+  art            EinheitArt
   /// Fläche in m²
-  flaeche     Decimal    @db.Decimal(10, 2)
-  lage        String? // z. B. "2. OG links"
-  notiz       String?
-  erstelltAm  DateTime   @default(now())
-  geaendertAm DateTime   @updatedAt
+  flaeche        Decimal    @db.Decimal(10, 2)
+  lage           String? // z. B. "2. OG links"
+  /// Erwartete Nettokaltmiete pro Monat bei Neuvermietung (Soll-Miete für Leerstand).
+  /// Wird bei leeren Einheiten angezeigt; die Jahresmiete (× 12) wird berechnet, nie gespeichert.
+  erwarteteMiete Decimal?   @db.Decimal(14, 2)
+  notiz          String?
+  erstelltAm     DateTime   @default(now())
+  geaendertAm    DateTime   @updatedAt
 
   mandant           Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   haus              Haus              @relation(fields: [hausId], references: [id], onDelete: Cascade)
