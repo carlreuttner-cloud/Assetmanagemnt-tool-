@@ -13,3 +13,8 @@ export function texte(sprache: string = STANDARD_SPRACHE): Texte {
 }
 
 export type { Texte };
+
+/** Setzt Platzhalter wie "{feld}" in einen Text ein. */
+export function fuelle(text: string, werte: Record<string, string | number>): string {
+  return text.replace(/\{(\w+)\}/g, (_, schluessel: string) => String(werte[schluessel] ?? `{${schluessel}}`));
+}
