@@ -1,0 +1,14 @@
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
+  },
+  datasource: {
+    // Für `prisma generate` wird keine Datenbank gebraucht, daher ein Platzhalter.
+    url: process.env.DATABASE_URL ?? "postgresql://placeholder@localhost:5432/placeholder",
+  },
+});

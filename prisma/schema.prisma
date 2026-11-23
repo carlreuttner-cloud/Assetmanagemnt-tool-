@@ -1,0 +1,523 @@
+// Datenmodell der Immobilien-App.
+//
+// Konventionen:
+// - Jede fachliche Tabelle hat eine `mandantId`. Der Mandantenfilter wird zentral
+//   in `src/lib/db/mandant.ts` gesetzt, nie von Hand in einzelnen Abfragen.
+// - Geldbeträge: Decimal(14, 2). Zinssätze und Prozentanteile: Decimal(9, 6)
+//   (z. B. 3.125000 = 3,125 %). Niemals Float.
+// - Reine Datumsangaben (Stichtage, Vertragsbeginn) als @db.Date, Zeitpunkte als DateTime.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Mandanten, Benutzer, Rollen
+// ---------------------------------------------------------------------------
+
+enum Rolle {
+  ADMIN
+  MITARBEITER
+  HAUSVERWALTUNG // darf nur Mieterlisten für zugewiesene Häuser hochladen
+  INVESTOR // nur Lesezugriff auf zugewiesene Gesellschaften
+}
+
+model Mandant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  /// ISO-4217-Code. Vorerst immer EUR, für spätere Mehrwährungsfähigkeit vorbereitet.
+  waehrung    String   @default("EUR")
+  /// BCP-47-Sprachcode für Oberfläche und Formatierung, vorerst "de-DE".
+  sprache     String   @default("de-DE")
+  erstelltAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mitgliedschaften        Mitgliedschaft[]
+  hausZuweisungen         HausZuweisung[]
+  gesellschaftZuweisungen GesellschaftZuweisung[]
+  gesellschaften          Gesellschaft[]
+  haeuser                 Haus[]
+  verkehrswerte           Verkehrswert[]
+  fotos                   Foto[]
+  einheiten               Einheit[]
+  mieter                  Mieter[]
+  mietverhaeltnisse       Mietverhaeltnis[]
+  kredite                 Kredit[]
+  covenants               Covenant[]
+  kreditHaeuser           KreditHaus[]
+  kreditbuchungen         Kreditbuchung[]
+  tilgungsplaene          Tilgungsplan[]
+  tilgungsplanZeilen      TilgungsplanZeile[]
+  investitionen           Investition[]
+  dokumente               Dokument[]
+  aenderungsprotokoll     Aenderungsprotokoll[]
+}
+
+/// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
+model Benutzer {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwortHash String
+  aktiv        Boolean  @default(true)
+  /// Optionale persönliche Sprache; sonst gilt die des Mandanten.
+  sprache      String?
+  erstelltAm   DateTime @default(now())
+  geaendertAm  DateTime @updatedAt
+
+  mitgliedschaften    Mitgliedschaft[]
+  aenderungsprotokoll Aenderungsprotokoll[]
+}
+
+model Mitgliedschaft {
+  id         String   @id @default(cuid())
+  mandantId  String
+  benutzerId String
+  rolle      Rolle
+  erstelltAm DateTime @default(now())
+
+  mandant                 Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  benutzer                Benutzer                @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
+  hausZuweisungen         HausZuweisung[]
+  gesellschaftZuweisungen GesellschaftZuweisung[]
+
+  @@unique([mandantId, benutzerId])
+  @@index([benutzerId])
+}
+
+/// Welche Häuser eine Hausverwaltung sehen und bearbeiten darf.
+model HausZuweisung {
+  id               String @id @default(cuid())
+  mandantId        String
+  mitgliedschaftId String
+  hausId           String
+
+  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  mitgliedschaft Mitgliedschaft @relation(fields: [mitgliedschaftId], references: [id], onDelete: Cascade)
+  haus           Haus           @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@unique([mitgliedschaftId, hausId])
+  @@index([mandantId])
+}
+
+/// Welche Gesellschaften ein Investor sehen darf.
+model GesellschaftZuweisung {
+  id               String @id @default(cuid())
+  mandantId        String
+  mitgliedschaftId String
+  gesellschaftId   String
+
+  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  mitgliedschaft Mitgliedschaft @relation(fields: [mitgliedschaftId], references: [id], onDelete: Cascade)
+  gesellschaft   Gesellschaft   @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@unique([mitgliedschaftId, gesellschaftId])
+  @@index([mandantId])
+}
+
+// ---------------------------------------------------------------------------
+// Gesellschaften, Häuser, Einheiten
+// ---------------------------------------------------------------------------
+
+model Gesellschaft {
+  id             String   @id @default(cuid())
+  mandantId      String
+  name           String
+  rechtsform     String?
+  registernummer String?
+  steuernummer   String?
+  notiz          String?
+  erstelltAm     DateTime @default(now())
+  geaendertAm    DateTime @updatedAt
+
+  mandant     Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haeuser     Haus[]
+  kredite     Kredit[]
+  dokumente   Dokument[]
+  zuweisungen GesellschaftZuweisung[]
+
+  @@index([mandantId])
+}
+
+model Haus {
+  id             String    @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  bezeichnung    String
+  strasse        String?
+  plz            String?
+  ort            String?
+  land           String    @default("DE")
+  kaufpreis      Decimal?  @db.Decimal(14, 2)
+  kaufdatum      DateTime? @db.Date
+  notiz          String?
+  erstelltAm     DateTime  @default(now())
+  geaendertAm    DateTime  @updatedAt
+
+  mandant       Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft  Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  verkehrswerte Verkehrswert[]
+  fotos         Foto[]
+  einheiten     Einheit[]
+  kredite       KreditHaus[]
+  investitionen Investition[]
+  dokumente     Dokument[]
+  zuweisungen   HausZuweisung[]
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
+}
+
+/// Verkehrswert mit Stichtag. Mehrere Einträge je Haus ergeben die Wertentwicklung.
+model Verkehrswert {
+  id         String   @id @default(cuid())
+  mandantId  String
+  hausId     String
+  wert       Decimal  @db.Decimal(14, 2)
+  stichtag   DateTime @db.Date
+  /// z. B. "Gutachten", "Bankbewertung", "eigene Schätzung"
+  quelle     String?
+  notiz      String?
+  erstelltAm DateTime @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([hausId, stichtag])
+}
+
+model Foto {
+  id           String   @id @default(cuid())
+  mandantId    String
+  hausId       String
+  /// Pfad relativ zum Dateispeicher (siehe UPLOAD_DIR).
+  speicherPfad String
+  dateiname    String
+  mimeType     String
+  groesseBytes Int
+  beschreibung String?
+  reihenfolge  Int      @default(0)
+  erstelltAm   DateTime @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([hausId])
+}
+
+enum EinheitArt {
+  WOHNUNG
+  GEWERBE
+}
+
+model Einheit {
+  id          String     @id @default(cuid())
+  mandantId   String
+  hausId      String
+  bezeichnung String
+  art         EinheitArt
+  /// Fläche in m²
+  flaeche     Decimal    @db.Decimal(10, 2)
+  lage        String? // z. B. "2. OG links"
+  notiz       String?
+  erstelltAm  DateTime   @default(now())
+  geaendertAm DateTime   @updatedAt
+
+  mandant           Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus              Haus              @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  mietverhaeltnisse Mietverhaeltnis[]
+  investitionen     Investition[]
+  dokumente         Dokument[]
+
+  @@index([mandantId])
+  @@index([hausId])
+}
+
+// ---------------------------------------------------------------------------
+// Mieter und Mietverhältnisse
+// ---------------------------------------------------------------------------
+
+model Mieter {
+  id          String   @id @default(cuid())
+  mandantId   String
+  /// Name der Person oder Firma
+  name        String
+  istFirma    Boolean  @default(false)
+  email       String?
+  telefon     String?
+  notiz       String?
+  erstelltAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mandant           Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  mietverhaeltnisse Mietverhaeltnis[]
+
+  @@index([mandantId])
+}
+
+model Mietverhaeltnis {
+  id                  String    @id @default(cuid())
+  mandantId           String
+  einheitId           String
+  mieterId            String
+  beginn              DateTime  @db.Date
+  ende                DateTime? @db.Date
+  /// Tatsächlich gezahlte Nettokaltmiete pro Monat.
+  /// Die Jahresnettokaltmiete (× 12) wird mit `jahresNettokaltmiete()` aus src/lib/miete.ts berechnet, nie gespeichert.
+  istMiete            Decimal   @db.Decimal(14, 2)
+  /// Vertraglich geschuldete Nettokaltmiete pro Monat
+  sollMiete           Decimal   @db.Decimal(14, 2)
+  letzteMieterhoehung DateTime? @db.Date
+  /// Offener Mietrückstand zum Stichtag
+  rueckstand          Decimal   @default(0) @db.Decimal(14, 2)
+  rueckstandStichtag  DateTime? @db.Date
+  notiz               String?
+  erstelltAm          DateTime  @default(now())
+  geaendertAm         DateTime  @updatedAt
+
+  mandant   Mandant    @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  einheit   Einheit    @relation(fields: [einheitId], references: [id], onDelete: Cascade)
+  mieter    Mieter     @relation(fields: [mieterId], references: [id], onDelete: Restrict)
+  dokumente Dokument[]
+
+  @@index([mandantId])
+  @@index([einheitId])
+  @@index([mieterId])
+}
+
+// ---------------------------------------------------------------------------
+// Kredite
+// ---------------------------------------------------------------------------
+
+enum ZinsArt {
+  FEST
+  VARIABEL
+}
+
+model Kredit {
+  id               String    @id @default(cuid())
+  mandantId        String
+  gesellschaftId   String
+  bezeichnung      String
+  bank             String?
+  kreditnummer     String?
+  iban             String?
+  ursprungsbetrag  Decimal   @db.Decimal(14, 2)
+  auszahlungsdatum DateTime? @db.Date
+  zinsArt          ZinsArt
+  /// Fester Sollzins in Prozent p. a. (bei FEST)
+  sollzins         Decimal?  @db.Decimal(9, 6)
+  /// Referenzzins bei VARIABEL, z. B. "3M-EURIBOR"
+  referenzzins     String?
+  /// Aufschlag auf den Referenzzins in Prozentpunkten
+  marge            Decimal?  @db.Decimal(9, 6)
+  zinsbindungBis   DateTime? @db.Date
+  laufzeitBis      DateTime? @db.Date
+  notiz            String?
+  erstelltAm       DateTime  @default(now())
+  geaendertAm      DateTime  @updatedAt
+
+  mandant        Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft   Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  haeuser        KreditHaus[]
+  covenants      Covenant[]
+  buchungen      Kreditbuchung[]
+  tilgungsplaene Tilgungsplan[]
+  dokumente      Dokument[]
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
+}
+
+enum CovenantVergleich {
+  HOECHSTENS // Kennzahl darf den Schwellenwert nicht überschreiten (z. B. LTV)
+  MINDESTENS // Kennzahl darf den Schwellenwert nicht unterschreiten (z. B. DSCR)
+}
+
+model Covenant {
+  id            String             @id @default(cuid())
+  mandantId     String
+  kreditId      String
+  /// Kennzahl, z. B. "LTV", "DSCR", "ICR"
+  kennzahl      String
+  vergleich     CovenantVergleich?
+  schwellenwert Decimal?           @db.Decimal(14, 6)
+  pruefrhythmus String? // z. B. "jährlich zum 31.12."
+  beschreibung  String?
+  erstelltAm    DateTime           @default(now())
+  geaendertAm   DateTime           @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([kreditId])
+}
+
+/// Zuordnung eines Kredits zu Häusern mit Anteil in Prozent (z. B. 60.000000 = 60 %).
+model KreditHaus {
+  id            String  @id @default(cuid())
+  mandantId     String
+  kreditId      String
+  hausId        String
+  anteilProzent Decimal @db.Decimal(9, 6)
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@unique([kreditId, hausId])
+  @@index([mandantId])
+  @@index([hausId])
+}
+
+enum BuchungsArt {
+  ZINS
+  TILGUNG
+  SONDERTILGUNG
+  GEBUEHR
+  AUSZAHLUNG
+  SONSTIGES
+}
+
+model Kreditbuchung {
+  id         String      @id @default(cuid())
+  mandantId  String
+  kreditId   String
+  datum      DateTime    @db.Date
+  art        BuchungsArt
+  /// Betrag immer positiv; die Richtung ergibt sich aus der Art.
+  betrag     Decimal     @db.Decimal(14, 2)
+  /// Kontostand (Restschuld) nach der Buchung
+  saldoNach  Decimal?    @db.Decimal(14, 2)
+  notiz      String?
+  erstelltAm DateTime    @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([kreditId, datum])
+}
+
+/// Tilgungsplan eines Kredits. Jede Änderung (z. B. nach Zinsanpassung) wird als
+/// neue Version gespeichert; alte Versionen bleiben erhalten.
+model Tilgungsplan {
+  id          String   @id @default(cuid())
+  mandantId   String
+  kreditId    String
+  version     Int
+  gueltigAb   DateTime @db.Date
+  bezeichnung String?
+  erstelltAm  DateTime @default(now())
+
+  mandant Mandant             @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit              @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+  zeilen  TilgungsplanZeile[]
+
+  @@unique([kreditId, version])
+  @@index([mandantId])
+}
+
+model TilgungsplanZeile {
+  id             String   @id @default(cuid())
+  mandantId      String
+  tilgungsplanId String
+  faelligAm      DateTime @db.Date
+  zins           Decimal  @db.Decimal(14, 2)
+  tilgung        Decimal  @db.Decimal(14, 2)
+  rate           Decimal  @db.Decimal(14, 2)
+  restschuld     Decimal  @db.Decimal(14, 2)
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  tilgungsplan Tilgungsplan @relation(fields: [tilgungsplanId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([tilgungsplanId, faelligAm])
+}
+
+// ---------------------------------------------------------------------------
+// Investitionen, Dokumente, Änderungsprotokoll
+// ---------------------------------------------------------------------------
+
+model Investition {
+  id           String   @id @default(cuid())
+  mandantId    String
+  hausId       String
+  einheitId    String?
+  datum        DateTime @db.Date
+  betrag       Decimal  @db.Decimal(14, 2)
+  /// z. B. "Dach", "Heizung", "Modernisierung Wohnung"
+  kategorie    String?
+  beschreibung String
+  erstelltAm   DateTime @default(now())
+  geaendertAm  DateTime @updatedAt
+
+  mandant Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus     @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  einheit Einheit? @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
+  @@index([hausId])
+}
+
+/// Dokument mit optionalem Bezug zu genau einem Objekt (Gesellschaft, Haus, ...).
+model Dokument {
+  id                String   @id @default(cuid())
+  mandantId         String
+  titel             String
+  /// z. B. "Kaufvertrag", "Mietvertrag", "Kreditvertrag", "Gutachten"
+  kategorie         String?
+  speicherPfad      String
+  dateiname         String
+  mimeType          String
+  groesseBytes      Int
+  gesellschaftId    String?
+  hausId            String?
+  einheitId         String?
+  mietverhaeltnisId String?
+  kreditId          String?
+  erstelltAm        DateTime @default(now())
+
+  mandant         Mandant          @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft    Gesellschaft?    @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
+  haus            Haus?            @relation(fields: [hausId], references: [id], onDelete: SetNull)
+  einheit         Einheit?         @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+  mietverhaeltnis Mietverhaeltnis? @relation(fields: [mietverhaeltnisId], references: [id], onDelete: SetNull)
+  kredit          Kredit?          @relation(fields: [kreditId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
+}
+
+enum AenderungsAktion {
+  ERSTELLT
+  GEAENDERT
+  GELOESCHT
+}
+
+/// Wird automatisch von `src/lib/db/mandant.ts` geschrieben, nie von Hand.
+model Aenderungsprotokoll {
+  id          String           @id @default(cuid())
+  mandantId   String
+  benutzerId  String?
+  zeitpunkt   DateTime         @default(now())
+  tabelle     String
+  datensatzId String
+  aktion      AenderungsAktion
+  alteWerte   Json?
+  neueWerte   Json?
+
+  mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  benutzer Benutzer? @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId, zeitpunkt])
+  @@index([tabelle, datensatzId])
+}

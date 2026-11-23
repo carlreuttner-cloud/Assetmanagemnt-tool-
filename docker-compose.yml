@@ -1,0 +1,54 @@
+# Lokaler Start: `docker compose up --build`
+# Passwörter und Schlüssel kommen aus der Datei .env (Vorlage: .env.example), nie aus dieser Datei.
+# Nur die Datenbank (für `npm run dev`): `docker compose up -d db`
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: immo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
+      POSTGRES_DB: immo
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-daten:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U immo -d immo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Spielt ausstehende Datenbank-Migrationen ein und beendet sich dann.
+  migrate:
+    build:
+      context: .
+      target: builder
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
+      SEED_PASSWORT: ${SEED_PASSWORT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET in .env setzen}
+      AUTH_TRUST_HOST: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db-daten:
+  uploads:
