@@ -53,6 +53,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
   const k = hausKennzahlen(daten, kredite, referenzwerte, stichtag);
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
   const darfGesellschaften = darf(kontext.rolle, "gesellschaften");
+  const darfMieter = darf(kontext.rolle, "mieter");
   const summeInvestitionen = haus.investitionen.reduce((s, i) => s.plus(dezimal(i.betrag)), dezimal(0));
   const vollvermietung = k.sollMonat.plus(k.erwartetLeerMonat);
   // Wertentwicklung ab Kauf: Kaufpreis als Startpunkt, danach die Verkehrswerte
@@ -175,7 +176,22 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                       <td className={rechts}>{f.zahl(e.flaeche, 1)}</td>
                       <td>{leer ? <Marke ton="warnung">{th.leer}</Marke> : <Marke ton="gut">{th.vermietet}</Marke>}</td>
                       <td>
-                        {leer ? <span className="text-xs text-slate-500">{e.notiz}</span> : aktiv.map((m) => m.mieter.name).join(", ")}
+                        {leer ? (
+                          <span className="text-xs text-slate-500">{e.notiz}</span>
+                        ) : (
+                          aktiv.map((m, i) => (
+                            <span key={m.id}>
+                              {i > 0 && ", "}
+                              {darfMieter ? (
+                                <Link href={`/mieter/vertraege/${m.id}`} className="hover:underline">
+                                  {m.mieter.name}
+                                </Link>
+                              ) : (
+                                m.mieter.name
+                              )}
+                            </span>
+                          ))
+                        )}
                       </td>
                       <td className={rechts}>
                         {leer ? (
@@ -194,7 +210,12 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                         {leer ? "–" : <MieteZelle monat={f.betrag(ist)} jahr={f.jahresmiete(ist)} />}
                       </td>
                       {schreiben && (
-                        <td className="text-right">
+                        <td className="whitespace-nowrap text-right">
+                          {leer && darf(kontext.rolle, "mieter", "schreiben") && (
+                            <Link href={`/mieter/neu?einheit=${e.id}`} className="mr-3 text-xs text-slate-600 hover:underline">
+                              {t.mieter.neuesMietverhaeltnis}
+                            </Link>
+                          )}
                           <Link href={`/haeuser/einheiten/${e.id}`} className="text-xs text-slate-600 hover:underline">
                             {t.allgemein.bearbeiten}
                           </Link>
