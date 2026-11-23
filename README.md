@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser) und Phase 3 (Mieter) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter) und Phase 4 (Import) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -95,6 +95,7 @@ src/
     formular.ts          Formularfelder in Server-Aktionen einlesen, Fehlermeldungen
     mietverhaeltnis.ts   Status, Monate seit Mieterhöhung, Überschneidungsprüfung
     dateispeicher.ts     Fotos im UPLOAD_DIR je Mandant, Typprüfung am Dateiinhalt
+    import/              CSV lesen (Zeichensatz, Trennzeichen, Zahlen, Daten), Bank-CSVs, Mieterlisten-Abgleich
     navigation.ts        Einträge der Seitenleiste
   i18n/                  Oberflächentexte (vorerst nur Deutsch)
 test/                    Tests
@@ -122,6 +123,8 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 - Covenants eines Kredits werden über alle Häuser geprüft, die er belastet, mit allen Krediten dieser Häuser.
 
 **Fotos.** Werden im Verzeichnis `UPLOAD_DIR` (Docker-Volume `uploads`) je Mandant abgelegt und nur über `/api/fotos/<id>` mit Mandanten- und Rechteprüfung ausgeliefert. Erlaubt sind JPEG, PNG und WebP bis 10 MB; der Typ wird am Dateiinhalt geprüft. Backups und S3-Speicher folgen in der Phase „Produktionsreife“.
+
+**Import.** Bank-CSVs und Mieterlisten werden nicht über feste Formate, sondern über bekannte Spaltennamen erkannt (deutsch und englisch, mit oder ohne Einheiten wie „(EUR)“). Neue Spaltennamen in `src/lib/import/kreditbuchungen.ts` bzw. `mieterliste.ts` ergänzen und in `test/import.test.ts` bzw. `test/mieterliste.test.ts` absichern. Jeder Import zeigt erst eine Vorschau; beim Übernehmen rechnet der Server den Plan aus der Datei neu und vertraut nicht der Vorschau im Browser. Dubletten bei Kreditbuchungen: gleicher Kredit, Tag, Art und Betrag. Eine Mieterliste ein zweites Mal hochzuladen ändert nichts. Jeder übernommene Import steht in `Importvorgang`, jede einzelne Änderung im Änderungsprotokoll.
 
 ## Betrieb auf einem Server (später)
 

@@ -67,7 +67,14 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
         titel={kredit.bezeichnung}
         beschreibung={[kredit.bank, kredit.kreditnummer].filter(Boolean).join(" · ")}
         zurueck={{ href: `/gesellschaften/${kredit.gesellschaft.id}`, text: kredit.gesellschaft.name }}
-        aktionen={schreiben && <KnopfLink href={`/gesellschaften/kredite/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>}
+        aktionen={
+          schreiben && (
+            <>
+              {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href="/import?art=kredite">{t.importe.buchungenImportieren}</KnopfLink>}
+              <KnopfLink href={`/gesellschaften/kredite/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+            </>
+          )
+        }
       />
 
       <Kacheln>

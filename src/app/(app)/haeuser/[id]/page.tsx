@@ -84,6 +84,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
           schreiben && (
             <>
               <KnopfLink href={`/haeuser/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+              {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href={`/import?haus=${id}`}>{t.importe.mieterlisteImportieren}</KnopfLink>}
               <KnopfLink href={`/haeuser/${id}/einheiten/neu`} art="primaer">
                 {t.einheiten.neu}
               </KnopfLink>

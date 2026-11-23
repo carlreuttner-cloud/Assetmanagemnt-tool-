@@ -163,6 +163,7 @@ export function Feld({
   breit?: boolean;
   inputMode?: "decimal" | "numeric" | "text";
   accept?: string;
+  multiple?: boolean;
 }) {
   return (
     <label className={`block text-sm ${breit ? "sm:col-span-2" : ""}`}>
