@@ -46,6 +46,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
           schreiben && (
             <>
               <KnopfLink href={`/gesellschaften/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+              <KnopfLink href={`/haeuser/neu?gesellschaft=${id}`}>{t.haeuser.neu}</KnopfLink>
               <KnopfLink href={`/gesellschaften/kredite/neu?gesellschaft=${id}`} art="primaer">
                 {t.kredite.neu}
               </KnopfLink>
@@ -182,6 +183,10 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
   );
 }
 
-function HausLink({ text }: { id: string; text: string }) {
-  return <span className="font-medium">{text}</span>;
+function HausLink({ id, text }: { id: string; text: string }) {
+  return (
+    <Link href={`/haeuser/${id}`} className="font-medium hover:underline">
+      {text}
+    </Link>
+  );
 }

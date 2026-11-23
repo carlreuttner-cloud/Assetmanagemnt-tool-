@@ -119,7 +119,11 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
               <tbody>
                 {kredit.haeuser.map((x) => (
                   <tr key={x.id}>
-                    <td>{x.haus.bezeichnung}</td>
+                    <td>
+                      <Link href={`/haeuser/${x.haus.id}`} className="hover:underline">
+                        {x.haus.bezeichnung}
+                      </Link>
+                    </td>
                     <td className={rechts}>{f.prozent(x.anteilProzent, 2)}</td>
                     <td className={rechts}>{f.betrag(saldo.times(dezimal(x.anteilProzent)).dividedBy(100))}</td>
                   </tr>
