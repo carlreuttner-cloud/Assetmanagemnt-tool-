@@ -59,6 +59,7 @@ model Mandant {
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
+  szenarien               Szenario[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -76,6 +77,7 @@ model Benutzer {
   mitgliedschaften    Mitgliedschaft[]
   aenderungsprotokoll Aenderungsprotokoll[]
   importvorgaenge     Importvorgang[]
+  szenarien           Szenario[]
 }
 
 model Mitgliedschaft {
@@ -144,6 +146,7 @@ model Gesellschaft {
   kredite     Kredit[]
   dokumente   Dokument[]
   zuweisungen GesellschaftZuweisung[]
+  szenarien   Szenario[]
 
   @@index([mandantId])
 }
@@ -599,4 +602,26 @@ model Importvorgang {
   kredit   Kredit?   @relation(fields: [kreditId], references: [id], onDelete: SetNull)
 
   @@index([mandantId, erstelltAm])
+}
+
+/// Gespeichertes Was-wäre-wenn-Szenario. Die Parameter stehen als JSON (Beträge als Text,
+/// Aufbau siehe `ParameterJson` in src/lib/szenario.ts); gerechnet wird immer neu mit den
+/// aktuellen Daten.
+model Szenario {
+  id             String   @id @default(cuid())
+  mandantId      String
+  name           String
+  beschreibung   String?
+  /// Nur diese Gesellschaft; leer = gesamtes Portfolio
+  gesellschaftId String?
+  parameter      Json
+  benutzerId     String?
+  erstelltAm     DateTime @default(now())
+  geaendertAm    DateTime @updatedAt
+
+  mandant      Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft? @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  benutzer     Benutzer?     @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
 }
