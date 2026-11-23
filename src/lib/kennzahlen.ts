@@ -229,3 +229,45 @@ export function covenantKennzahlen(
   return kennzahlenAus(s);
 }
 
+
+export interface ZeitreihenPunkt {
+  datum: IsoDatum;
+  verkehrswert: Decimal;
+  restschuld: Decimal;
+  /** Soll-Nettokaltmiete pro Monat der an diesem Tag laufenden Mietverhältnisse */
+  sollMonat: Decimal;
+}
+
+/**
+ * Verlauf von Verkehrswert, Restschuld und Soll-Miete zu den angegebenen Stichtagen.
+ * Restschuld in der Zukunft folgt dem gültigen Tilgungsplan. Die Miete beruht auf den
+ * heutigen Soll-Mieten der jeweils laufenden Mietverhältnisse (frühere Mieterhöhungen
+ * werden nicht zurückgerechnet).
+ */
+export function zeitreihe(haeuser: HausDaten[], kredite: KreditDaten[], stichtage: IsoDatum[]): ZeitreihenPunkt[] {
+  return stichtage.map((datum) => {
+    let verkehrswert = NULL;
+    let sollMonat = NULL;
+    for (const h of haeuser) {
+      verkehrswert = verkehrswert.plus(verkehrswertAm(h, datum) ?? 0);
+      for (const e of h.einheiten) for (const m of e.mietverhaeltnisse) if (istAktiv(m, datum)) sollMonat = sollMonat.plus(m.sollMiete);
+    }
+    const rest = kredite.reduce((s, k) => s.plus(restschuld(k, datum)), NULL);
+    return { datum, verkehrswert, restschuld: rest, sollMonat };
+  });
+}
+
+/** Restschuld heute nach Jahr des Zinsbindungsendes; variable Kredite unter "variabel". */
+export function zinsbindungsProfil(kredite: KreditDaten[], stichtag: IsoDatum): Array<{ jahr: string; restschuld: Decimal; anzahl: number }> {
+  const gruppen = new Map<string, { restschuld: Decimal; anzahl: number }>();
+  for (const k of kredite) {
+    const rest = restschuld(k, stichtag);
+    if (rest.lessThanOrEqualTo(0)) continue;
+    const jahr = k.zinsArt === "VARIABEL" || !k.zinsbindungBis ? "variabel" : k.zinsbindungBis < stichtag ? stichtag.slice(0, 4) : k.zinsbindungBis.slice(0, 4);
+    const g = gruppen.get(jahr) ?? { restschuld: NULL, anzahl: 0 };
+    gruppen.set(jahr, { restschuld: g.restschuld.plus(rest), anzahl: g.anzahl + 1 });
+  }
+  return [...gruppen.entries()]
+    .map(([jahr, g]) => ({ jahr, ...g }))
+    .sort((a, b) => (a.jahr === "variabel" ? -1 : b.jahr === "variabel" ? 1 : a.jahr.localeCompare(b.jahr)));
+}
