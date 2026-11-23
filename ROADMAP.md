@@ -11,7 +11,7 @@ Next.js, Prisma, PostgreSQL, Tailwind, Docker. Login mit Rollen, Mandantentrennu
 Werden mit Testdaten entwickelt, je Phase ein eigener Branch und Pull Request.
 
 - [x] **Phase 1: Gesellschaften und Kredite.** Liste und Detailseite je Gesellschaft mit Kennzahlen, Kredite mit Restschuld, aktuellem Zinssatz, Kapitaldienst, Zinsbindung, Covenant-Prüfung, Buchungen und versionierten Tilgungsplänen; Referenzzinsen für variable Kredite.
-- [ ] **Phase 2: Häuser.** Häuser mit Einheiten, Verkehrswerten (Verlauf), Fotos, Investitionen und anteiligen Krediten.
+- [x] **Phase 2: Häuser.** Häuser mit Einheiten, Verkehrswerten (Verlauf), Fotos, Investitionen und anteiligen Krediten.
 - [ ] **Phase 3: Mieter.** Mieter und Mietverhältnisse mit Ist- und Soll-Miete, Rückständen, Mieterhöhungen, Leerstand.
 - [ ] **Phase 4: Import.** Mieterlisten (auch für die Hausverwaltung) und Kreditbuchungen der Banken mit Vorschau und Dublettenprüfung.
 - [ ] **Phase 5: Übersicht.** Portfolio-Kennzahlen, Grafiken, Warnungen (Zinsbindung, Covenants, Rückstände, Leerstand).

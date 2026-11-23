@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst) und Phase 1 (Gesellschaften und Kredite) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite) und Phase 2 (Häuser) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -93,6 +93,7 @@ src/
     daten/portfolio.ts   lädt die Rechengrundlage für den sichtbaren Ausschnitt des Mandanten
     format.ts            Anzeigeformate (Beträge, Prozent, Fläche, Datum) je Mandant
     formular.ts          Formularfelder in Server-Aktionen einlesen, Fehlermeldungen
+    dateispeicher.ts     Fotos im UPLOAD_DIR je Mandant, Typprüfung am Dateiinhalt
     navigation.ts        Einträge der Seitenleiste
   i18n/                  Oberflächentexte (vorerst nur Deutsch)
 test/                    Tests
@@ -118,6 +119,8 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 - LTV = Restschuld / Verkehrswert. DSCR (vereinfacht) = Ist-Jahresnettokaltmiete / Kapitaldienst, ohne Bewirtschaftungskosten.
 - Häuser tragen Kredite anteilig (`KreditHaus.anteilProzent`); Gesellschaft und Portfolio zählen ihre Kredite zu 100 %.
 - Covenants eines Kredits werden über alle Häuser geprüft, die er belastet, mit allen Krediten dieser Häuser.
+
+**Fotos.** Werden im Verzeichnis `UPLOAD_DIR` (Docker-Volume `uploads`) je Mandant abgelegt und nur über `/api/fotos/<id>` mit Mandanten- und Rechteprüfung ausgeliefert. Erlaubt sind JPEG, PNG und WebP bis 10 MB; der Typ wird am Dateiinhalt geprüft. Backups und S3-Speicher folgen in der Phase „Produktionsreife“.
 
 ## Betrieb auf einem Server (später)
 

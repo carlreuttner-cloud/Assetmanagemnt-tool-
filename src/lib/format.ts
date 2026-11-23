@@ -25,6 +25,13 @@ export function formatierer({ waehrung = "EUR", sprache = "de-DE" }: { waehrung?
         : new Intl.NumberFormat(sprache, { style: "currency", currency: waehrung, maximumFractionDigits: 0 }).format(
             dezimal(wert).toDecimalPlaces(0).toFixed(0) as unknown as number,
           ),
+    /** Kurzform für Achsen, z. B. "16,9 Mio. €" */
+    betragKurz: (wert: DezimalEingabe | null | undefined) =>
+      wert == null
+        ? leer
+        : new Intl.NumberFormat(sprache, { style: "currency", currency: waehrung, notation: "compact", maximumFractionDigits: 1 }).format(
+            dezimal(wert).toDecimalPlaces(0).toFixed(0) as unknown as number,
+          ),
     /** Monats-Nettokaltmiete und daraus berechnete Jahresmiete */
     jahresmiete: (monat: DezimalEingabe | null | undefined) =>
       monat == null ? leer : formatBetrag(jahresNettokaltmiete(monat), { waehrung, sprache }),
