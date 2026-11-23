@@ -163,6 +163,7 @@ export function Feld({
   breit?: boolean;
   inputMode?: "decimal" | "numeric" | "text";
   accept?: string;
+  multiple?: boolean;
 }) {
   return (
     <label className={`block text-sm ${breit ? "sm:col-span-2" : ""}`}>
@@ -225,4 +226,30 @@ export function Textfeld({ name, label, wert }: { name: string; label: ReactNode
 
 export function Felder({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>;
+}
+
+export function Ankreuzfeld({ name, label, wert }: { name: string; label: ReactNode; wert?: boolean }) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" name={name} defaultChecked={wert} className="h-4 w-4 rounded border-slate-300" />
+      <span className="font-medium text-slate-700">{label}</span>
+    </label>
+  );
+}
+
+/** Umschalter als Links (z. B. Filter), der aktive ist hervorgehoben. */
+export function Reiter({ eintraege }: { eintraege: Array<{ href: string; text: ReactNode; aktiv: boolean }> }) {
+  return (
+    <div className="mb-4 flex flex-wrap gap-2 text-sm">
+      {eintraege.map((e) => (
+        <Link
+          key={e.href}
+          href={e.href}
+          className={`rounded-full px-3 py-1 ring-1 ring-inset ${e.aktiv ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+        >
+          {e.text}
+        </Link>
+      ))}
+    </div>
+  );
 }
