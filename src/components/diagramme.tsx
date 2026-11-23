@@ -11,7 +11,7 @@ export type Reihe = { name: string; farbe?: string; punkte: { x: IsoDatum; y: De
 
 const B = 600;
 const H = 240;
-const RAND = { l: 72, r: 16, o: 12, u: 28 };
+const RAND = { l: 72, r: 28, o: 12, u: 28 };
 
 function px(wert: Decimal, min: Decimal, max: Decimal) {
   const anteil = max.equals(min) ? 0.5 : wert.minus(min).dividedBy(max.minus(min)).toNumber();

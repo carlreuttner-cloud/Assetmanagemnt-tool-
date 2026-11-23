@@ -14,7 +14,7 @@ Werden mit Testdaten entwickelt, je Phase ein eigener Branch und Pull Request.
 - [x] **Phase 2: Häuser.** Häuser mit Einheiten, Verkehrswerten (Verlauf), Fotos, Investitionen und anteiligen Krediten.
 - [x] **Phase 3: Mieter.** Mieter und Mietverhältnisse mit Ist- und Soll-Miete, Rückständen, Mieterhöhungen, Leerstand.
 - [x] **Phase 4: Import.** Mieterlisten (auch für die Hausverwaltung) und Kreditbuchungen der Banken mit Vorschau und Dublettenprüfung.
-- [ ] **Phase 5: Übersicht.** Portfolio-Kennzahlen, Grafiken, Warnungen (Zinsbindung, Covenants, Rückstände, Leerstand).
+- [x] **Phase 5: Übersicht.** Portfolio-Kennzahlen, Grafiken, Warnungen (Zinsbindung, Covenants, Rückstände, Leerstand).
 - [ ] **Phase 6: Szenarien.** Was-wäre-wenn-Rechnungen (Zinsen, Mieten, Leerstand, Verkauf) mit Vorschau über mehrere Jahre.
 - [ ] Berichte, KI-Assistent (danach)
 

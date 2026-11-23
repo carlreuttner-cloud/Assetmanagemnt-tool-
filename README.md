@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter) und Phase 4 (Import) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import) und Phase 5 (Übersicht) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -93,6 +93,7 @@ src/
     daten/portfolio.ts   lädt die Rechengrundlage für den sichtbaren Ausschnitt des Mandanten
     format.ts            Anzeigeformate (Beträge, Prozent, Fläche, Datum) je Mandant
     formular.ts          Formularfelder in Server-Aktionen einlesen, Fehlermeldungen
+    warnungen.ts         Warnungen der Übersicht (Zinsbindung, Covenants, Rückstände, Leerstand) mit Schwellen
     mietverhaeltnis.ts   Status, Monate seit Mieterhöhung, Überschneidungsprüfung
     dateispeicher.ts     Fotos im UPLOAD_DIR je Mandant, Typprüfung am Dateiinhalt
     import/              CSV lesen (Zeichensatz, Trennzeichen, Zahlen, Daten), Bank-CSVs, Mieterlisten-Abgleich
