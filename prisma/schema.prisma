@@ -58,6 +58,7 @@ model Mandant {
   investitionen           Investition[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
+  importvorgaenge         Importvorgang[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -74,6 +75,7 @@ model Benutzer {
 
   mitgliedschaften    Mitgliedschaft[]
   aenderungsprotokoll Aenderungsprotokoll[]
+  importvorgaenge     Importvorgang[]
 }
 
 model Mitgliedschaft {
@@ -170,6 +172,7 @@ model Haus {
   investitionen Investition[]
   dokumente     Dokument[]
   zuweisungen   HausZuweisung[]
+  importe       Importvorgang[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -359,6 +362,7 @@ model Kredit {
   buchungen      Kreditbuchung[]
   tilgungsplaene Tilgungsplan[]
   dokumente      Dokument[]
+  importe        Importvorgang[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -566,4 +570,33 @@ model Aenderungsprotokoll {
 
   @@index([mandantId, zeitpunkt])
   @@index([tabelle, datensatzId])
+}
+
+enum ImportArt {
+  KREDITBUCHUNGEN
+  MIETERLISTE
+}
+
+/// Protokoll jedes übernommenen Imports: wer, wann, welche Datei und was sich geändert hat.
+/// Die einzelnen Änderungen stehen zusätzlich im Änderungsprotokoll.
+model Importvorgang {
+  id         String    @id @default(cuid())
+  mandantId  String
+  art        ImportArt
+  dateiname  String
+  benutzerId String?
+  hausId     String?
+  kreditId   String?
+  /// Stand der Mieterliste
+  stand      DateTime? @db.Date
+  /// Anzahl je Ergebnis, z. B. {"neu": 3, "unveraendert": 40}
+  ergebnis   Json
+  erstelltAm DateTime  @default(now())
+
+  mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  benutzer Benutzer? @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
+  haus     Haus?     @relation(fields: [hausId], references: [id], onDelete: SetNull)
+  kredit   Kredit?   @relation(fields: [kreditId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId, erstelltAm])
 }
