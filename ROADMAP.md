@@ -16,7 +16,19 @@ Werden mit Testdaten entwickelt, je Phase ein eigener Branch und Pull Request.
 - [x] **Phase 4: Import.** Mieterlisten (auch für die Hausverwaltung) und Kreditbuchungen der Banken mit Vorschau und Dublettenprüfung.
 - [x] **Phase 5: Übersicht.** Portfolio-Kennzahlen, Grafiken, Warnungen (Zinsbindung, Covenants, Rückstände, Leerstand).
 - [x] **Phase 6: Szenarien.** Was-wäre-wenn-Rechnungen (Zinsen, Mieten, Leerstand, Verkauf) mit Vorschau über mehrere Jahre.
-- [ ] Berichte, KI-Assistent (danach)
+
+## Erweiterungen (ab 24.11.)
+
+Fachliche Regeln für alle Phasen stehen in `CLAUDE.md` (Quelle, Stichtag und Berechnung je Zahl; unbekannt statt 0; Restschuld nur aus belegten Salden; Abkürzungen erklären).
+
+- [ ] **Phase 7: Nachvollziehbarkeit und belegte Salden.** Herleitung (Quelle, Stichtag, Berechnung) für die wesentlichen Kennzahlen in allen Ansichten nachrüsten; fehlende Werte als „unbekannt“ statt 0; Glossar für Abkürzungen. Belegte Kreditsalden je Kredit und Jahr (Quelle, Stichtag, Status Entwurf/belegt, unklare Stichtage getrennt), Jahrestabelle und Diagramm je Kredit; Guthaben getrennt von Darlehen.
+- [ ] **Phase 8: Covenant-Headroom und Ausschüttungssperren.** Puffer je Covenant bis zur Grenze (absolut und in %, z. B. wie viel Miete fehlen dürfte), Ausschüttungssperren mit Bedingungen und aktuellem Status.
+- [ ] **Phase 9: Gutachtenhistorie je Haus.** Gutachten mit Wert, Stichtag, Gutachter, Bewertungsfaktoren (Rohertrag, Vervielfältiger, Liegenschaftszins, Bewirtschaftungskosten …), Objektdetails und SWOT des Gutachters; Vergleich der Gutachten über die Zeit.
+- [ ] **Phase 10: Finanzen der Gesellschaften.** Bilanz, GuV, Cashflow und EBITDA je Geschäftsjahr mit Historie und Quelle (Jahresabschluss, BWA, Entwurf).
+- [ ] **Phase 11: Dokumenten-Checkliste.** Pflichtdokumente je Gesellschaft und Haus (z. B. Grundbuchauszug, Gutachten, Darlehensvertrag, Jahresabschluss) mit Status vorhanden/fehlt/veraltet. Ablage der Dateien selbst erst mit dem Dateispeicher der Produktionsreife.
+- [ ] **Phase 12: Verkaufsszenarien mit Waterfall.** Verteilung eines Verkaufserlöses (Kosten, Kreditablösung, Vorfälligkeit, Rückzahlung Einlagen, Vorzugsrendite, Gewinnverteilung); unbekannte Einzahlungen und Vertragsregeln als Lücke statt Schätzung.
+- [ ] **Phase 13: KI-Analyse.** Manuell gestartete Analyse nur aus gespeicherten Daten, mit Quellenbezug je Aussage und klarer Kennzeichnung von Annahmen und Datenlücken.
+- [ ] Berichte (danach)
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
 
