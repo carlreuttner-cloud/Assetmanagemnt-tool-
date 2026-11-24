@@ -10,6 +10,7 @@
  */
 import { aufCent, dezimal, type Decimal } from "../../src/lib/geld";
 import { zufall, type Zufall } from "./hilfen";
+import { baueGutachten, type TestGutachten } from "./gutachten";
 import { baueKredite, STICHTAG, type TestKredit } from "./kredite";
 
 export { STICHTAG, BUCHUNGEN_AB, BANKEN } from "./kredite";
@@ -142,6 +143,8 @@ export interface TestHaus {
   kaufpreis: Decimal;
   kaufdatum: string;
   verkehrswerte: { wert: Decimal; stichtag: string; quelle: string }[];
+  /** Gutachten zu den Verkehrswerten mit Quelle "Gutachten" (gleicher Stichtag) */
+  gutachten: TestGutachten[];
   einheiten: TestEinheit[];
   investitionen: { datum: string; betrag: Decimal; kategorie: string; beschreibung: string; einheit: string | null }[];
 }
@@ -299,6 +302,11 @@ function baueHaus(v: HausVorgabe): TestHaus {
     }
   }
   verkehrswerte.push({ wert: verkehrswert, stichtag: "2025-12-31", quelle: "Gutachten" });
+  const gutachten = baueGutachten(
+    v.schluessel,
+    verkehrswerte.filter((w) => w.quelle === "Gutachten"),
+    { wohnflaeche: wohnFlaeche.toDecimalPlaces(1), gewerbeflaeche: gewerbeSumme, einheiten: einheiten.length, ort: v.ort },
+  );
 
   const investitionen = z.mische(INVESTITIONEN).slice(0, z.ganz(1, 3)).map((inv) => {
     const einheit = inv.kategorie === "Modernisierung Wohnung" ? z.waehle(wohnungen).bezeichnung : null;
@@ -321,6 +329,7 @@ function baueHaus(v: HausVorgabe): TestHaus {
     kaufpreis,
     kaufdatum: v.kaufdatum,
     verkehrswerte,
+    gutachten,
     einheiten: einheiten.map((e) => ({
       bezeichnung: e.bezeichnung, art: e.art, flaeche: e.flaeche, lage: e.lage, erwarteteMiete: e.erwarteteMiete, notiz: e.notiz, mietverhaeltnisse: e.mietverhaeltnisse,
     })),
