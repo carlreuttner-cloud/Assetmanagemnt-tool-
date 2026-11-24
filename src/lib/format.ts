@@ -29,7 +29,7 @@ export function formatierer({ waehrung = "EUR", sprache = "de-DE" }: { waehrung?
     betragKurz: (wert: DezimalEingabe | null | undefined) =>
       wert == null
         ? leer
-        : new Intl.NumberFormat(sprache, { style: "currency", currency: waehrung, notation: "compact", maximumFractionDigits: 1 }).format(
+        : new Intl.NumberFormat(sprache, { style: "currency", currency: waehrung, notation: "compact", maximumSignificantDigits: 3 }).format(
             dezimal(wert).toDecimalPlaces(0).toFixed(0) as unknown as number,
           ),
     /** Monats-Nettokaltmiete und daraus berechnete Jahresmiete */

@@ -8,6 +8,7 @@ import { hash } from "@node-rs/argon2";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { BANKEN, erzeugePortfolio, type TestPortfolio } from "./testdaten/portfolio";
+import { baueFinanzen } from "./testdaten/finanzen";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 
 if (process.env.NODE_ENV === "production") {
@@ -181,6 +182,14 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       mandantId, kreditId: kredit.get(k.schluessel)!, stichtag: x.stichtag ? tag(x.stichtag) : null,
       stichtagHinweis: x.stichtagHinweis, art: x.art, betrag: geld(x.betrag), quelle: x.quelle, quelleText: x.quelleText, status: x.status,
     }))),
+  });
+
+  await db.geschaeftsjahr.createMany({
+    data: baueFinanzen(p.gesellschaften, p.haeuser, p.kredite).map((j) => ({
+      mandantId, gesellschaftId: gesellschaft.get(j.gesellschaft)!, jahr: j.jahr, beginn: tag(`${j.jahr}-01-01`), ende: tag(`${j.jahr}-12-31`),
+      quelle: j.quelle, quelleText: j.quelleText, status: j.status,
+      ...Object.fromEntries(Object.entries(j.werte).map(([k, w]) => [k, w === null ? null : geld(w)])),
+    })),
   });
 
   // Referenzzinsen (Näherungswerte aus dem Generator), monatlich ab 01/2024.
