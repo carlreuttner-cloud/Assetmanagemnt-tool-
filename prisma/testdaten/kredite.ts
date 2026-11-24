@@ -51,7 +51,14 @@ interface KreditVorgabe {
   variabel?: { referenz: Referenzzins; marge: string; laufzeitJahre: number };
   nachverhandlung?: { ab: string; sollzins: string; tilgung: string; bindungJahre: number };
   sondertilgung?: { datum: string; prozentVomSaldo: number };
-  covenants?: { kennzahl: string; vergleich: "HOECHSTENS" | "MINDESTENS"; schwellenwert: string; pruefrhythmus: string }[];
+  covenants?: {
+    kennzahl: string;
+    vergleich: "HOECHSTENS" | "MINDESTENS" | null;
+    schwellenwert: string | null;
+    pruefrhythmus: string;
+    folge?: "COVENANT" | "AUSSCHUETTUNGSSPERRE";
+    beschreibung?: string;
+  }[];
 }
 
 /**
@@ -70,7 +77,7 @@ export const KREDIT_VORGABEN: KreditVorgabe[] = [
     auszahlung: "2021-06-01", zahlweise: "MONATLICH", tilgung: "3.00", variabel: { referenz: "3M-EURIBOR", marge: "1.65", laufzeitJahre: 10 } },
   { schluessel: "K03", gesellschaft: "G1", haeuser: ["H02"], anteil: 100, bank: "BH", bezeichnung: "Annuitätendarlehen Ankauf",
     auszahlung: "2019-07-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "1.12", bindungJahre: 15 },
-    covenants: [{ kennzahl: "LTV", vergleich: "HOECHSTENS", schwellenwert: "70", pruefrhythmus: "jährlich zum 31.12." }] },
+    covenants: [{ kennzahl: "LTV", vergleich: "HOECHSTENS", schwellenwert: "70", pruefrhythmus: "jährlich zum 31.12." }, { kennzahl: "DSCR", vergleich: "MINDESTENS", schwellenwert: "1.30", pruefrhythmus: "jährlich zum 31.12.", folge: "AUSSCHUETTUNGSSPERRE", beschreibung: "Lock-up: Ausschüttungen nur bei DSCR ab 1,30" }] },
   { schluessel: "K04", gesellschaft: "G1", haeuser: ["H02", "H03"], bank: "TN", bezeichnung: "Gesamtgrundschuld-Darlehen Spreeufer/Kastanienhof",
     auszahlung: "2019-07-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "1.35", bindungJahre: 10 } },
   { schluessel: "K05", gesellschaft: "G1", haeuser: ["H03"], anteil: 100, bank: "LB", bezeichnung: "Annuitätendarlehen Ankauf",
@@ -78,7 +85,7 @@ export const KREDIT_VORGABEN: KreditVorgabe[] = [
     nachverhandlung: { ab: "2025-07-01", sollzins: "3.45", tilgung: "3.00", bindungJahre: 5 } },
   { schluessel: "K06", gesellschaft: "G2", haeuser: ["H04"], anteil: 100, bank: "BH", bezeichnung: "Variables Darlehen 6M",
     auszahlung: "2018-05-02", zahlweise: "QUARTALSWEISE", tilgung: "2.00", variabel: { referenz: "6M-EURIBOR", marge: "1.40", laufzeitJahre: 10 },
-    covenants: [{ kennzahl: "DSCR", vergleich: "MINDESTENS", schwellenwert: "1.20", pruefrhythmus: "jährlich zum 31.12." }] },
+    covenants: [{ kennzahl: "DSCR", vergleich: "MINDESTENS", schwellenwert: "1.20", pruefrhythmus: "jährlich zum 31.12." }, { kennzahl: "DSCR", vergleich: "MINDESTENS", schwellenwert: "1.25", pruefrhythmus: "jährlich zum 31.12.", folge: "AUSSCHUETTUNGSSPERRE", beschreibung: "Lock-up: Ausschüttungen nur bei DSCR ab 1,25" }] },
   { schluessel: "K07", gesellschaft: "G2", haeuser: ["H05"], anteil: 60, bank: "VB", bezeichnung: "Annuitätendarlehen Ankauf",
     auszahlung: "2021-02-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "1.15", bindungJahre: 10 } },
   { schluessel: "K08", gesellschaft: "G2", haeuser: ["H05"], anteil: 40, bank: "TN", bezeichnung: "Nachfinanzierung Dachausbau",
@@ -91,7 +98,7 @@ export const KREDIT_VORGABEN: KreditVorgabe[] = [
     auszahlung: "2024-04-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "3.70", bindungJahre: 10 } },
   { schluessel: "K12", gesellschaft: "G3", haeuser: ["H07"], anteil: 65, bank: "BH", bezeichnung: "Annuitätendarlehen Ankauf",
     auszahlung: "2020-04-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "0.95", bindungJahre: 10 },
-    covenants: [{ kennzahl: "LTV", vergleich: "HOECHSTENS", schwellenwert: "65", pruefrhythmus: "halbjährlich" }] },
+    covenants: [{ kennzahl: "LTV", vergleich: "HOECHSTENS", schwellenwert: "65", pruefrhythmus: "halbjährlich" }, { kennzahl: "LTV", vergleich: "HOECHSTENS", schwellenwert: "60", pruefrhythmus: "halbjährlich", folge: "AUSSCHUETTUNGSSPERRE", beschreibung: "Keine Ausschüttung, solange der LTV über 60 % liegt" }] },
   { schluessel: "K13", gesellschaft: "G3", haeuser: ["H07"], anteil: 35, bank: "VB", bezeichnung: "Variables Darlehen 6M",
     auszahlung: "2022-10-01", zahlweise: "MONATLICH", tilgung: "2.00", variabel: { referenz: "6M-EURIBOR", marge: "1.85", laufzeitJahre: 10 } },
   { schluessel: "K14", gesellschaft: "G3", haeuser: ["H08"], anteil: 100, bank: "LB", bezeichnung: "Annuitätendarlehen Ankauf",
@@ -113,7 +120,8 @@ export const KREDIT_VORGABEN: KreditVorgabe[] = [
   { schluessel: "K21", gesellschaft: "G4", haeuser: ["H12"], anteil: 30, bank: "TN", bezeichnung: "Variables Darlehen 6M",
     auszahlung: "2023-03-01", zahlweise: "MONATLICH", tilgung: "2.00", variabel: { referenz: "6M-EURIBOR", marge: "1.60", laufzeitJahre: 7 } },
   { schluessel: "K22", gesellschaft: "G5", haeuser: ["H13"], anteil: 100, bank: "BH", bezeichnung: "Annuitätendarlehen Ankauf",
-    auszahlung: "2018-10-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "1.70", bindungJahre: 10 } },
+    auszahlung: "2018-10-01", zahlweise: "MONATLICH", tilgung: "2.00", fest: { sollzins: "1.70", bindungJahre: 10 },
+    covenants: [{ kennzahl: "Jahresabschluss", vergleich: null, schwellenwert: null, pruefrhythmus: "jährlich", folge: "AUSSCHUETTUNGSSPERRE", beschreibung: "Ausschüttung erst nach Vorlage des geprüften Jahresabschlusses bei der Bank" }] },
   { schluessel: "K23", gesellschaft: "G5", haeuser: ["H14"], anteil: 45, bank: "LB", bezeichnung: "Variables Darlehen 6M",
     auszahlung: "2016-02-01", zahlweise: "MONATLICH", tilgung: "2.00", variabel: { referenz: "6M-EURIBOR", marge: "1.50", laufzeitJahre: 12 } },
   { schluessel: "K24", gesellschaft: "G5", haeuser: ["H14"], anteil: 55, bank: "TN", bezeichnung: "Annuitätendarlehen Refinanzierung",

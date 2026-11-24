@@ -9,7 +9,13 @@ import { alsDaten } from "./hilfen/testportfolio";
 const p = erzeugePortfolio();
 const { haeuser, kredite } = alsDaten(p);
 const covenants: CovenantDaten[] = p.kredite.flatMap((k) =>
-  (k.covenants ?? []).map((c) => ({ kreditId: k.schluessel, kennzahl: c.kennzahl, vergleich: c.vergleich, schwellenwert: dezimal(c.schwellenwert) })),
+  (k.covenants ?? []).map((c) => ({
+    kreditId: k.schluessel,
+    kennzahl: c.kennzahl,
+    vergleich: c.vergleich,
+    schwellenwert: c.schwellenwert ? dezimal(c.schwellenwert) : null,
+    folge: c.folge,
+  })),
 );
 const warnungen = ermittleWarnungen(haeuser, kredite, covenants, [], STICHTAG);
 

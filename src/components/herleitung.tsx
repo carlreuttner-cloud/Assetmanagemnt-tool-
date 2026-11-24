@@ -31,15 +31,16 @@ export function MitHerleitung({ wert, herleitung, t, ausrichtung = "links" }: { 
   for (const l of herleitung.fehlt ?? []) zeilen.push([th.fehlt, <span key="fehlt" className="text-amber-700">{l}</span>]);
   if (herleitung.hinweis) zeilen.push([th.hinweis, herleitung.hinweis]);
   return (
-    <details className="group relative inline-block">
-      <summary className="inline-flex cursor-pointer list-none items-baseline gap-1 [&::-webkit-details-marker]:hidden" title={th.oeffnen}>
+    <details className={`group relative ${ausrichtung === "rechts" ? "inline-flex flex-col items-end" : "inline-block"}`}>
+      <summary className="inline-flex cursor-pointer list-none items-baseline gap-1 whitespace-nowrap [&::-webkit-details-marker]:hidden" title={th.oeffnen}>
         <span>{wert}</span>
         <span aria-hidden className="text-xs font-normal text-slate-400 group-open:text-teal-700">ⓘ</span>
         <span className="sr-only">{th.oeffnen}</span>
       </summary>
+      {/* In Tabellen (rechts ausgerichtet) im Fluss, damit Tabellen mit Scrollbereich nichts abschneiden. */}
       <div
-        className={`absolute z-20 mt-1 w-80 max-w-[85vw] rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal normal-case tracking-normal text-slate-700 shadow-lg ${
-          ausrichtung === "rechts" ? "right-0" : "left-0"
+        className={`z-20 mt-1 w-72 max-w-[85vw] rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal normal-case tracking-normal whitespace-normal text-slate-700 shadow-lg ${
+          ausrichtung === "rechts" ? "relative ml-auto" : "absolute left-0"
         }`}
       >
         <dl className="space-y-1.5">

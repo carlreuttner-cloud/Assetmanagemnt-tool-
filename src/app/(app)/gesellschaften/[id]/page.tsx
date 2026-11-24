@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CovenantMarke, ZinsbindungMarke } from "@/components/kredit-marken";
+import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/components/kredit-marken";
+import { covenantPuffer, sperrenStatus } from "@/lib/covenant";
 import { Begriff, Glossar, Kennzahl, KapitaldienstWert, RestschuldWert, ZinssatzWert } from "@/components/herleitung";
 import { KennzahlKacheln } from "@/components/kennzahl-kacheln";
 import { Angaben, Karte, KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
@@ -9,7 +10,7 @@ import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { heute } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
-import { dezimal } from "@/lib/geld";
+import { dezimal, type Decimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { covenantKennzahlen, gruppenKennzahlen, hausKennzahlen } from "@/lib/kennzahlen";
 import { kapitaldienstJahr, pruefeCovenant, restschuldNachweis, zinsbindung } from "@/lib/kredit";
@@ -36,6 +37,19 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
   const eigeneKredite = kredite.filter((k) => k.gesellschaftId === id);
   const k = gruppenKennzahlen(eigeneHaeuser, eigeneKredite, referenzwerte, stichtag);
   const schreiben = darf(kontext.rolle, "gesellschaften", "schreiben");
+  const sperren = g.kredite.flatMap((kredit) => {
+    const daten = eigeneKredite.find((x) => x.id === kredit.id);
+    if (!daten) return [];
+    const werte = covenantKennzahlen(daten, haeuser, kredite, referenzwerte, stichtag);
+    return kredit.covenants
+      .filter((c) => c.folge === "AUSSCHUETTUNGSSPERRE")
+      .map((c) => ({
+        c,
+        kredit,
+        werte,
+        puffer: covenantPuffer({ kennzahl: c.kennzahl, vergleich: c.vergleich, schwellenwert: c.schwellenwert ? dezimal(c.schwellenwert) : null }, werte),
+      }));
+  });
   const tk = t.kennzahlen;
 
   return (
@@ -81,7 +95,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                 const daten = eigeneKredite.find((x) => x.id === zeile.id)!;
                 const kd = kapitaldienstJahr(daten, referenzwerte, stichtag);
                 const werte = covenantKennzahlen(daten, haeuser, kredite, referenzwerte, stichtag);
-                const pruefungen = zeile.covenants.map((c) =>
+                const pruefungen = zeile.covenants.filter((c) => c.folge === "COVENANT").map((c) =>
                   pruefeCovenant(
                     { kennzahl: c.kennzahl, vergleich: c.vergleich, schwellenwert: c.schwellenwert ? dezimal(c.schwellenwert) : null },
                     { LTV: werte.ltv, DSCR: werte.dscr, ICR: werte.icr },
@@ -114,6 +128,54 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                       <ZinsbindungMarke zb={zinsbindung(daten, stichtag)} t={t} f={f} />
                     </td>
                     <td>{pruefungen.length > 0 && <CovenantMarke eingehalten={verletzt ? false : pruefungen.every((p) => p.eingehalten) ? true : null} t={t} />}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Tabelle>
+        )}
+      </Karte>
+
+      <Karte titel={<Begriff k="Ausschuettungssperre" t={t}>{t.kredite.ausschuettungssperren}</Begriff>}>
+        <p className="mb-3 text-xs text-slate-500">{t.kredite.sperrenHinweis}</p>
+        {sperren.length === 0 ? (
+          <Leer>{t.kredite.keineSperren}</Leer>
+        ) : (
+          <Tabelle>
+            <thead>
+              <tr>
+                <th>{t.kredite.titel}</th>
+                <th>{t.kredite.vergleich}</th>
+                <th className={rechts}>{t.kredite.aktuellerWert}</th>
+                <th className={rechts}>
+                  <Begriff k="Headroom" t={t}>{t.kredite.puffer}</Begriff>
+                </th>
+                <th>{t.kredite.status}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sperren.map(({ c, kredit, puffer, werte }) => {
+                const ltv = c.kennzahl.toUpperCase() === "LTV";
+                const zeige = (w: Decimal | null) => (ltv ? f.prozent(w, 1) : f.faktor(w));
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <Link href={`/gesellschaften/kredite/${kredit.id}`} className="font-medium hover:underline">
+                        {kredit.bezeichnung}
+                      </Link>
+                      {c.beschreibung && <div className="text-xs text-slate-500">{c.beschreibung}</div>}
+                    </td>
+                    <td>
+                      {c.kennzahl}
+                      {c.vergleich && c.schwellenwert && ` ${t.vergleiche[c.vergleich]} ${zeige(dezimal(c.schwellenwert))}`}
+                    </td>
+                    <td className={rechts}>{puffer ? zeige(puffer.wert) : "–"}</td>
+                    <td className={rechts}>
+                      {c.vergleich && c.schwellenwert ? <PufferWert puffer={puffer} kennzahl={c.kennzahl} kz={werte} stichtag={stichtag} t={t} f={f} /> : "–"}
+                    </td>
+                    <td>
+                      <SperrenMarke status={sperrenStatus(puffer)} t={t} />
+                    </td>
                   </tr>
                 );
               })}
@@ -173,7 +235,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         )}
       </Karte>
 
-      <Glossar begriffe={["LTV", "DSCR", "JNKM", "Kapitaldienst", "Restschuld", "Covenant", "Zinsbindung", "BAR", "Kaufpreisfaktor", "Leerstand"]} t={t} />
+      <Glossar begriffe={["LTV", "DSCR", "JNKM", "Kapitaldienst", "Restschuld", "Covenant", "Ausschuettungssperre", "Headroom", "Zinsbindung", "BAR", "Kaufpreisfaktor", "Leerstand"]} t={t} />
 
       <Karte titel={t.gesellschaften.stammdaten}>
         <Angaben
