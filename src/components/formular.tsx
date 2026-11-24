@@ -19,6 +19,7 @@ export function Formular({
   zuruecksetzen = false,
   className = "space-y-4",
   inline = false,
+  laeuftText,
 }: {
   aktion: Aktion;
   absenden: string;
@@ -30,6 +31,8 @@ export function Formular({
   zuruecksetzen?: boolean;
   className?: string;
   inline?: boolean;
+  /** Hinweis, solange die Aktion läuft (bei langen Aktionen) */
+  laeuftText?: string;
 }) {
   const [ergebnis, ausfuehren, laeuft] = useActionState<AktionsErgebnis, FormData>(aktion, {});
   const formular = useRef<HTMLFormElement>(null);
@@ -58,6 +61,7 @@ export function Formular({
         >
           {absenden}
         </button>
+        {laeuft && laeuftText && <span role="status" className="text-sm text-slate-600">{laeuftText}</span>}
         {ergebnis.fehler && <span role="alert" className="text-sm text-red-700">{ergebnis.fehler}</span>}
         {ergebnis.ok && !inline && <span className="text-sm text-emerald-700">{ergebnis.ok}</span>}
       </div>
