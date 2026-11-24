@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CovenantMarke, ZinsbindungMarke } from "@/components/kredit-marken";
-import { Angaben, Kachel, Kacheln, Karte, KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
+import { Begriff, Glossar, Kennzahl, KapitaldienstWert, RestschuldWert, ZinssatzWert } from "@/components/herleitung";
+import { KennzahlKacheln } from "@/components/kennzahl-kacheln";
+import { Angaben, Karte, KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -10,7 +12,7 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { covenantKennzahlen, gruppenKennzahlen, hausKennzahlen } from "@/lib/kennzahlen";
-import { kapitaldienstJahr, pruefeCovenant, restschuld, zinsbindung, zinssatz } from "@/lib/kredit";
+import { kapitaldienstJahr, pruefeCovenant, restschuldNachweis, zinsbindung } from "@/lib/kredit";
 
 export default async function GesellschaftSeite({ params }: PageProps<"/gesellschaften/[id]">) {
   const { id } = await params;
@@ -55,16 +57,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         }
       />
 
-      <Kacheln>
-        <Kachel titel={tk.verkehrswert} wert={f.betragGanz(k.verkehrswert)} unter={`${k.haeuser} ${tk.haeuser}, ${k.einheiten} ${tk.einheiten}`} />
-        <Kachel titel={tk.restschuld} wert={f.betragGanz(k.restschuld)} unter={`${tk.ltv} ${f.prozent(k.ltv, 1)}`} />
-        <Kachel titel={tk.sollMieteMonat} wert={f.betrag(k.sollMonat)} unter={`${tk.sollMieteJahr}: ${f.betrag(k.sollJahr)}`} />
-        <Kachel titel={tk.istMieteMonat} wert={f.betrag(k.istMonat)} unter={`${tk.istMieteJahr}: ${f.betrag(k.istJahr)}`} />
-        <Kachel titel={tk.leerstandFlaeche} wert={f.prozent(k.leerstandQuote, 1)} unter={`${tk.erwartetLeer}: ${f.betrag(k.erwartetLeerMonat)} / ${f.betrag(k.erwartetLeerJahr)}`} />
-        <Kachel titel={tk.kapitaldienstJahr} wert={f.betragGanz(k.kapitaldienstJahr)} unter={`${tk.zinsenJahr}: ${f.betragGanz(k.zinsenJahr)}`} />
-        <Kachel titel={tk.dscrLang} wert={f.faktor(k.dscr)} unter={tk.hinweisDscr} />
-        <Kachel titel={tk.bruttoanfangsrendite} wert={f.prozent(k.bruttoanfangsrendite)} unter={`${tk.kaufpreisfaktor}: ${f.faktor(k.kaufpreisfaktor, 1)}`} />
-      </Kacheln>
+      <KennzahlKacheln k={k} t={t} f={f} stichtag={stichtag} />
 
       <Karte titel={t.gesellschaften.kredite}>
         {g.kredite.length === 0 ? (
@@ -108,11 +101,14 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                       {t.zinsArten[zeile.zinsArt]}
                       {zeile.referenzzins && <div className="text-xs text-slate-500">{zeile.referenzzins}</div>}
                     </td>
-                    <td className={rechts}>{f.prozent(zinssatz(daten, referenzwerte, stichtag), 3)}</td>
-                    <td className={rechts}>{f.betrag(restschuld(daten, stichtag))}</td>
                     <td className={rechts}>
-                      {f.betrag(kd.summe)}
-                      {kd.quelle === "schaetzung" && <div className="text-xs text-slate-500">{t.kredite.schaetzung}</div>}
+                      <ZinssatzWert k={daten} referenzwerte={referenzwerte} stichtag={stichtag} t={t} f={f} />
+                    </td>
+                    <td className={rechts}>
+                      <RestschuldWert nachweis={restschuldNachweis(daten, stichtag)} t={t} f={f} />
+                    </td>
+                    <td className={rechts}>
+                      <KapitaldienstWert kd={kd} t={t} f={f} />
                     </td>
                     <td>
                       <ZinsbindungMarke zb={zinsbindung(daten, stichtag)} t={t} f={f} />
@@ -136,7 +132,9 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                 <th>{t.allgemein.bezeichnung}</th>
                 <th className={rechts}>{tk.verkehrswert}</th>
                 <th className={rechts}>{tk.restschuld}</th>
-                <th className={rechts}>{tk.ltv}</th>
+                <th className={rechts}>
+                  <Begriff k="LTV" t={t} />
+                </th>
                 <th className={rechts}>
                   {tk.sollMiete} ({t.allgemein.monat} / {t.allgemein.jahr})
                 </th>
@@ -154,9 +152,15 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                       <HausLink id={h.id} text={h.bezeichnung} />
                       <div className="text-xs text-slate-500">{[h.plz, h.ort].filter(Boolean).join(" ")}</div>
                     </td>
-                    <td className={rechts}>{f.betragGanz(hk.verkehrswert)}</td>
-                    <td className={rechts}>{f.betragGanz(hk.restschuld)}</td>
-                    <td className={rechts}>{f.prozent(hk.ltv, 1)}</td>
+                    <td className={rechts}>
+                      <Kennzahl art="verkehrswert" k={hk} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                    </td>
+                    <td className={rechts}>
+                      <Kennzahl art="restschuld" k={hk} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                    </td>
+                    <td className={rechts}>
+                      <Kennzahl art="ltv" k={hk} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                    </td>
                     <td className={rechts}>
                       <MieteZelle monat={f.betrag(hk.sollMonat)} jahr={f.betrag(hk.sollJahr)} />
                     </td>
@@ -168,6 +172,8 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
           </Tabelle>
         )}
       </Karte>
+
+      <Glossar begriffe={["LTV", "DSCR", "JNKM", "Kapitaldienst", "Restschuld", "Covenant", "Zinsbindung", "BAR", "Kaufpreisfaktor", "Leerstand"]} t={t} />
 
       <Karte titel={t.gesellschaften.stammdaten}>
         <Angaben

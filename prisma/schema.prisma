@@ -52,6 +52,7 @@ model Mandant {
   covenants               Covenant[]
   kreditHaeuser           KreditHaus[]
   kreditbuchungen         Kreditbuchung[]
+  kreditsalden            Kreditsaldo[]
   tilgungsplaene          Tilgungsplan[]
   tilgungsplanZeilen      TilgungsplanZeile[]
   referenzzinssaetze      Referenzzinssatz[]
@@ -363,6 +364,7 @@ model Kredit {
   haeuser        KreditHaus[]
   covenants      Covenant[]
   buchungen      Kreditbuchung[]
+  salden         Kreditsaldo[]
   tilgungsplaene Tilgungsplan[]
   dokumente      Dokument[]
   importe        Importvorgang[]
@@ -459,6 +461,51 @@ model Kreditbuchung {
 
   @@index([mandantId])
   @@index([kreditId, datum])
+}
+
+enum SaldoArt {
+  DARLEHEN // Restschuld des Darlehens
+  GUTHABEN // Guthaben, z. B. Tilgungsersatz- oder Zinsreservekonto; nie mit der Restschuld verrechnet
+}
+
+enum SaldoQuelle {
+  KONTOAUSZUG
+  BANKBESTAETIGUNG
+  JAHRESABSCHLUSS
+  SONSTIGE
+}
+
+enum SaldoStatus {
+  BELEGT
+  ENTWURF
+}
+
+/// Belegter Saldo eines Kredits zu einem Stichtag (z. B. Saldenbestätigung zum 31.12.).
+/// Grundlage der Restschuld; Buchungssummen werden nie als Restschuld verwendet.
+model Kreditsaldo {
+  id              String      @id @default(cuid())
+  mandantId       String
+  kreditId        String
+  /// leer, wenn der Stichtag aus dem Beleg nicht eindeutig hervorgeht
+  stichtag        DateTime?   @db.Date
+  /// Angabe aus dem Beleg bei unklarem Stichtag, z. B. "Ende 2023 (laut Notiz)"
+  stichtagHinweis String?
+  art             SaldoArt    @default(DARLEHEN)
+  /// Betrag immer positiv
+  betrag          Decimal     @db.Decimal(14, 2)
+  quelle          SaldoQuelle
+  /// z. B. "Saldenbestätigung Sparkasse vom 08.01.2026"
+  quelleText      String?
+  status          SaldoStatus @default(BELEGT)
+  notiz           String?
+  erstelltAm      DateTime    @default(now())
+  geaendertAm     DateTime    @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([kreditId, stichtag])
 }
 
 /// Tilgungsplan eines Kredits. Jede Änderung (z. B. nach Zinsanpassung) wird als

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Liniendiagramm } from "@/components/diagramme";
 import { Formular } from "@/components/formular";
 import { ZinsbindungMarke } from "@/components/kredit-marken";
+import { Begriff, Glossar, Hinweismarke, Kennzahl, RestschuldWert, ZinssatzWert } from "@/components/herleitung";
 import { Angaben, Auswahl, Feld, Felder, Kachel, Kacheln, Karte, KnopfLink, Leer, Marke, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -13,7 +14,7 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { hausKennzahlen, istAktiv } from "@/lib/kennzahlen";
-import { restschuld, zinsbindung, zinssatz } from "@/lib/kredit";
+import { restschuldNachweis, zinsbindung } from "@/lib/kredit";
 import {
   fotoHochladen,
   fotoLoeschen,
@@ -51,6 +52,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
   const daten = grundlage.haeuser.find((h) => h.id === id)!;
   const { kredite, referenzwerte } = grundlage;
   const k = hausKennzahlen(daten, kredite, referenzwerte, stichtag);
+  const p = { k, t, f, stichtag };
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
   const darfGesellschaften = darf(kontext.rolle, "gesellschaften");
   const darfMieter = darf(kontext.rolle, "mieter");
@@ -94,18 +96,68 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
       />
 
       <Kacheln>
-        <Kachel titel={tk.verkehrswert} wert={f.betragGanz(k.verkehrswert)} unter={`${tk.kaufpreis}: ${f.betragGanz(haus.kaufpreis)} (${f.datum(haus.kaufdatum)})`} />
-        <Kachel titel={tk.restschuld} wert={f.betragGanz(k.restschuld)} unter={`${tk.ltv} ${f.prozent(k.ltv, 1)} · ${tk.dscr} ${f.faktor(k.dscr)}`} />
-        <Kachel titel={tk.sollMieteMonat} wert={f.betrag(k.sollMonat)} unter={`${tk.sollMieteJahr}: ${f.betrag(k.sollJahr)}`} />
-        <Kachel titel={tk.istMieteMonat} wert={f.betrag(k.istMonat)} unter={`${tk.istMieteJahr}: ${f.betrag(k.istJahr)}`} />
         <Kachel
-          titel={tk.leerstandFlaeche}
-          wert={f.prozent(k.leerstandQuote, 1)}
-          unter={`${k.leereEinheiten} / ${k.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: ${f.betrag(k.erwartetLeerMonat)} / ${f.betrag(k.erwartetLeerJahr)}`}
+          titel={tk.verkehrswert}
+          wert={<Kennzahl art="verkehrswert" {...p} ganz />}
+          unter={`${tk.kaufpreis}: ${f.betragGanz(haus.kaufpreis)} (${f.datum(haus.kaufdatum)})`}
+        />
+        <Kachel
+          titel={<Begriff k="Restschuld" t={t}>{tk.restschuld}</Begriff>}
+          wert={<Kennzahl art="restschuld" {...p} ganz />}
+          unter={
+            <>
+              <Begriff k="LTV" t={t} /> <Kennzahl art="ltv" {...p} /> · <Begriff k="DSCR" t={t} /> <Kennzahl art="dscr" {...p} />
+            </>
+          }
+        />
+        <Kachel
+          titel={tk.sollMieteMonat}
+          wert={<Kennzahl art="sollMonat" {...p} />}
+          unter={
+            <>
+              {tk.sollMieteJahr} (<Begriff k="JNKM" t={t} />): <Kennzahl art="sollJahr" {...p} />
+            </>
+          }
+        />
+        <Kachel
+          titel={tk.istMieteMonat}
+          wert={<Kennzahl art="istMonat" {...p} />}
+          unter={
+            <>
+              {tk.istMieteJahr}: <Kennzahl art="istJahr" {...p} />
+            </>
+          }
+        />
+        <Kachel
+          titel={<Begriff k="Leerstand" t={t}>{tk.leerstandFlaeche}</Begriff>}
+          wert={<Kennzahl art="leerstand" {...p} />}
+          unter={
+            <>
+              {`${k.leereEinheiten} / ${k.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: `}
+              <Kennzahl art="erwartetLeerMonat" {...p} /> / {f.betrag(k.erwartetLeerJahr)}
+            </>
+          }
           ton={k.leereEinheiten > 0 ? "warnung" : undefined}
         />
-        <Kachel titel={th.mieteBeiVollvermietung} wert={f.betrag(vollvermietung)} unter={`${t.allgemein.jahr}: ${f.jahresmiete(vollvermietung)}`} />
-        <Kachel titel={tk.bruttoanfangsrendite} wert={f.prozent(k.bruttoanfangsrendite)} unter={`${tk.kaufpreisfaktor} ${f.faktor(k.kaufpreisfaktor, 1)} · ${tk.sollProM2} ${f.betrag(k.sollProM2)}`} />
+        <Kachel
+          titel={th.mieteBeiVollvermietung}
+          wert={
+            <>
+              {f.betrag(vollvermietung)}
+              {k.luecken.erwarteteMiete.fehlend > 0 && <Hinweismarke>{t.allgemein.unvollstaendig}</Hinweismarke>}
+            </>
+          }
+          unter={`${t.allgemein.jahr}: ${f.jahresmiete(vollvermietung)}`}
+        />
+        <Kachel
+          titel={<Begriff k="BAR" t={t}>{tk.bruttoanfangsrendite}</Begriff>}
+          wert={<Kennzahl art="bruttoanfangsrendite" {...p} />}
+          unter={
+            <>
+              <Begriff k="Kaufpreisfaktor" t={t}>{tk.kaufpreisfaktor}</Begriff> <Kennzahl art="kaufpreisfaktor" {...p} /> · {tk.sollProM2} {f.betrag(k.sollProM2)}
+            </>
+          }
+        />
         <Kachel titel={tk.rueckstand} wert={f.betrag(k.rueckstand)} ton={k.rueckstand.greaterThan(0) ? "schlecht" : undefined} unter={`${tk.flaeche}: ${f.flaeche(k.flaeche)}`} />
       </Kacheln>
 
@@ -233,7 +285,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Karte titel={th.wertentwicklung}>
-          {wertverlauf.length > 1 && <Liniendiagramm reihen={[{ name: tk.verkehrswert, punkte: wertverlauf }]} formatY={(w) => f.betragKurz(w)} formatX={(d) => formatMonat(d)} />}
+          {wertverlauf.length > 1 && <Liniendiagramm reihen={[{ name: th.wertentwicklungReihe, punkte: wertverlauf }]} formatY={(w) => f.betragKurz(w)} formatX={(d) => formatMonat(d)} />}
           <Tabelle>
             <thead>
               <tr>
@@ -306,8 +358,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                         <div className="text-xs text-slate-500">{[x.kredit.bank, x.kredit.kreditnummer].filter(Boolean).join(" · ")}</div>
                       </td>
                       <td className={rechts}>{f.prozent(anteil, 2)}</td>
-                      <td className={rechts}>{kd ? f.prozent(zinssatz(kd, referenzwerte, stichtag), 3) : "–"}</td>
-                      <td className={rechts}>{kd ? f.betrag(restschuld(kd, stichtag).times(anteil).dividedBy(100)) : "–"}</td>
+                      <td className={rechts}>{kd ? <ZinssatzWert k={kd} referenzwerte={referenzwerte} stichtag={stichtag} t={t} f={f} /> : "–"}</td>
+                      <td className={rechts}>{kd ? <RestschuldWert nachweis={restschuldNachweis(kd, stichtag)} anteilProzent={anteil} t={t} f={f} /> : "–"}</td>
                       <td>{kd && <ZinsbindungMarke zb={zinsbindung(kd, stichtag)} t={t} f={f} />}</td>
                     </tr>
                   );
@@ -385,6 +437,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
           ]}
         />
       </Karte>
+
+      <Glossar begriffe={["Restschuld", "LTV", "DSCR", "JNKM", "NKM", "Leerstand", "BAR", "Kaufpreisfaktor", "Zinsbindung"]} t={t} />
     </div>
   );
 }

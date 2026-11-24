@@ -17,7 +17,7 @@ import { pruefeCovenant, restschuld, zinsbindung, type KreditDaten, type Referen
 export type WarnStufe = "hoch" | "mittel";
 
 export type Warnung =
-  | { art: "zinsbindung"; stufe: WarnStufe; kreditId: string; bis: IsoDatum; monate: number; restschuld: Decimal }
+  | { art: "zinsbindung"; stufe: WarnStufe; kreditId: string; bis: IsoDatum; monate: number; restschuld: Decimal | null }
   | {
       art: "covenant";
       stufe: WarnStufe;
@@ -55,7 +55,7 @@ export function ermittleWarnungen(
   for (const k of kredite) {
     const zb = zinsbindung(k, stichtag);
     const rest = restschuld(k, stichtag);
-    if (zb.bis && zb.monate !== null && rest.greaterThan(0) && zb.stufe !== "spaeter" && zb.stufe !== "keine") {
+    if (zb.bis && zb.monate !== null && (rest === null || rest.greaterThan(0)) && zb.stufe !== "spaeter" && zb.stufe !== "keine") {
       warnungen.push({
         art: "zinsbindung",
         stufe: zb.stufe === "unter24" ? "mittel" : "hoch",

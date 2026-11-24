@@ -5,7 +5,7 @@
  * Alle Beträge als Decimal, Zinssätze in Prozentpunkten (3.125 = 3,125 %).
  */
 import { aufCent, Decimal, dezimal } from "./geld";
-import { monatsende, monatsNummer, plusMonate, type IsoDatum } from "./datum";
+import { monatsende, monatsNummer, plusMonate, plusTage, type IsoDatum } from "./datum";
 
 export type BuchungsArt = "ZINS" | "TILGUNG" | "SONDERTILGUNG" | "GEBUEHR" | "AUSZAHLUNG" | "SONSTIGES";
 export type ZahlweiseArt = "MONATLICH" | "QUARTALSWEISE" | "HALBJAEHRLICH" | "JAEHRLICH";
@@ -32,6 +32,22 @@ export interface TilgungsplanDaten {
   zeilen: PlanZeileDaten[];
 }
 
+export type SaldoArt = "DARLEHEN" | "GUTHABEN";
+export type SaldoQuelle = "KONTOAUSZUG" | "BANKBESTAETIGUNG" | "JAHRESABSCHLUSS" | "SONSTIGE";
+export type SaldoStatus = "BELEGT" | "ENTWURF";
+
+/** Belegter Saldo (Restschuld oder Guthaben) zu einem Stichtag; `stichtag` null = unklar. */
+export interface SaldoDaten {
+  id?: string;
+  stichtag: IsoDatum | null;
+  stichtagHinweis?: string | null;
+  art: SaldoArt;
+  betrag: Decimal;
+  quelle: SaldoQuelle;
+  quelleText?: string | null;
+  status: SaldoStatus;
+}
+
 export interface ReferenzWert {
   referenz: string;
   stichtag: IsoDatum;
@@ -56,6 +72,8 @@ export interface KreditDaten {
   ratenbetrag: Decimal | null;
   haeuser: { hausId: string; anteilProzent: Decimal }[];
   buchungen: BuchungDaten[];
+  /** Belegte Salden; fehlt das Feld, gibt es keine */
+  salden?: SaldoDaten[];
   tilgungsplaene: TilgungsplanDaten[];
 }
 
@@ -92,28 +110,115 @@ export function gueltigerTilgungsplan(k: Pick<KreditDaten, "tilgungsplaene">, st
 }
 
 /**
- * Restschuld am Stichtag. Quelle ist die jüngste Angabe aus Buchungen (Saldo nach Buchung)
- * oder dem gültigen Tilgungsplan; bei Gleichstand gewinnt die Buchung.
- * Ohne beides: Ursprungsbetrag (bzw. 0 vor der Auszahlung).
+ * Herkunft einer Restschuld:
+ * - "saldo": belegter Saldo (Kontoauszug, Saldenbestätigung, Jahresabschluss),
+ * - "buchung": Kontostand nach einer Bankbuchung (aus dem Kontoauszug bzw. Import),
+ * - "nichtAusgezahlt": der Kredit ist am Stichtag noch nicht ausgezahlt (Restschuld 0).
  */
-export function restschuld(k: KreditDaten, stichtag: IsoDatum): Decimal {
-  if (k.auszahlungsdatum && k.auszahlungsdatum > stichtag) return NULL;
+export interface RestschuldNachweis {
+  betrag: Decimal;
+  /** Stichtag des Belegs (kann vor dem gefragten Stichtag liegen) */
+  stichtag: IsoDatum;
+  herkunft: "saldo" | "buchung" | "nichtAusgezahlt";
+  quelle: SaldoQuelle | null;
+  quelleText: string | null;
+}
 
-  const mitSaldo = sortiereBuchungen(k.buchungen.filter((b) => b.saldoNach !== null && b.datum <= stichtag));
-  const letzteBuchung = mitSaldo[mitSaldo.length - 1];
-
-  const plan = gueltigerTilgungsplan(k, stichtag);
-  const planZeilen = (plan?.zeilen ?? []).filter((z) => z.faelligAm <= stichtag);
-  const letzteZeile = planZeilen.reduce<PlanZeileDaten | undefined>(
-    (l, z) => (!l || z.faelligAm >= l.faelligAm ? z : l),
-    undefined,
-  );
-
-  if (letzteBuchung && (!letzteZeile || letzteBuchung.datum >= letzteZeile.faelligAm)) {
-    return dezimal(letzteBuchung.saldoNach!);
+/**
+ * Restschuld am Stichtag, nur aus Belegen: der jüngste belegte Darlehenssaldo oder
+ * Kontostand nach einer Bankbuchung bis zum Stichtag; bei gleichem Datum gewinnt der Saldo.
+ * Entwürfe, Salden mit unklarem Stichtag, Guthaben, Tilgungspläne und Buchungssummen zählen
+ * nicht. Ohne Beleg: null (unbekannt).
+ */
+export function restschuldNachweis(k: KreditDaten, stichtag: IsoDatum): RestschuldNachweis | null {
+  if (k.auszahlungsdatum && k.auszahlungsdatum > stichtag) {
+    return { betrag: NULL, stichtag, herkunft: "nichtAusgezahlt", quelle: null, quelleText: null };
   }
-  if (letzteZeile) return letzteZeile.restschuld;
-  return k.ursprungsbetrag;
+  let best: RestschuldNachweis | null = null;
+  for (const s of k.salden ?? []) {
+    if (s.art !== "DARLEHEN" || s.status !== "BELEGT" || !s.stichtag || s.stichtag > stichtag) continue;
+    if (!best || s.stichtag > best.stichtag) {
+      best = { betrag: s.betrag, stichtag: s.stichtag, herkunft: "saldo", quelle: s.quelle, quelleText: s.quelleText ?? null };
+    }
+  }
+  const mitSaldo = sortiereBuchungen(k.buchungen.filter((b) => b.saldoNach !== null && b.datum <= stichtag));
+  const letzte = mitSaldo[mitSaldo.length - 1];
+  if (letzte && (!best || letzte.datum > best.stichtag)) {
+    best = { betrag: dezimal(letzte.saldoNach!), stichtag: letzte.datum, herkunft: "buchung", quelle: "KONTOAUSZUG", quelleText: null };
+  }
+  return best;
+}
+
+/** Belegte Restschuld am Stichtag oder null (unbekannt), siehe `restschuldNachweis`. */
+export function restschuld(k: KreditDaten, stichtag: IsoDatum): Decimal | null {
+  return restschuldNachweis(k, stichtag)?.betrag ?? null;
+}
+
+/** Restschuld laut gültigem Tilgungsplan (Planwert, kein Beleg) oder null. */
+export function planRestschuld(k: KreditDaten, stichtag: IsoDatum): Decimal | null {
+  if (k.auszahlungsdatum && k.auszahlungsdatum > stichtag) return NULL;
+  const plan = gueltigerTilgungsplan(k, stichtag);
+  let letzte: PlanZeileDaten | undefined;
+  for (const z of plan?.zeilen ?? []) if (z.faelligAm <= stichtag && (!letzte || z.faelligAm >= letzte.faelligAm)) letzte = z;
+  return letzte?.restschuld ?? null;
+}
+
+export interface SaldoJahr {
+  jahr: number;
+  /** jüngster Saldo des Jahres (belegt vor Entwurf bei gleichem Datum) */
+  saldo: SaldoDaten & { stichtag: IsoDatum; herkunft: "saldo" | "buchung" };
+  /** Veränderung zum Vorjahr (nur wenn beide Jahre einen Saldo haben) */
+  veraenderung: Decimal | null;
+  /** Restschuld laut Tilgungsplan zum selben Stichtag, zum Vergleich */
+  plan: Decimal | null;
+  /** Entwürfe desselben Jahres, die nicht gewählt wurden (z. B. weil ein belegter Wert vorliegt) */
+  entwuerfe: SaldoDaten[];
+}
+
+/**
+ * Jahresvergleich der Salden einer Art: je Kalenderjahr der jüngste Saldo (belegte Salden und
+ * Kontostände aus Bankbuchungen; Entwürfe gekennzeichnet). Salden ohne Stichtag stehen in `unklar`.
+ */
+export function saldenJahresvergleich(k: KreditDaten, art: SaldoArt = "DARLEHEN"): { jahre: SaldoJahr[]; unklar: SaldoDaten[] } {
+  type Kandidat = SaldoJahr["saldo"];
+  const kandidaten: Kandidat[] = [];
+  const unklar: SaldoDaten[] = [];
+  for (const s of k.salden ?? []) {
+    if (s.art !== art) continue;
+    if (!s.stichtag) unklar.push(s);
+    else kandidaten.push({ ...s, stichtag: s.stichtag, herkunft: "saldo" });
+  }
+  if (art === "DARLEHEN") {
+    // je Tag nur der Kontostand nach der letzten Buchung (Tilgung nach Zins)
+    const letzteJeTag = new Map<IsoDatum, BuchungDaten>();
+    for (const b of sortiereBuchungen(k.buchungen)) if (b.saldoNach !== null) letzteJeTag.set(b.datum, b);
+    for (const b of letzteJeTag.values()) {
+      if (b.saldoNach === null) continue;
+      kandidaten.push({ stichtag: b.datum, art, betrag: b.saldoNach, quelle: "KONTOAUSZUG", quelleText: null, status: "BELEGT", herkunft: "buchung" });
+    }
+  }
+  const rang = (c: Kandidat) => (c.herkunft === "saldo" ? 0 : 1) + (c.status === "BELEGT" ? 0 : 2);
+  const besser = (a: Kandidat, b: Kandidat) => (a.stichtag !== b.stichtag ? a.stichtag > b.stichtag : rang(a) < rang(b));
+  const proJahr = new Map<number, Kandidat>();
+  for (const c of kandidaten) {
+    const jahr = Number(c.stichtag.slice(0, 4));
+    const bisher = proJahr.get(jahr);
+    if (!bisher || besser(c, bisher)) proJahr.set(jahr, c);
+  }
+  const jahre = [...proJahr.entries()].sort((a, b) => a[0] - b[0]);
+  return {
+    jahre: jahre.map(([jahr, saldo], i) => {
+      const vorjahr = i > 0 && jahre[i - 1][0] === jahr - 1 ? jahre[i - 1][1] : null;
+      return {
+        jahr,
+        saldo,
+        veraenderung: vorjahr ? saldo.betrag.minus(vorjahr.betrag) : null,
+        plan: art === "DARLEHEN" ? planRestschuld(k, saldo.stichtag) : null,
+        entwuerfe: kandidaten.filter((c) => c !== saldo && c.status === "ENTWURF" && c.stichtag.startsWith(String(jahr))),
+      };
+    }),
+    unklar,
+  };
 }
 
 /** Letzter bekannter Wert eines Referenzzinses bis zum Stichtag. */
@@ -149,6 +254,11 @@ export interface Kapitaldienst {
   summe: Decimal;
   /** "buchungen": Summe der letzten 12 Monate; "schaetzung": aus Rate und Zinssatz hochgerechnet */
   quelle: "buchungen" | "schaetzung";
+  /** Zeitraum der Buchungen bzw. Grundlage der Hochrechnung */
+  von?: IsoDatum;
+  bis?: IsoDatum;
+  saldo?: Decimal;
+  zinssatz?: Decimal;
 }
 
 /**
@@ -156,16 +266,20 @@ export interface Kapitaldienst {
  * Sondertilgungen zählen nicht dazu. Liegen im Zeitraum keine Buchungen vor oder ist der
  * Kredit jünger als 12 Monate, wird aus Rate und Zinssatz auf ein Jahr hochgerechnet.
  */
-export function kapitaldienstJahr(k: KreditDaten, referenzwerte: ReferenzWert[], stichtag: IsoDatum): Kapitaldienst {
+export function kapitaldienstJahr(k: KreditDaten, referenzwerte: ReferenzWert[], stichtag: IsoDatum): Kapitaldienst | null {
   const ab = plusMonate(stichtag, -12);
   const imZeitraum = k.buchungen.filter((b) => b.datum > ab && b.datum <= stichtag);
   const vollesJahr = !k.auszahlungsdatum || k.auszahlungsdatum <= ab;
   if (imZeitraum.length > 0 && vollesJahr) {
     const zins = imZeitraum.filter((b) => b.art === "ZINS").reduce((s, b) => s.plus(b.betrag), NULL);
     const tilgung = imZeitraum.filter((b) => b.art === "TILGUNG").reduce((s, b) => s.plus(b.betrag), NULL);
-    return { zins, tilgung, summe: zins.plus(tilgung), quelle: "buchungen" };
+    return { zins, tilgung, summe: zins.plus(tilgung), quelle: "buchungen", von: plusTage(ab, 1), bis: stichtag };
   }
-  return geschaetzterKapitaldienst(k, restschuld(k, stichtag), zinssatz(k, referenzwerte, stichtag) ?? NULL);
+  // Hochrechnung nur mit bekannter Restschuld und bekanntem Zinssatz, sonst unbekannt.
+  const saldo = restschuld(k, stichtag);
+  const satz = zinssatz(k, referenzwerte, stichtag);
+  if (saldo === null || satz === null) return null;
+  return { ...geschaetzterKapitaldienst(k, saldo, satz), saldo, zinssatz: satz };
 }
 
 /** Hochrechnung des Jahres-Kapitaldiensts aus Restschuld, Zinssatz und Rate. */

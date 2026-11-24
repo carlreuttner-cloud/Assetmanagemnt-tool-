@@ -7,10 +7,14 @@
  * - Restschuld und Kapitaldienst eines Hauses: Kredite anteilig nach `anteilProzent`.
  * - Gesellschaft und Portfolio: Summe der Häuser plus Summe der eigenen Kredite (zu 100 %).
  * - DSCR vereinfacht: Ist-Jahresnettokaltmiete / Kapitaldienst (ohne Bewirtschaftungskosten).
+ * - Fehlende Werte (Verkehrswert, Kaufpreis, belegte Restschuld, Kapitaldienst, erwartete Miete)
+ *   werden nie als 0 gezählt: `luecken` hält je Größe fest, wie viele Teile bekannt sind und
+ *   fehlen und von welchen Stichtagen die bekannten stammen. Quoten mit unvollständigen
+ *   Grundlagen sind null (unbekannt); Summen mit Lücken werden als unvollständig angezeigt.
  */
 import { dezimal, type Decimal } from "./geld";
 import type { IsoDatum } from "./datum";
-import { kapitaldienstJahr, restschuld, type KreditDaten, type ReferenzWert } from "./kredit";
+import { kapitaldienstJahr, restschuld, restschuldNachweis, type KreditDaten, type ReferenzWert } from "./kredit";
 import { jahresNettokaltmiete } from "./miete";
 
 export interface MietverhaeltnisDaten {
@@ -37,6 +41,37 @@ export interface HausDaten {
   einheiten: EinheitDaten[];
 }
 
+/** Wie vollständig eine Summe ist: Anzahl bekannter und fehlender Teile, Spanne der Stichtage. */
+export interface Vollstaendigkeit {
+  bekannt: number;
+  fehlend: number;
+  von: IsoDatum | null;
+  bis: IsoDatum | null;
+  /** Anzahl der Teile, die hochgerechnet statt belegt sind (Kapitaldienst) */
+  geschaetzt: number;
+}
+
+export type LueckenArt = "verkehrswert" | "kaufpreis" | "restschuld" | "kapitaldienst" | "erwarteteMiete";
+export type Luecken = Record<LueckenArt, Vollstaendigkeit>;
+
+const leer = (): Vollstaendigkeit => ({ bekannt: 0, fehlend: 0, von: null, bis: null, geschaetzt: 0 });
+
+function verbinde(a: Vollstaendigkeit, b: Vollstaendigkeit): Vollstaendigkeit {
+  const min = (x: IsoDatum | null, y: IsoDatum | null) => (x === null ? y : y === null ? x : x < y ? x : y);
+  const max = (x: IsoDatum | null, y: IsoDatum | null) => (x === null ? y : y === null ? x : x > y ? x : y);
+  return { bekannt: a.bekannt + b.bekannt, fehlend: a.fehlend + b.fehlend, von: min(a.von, b.von), bis: max(a.bis, b.bis), geschaetzt: a.geschaetzt + b.geschaetzt };
+}
+
+function teil(bekannt: boolean, stichtag: IsoDatum | null = null, geschaetzt = false): Vollstaendigkeit {
+  return { bekannt: bekannt ? 1 : 0, fehlend: bekannt ? 0 : 1, von: stichtag, bis: stichtag, geschaetzt: geschaetzt ? 1 : 0 };
+}
+
+/** true, wenn keine Teile fehlen. */
+export const vollstaendig = (v: Vollstaendigkeit) => v.fehlend === 0;
+
+/** Summe für die Anzeige: null (unbekannt), wenn kein Teil bekannt ist, aber welche fehlen. */
+export const summeOderUnbekannt = (wert: Decimal, v: Vollstaendigkeit): Decimal | null => (v.bekannt === 0 && v.fehlend > 0 ? null : wert);
+
 export interface Summen {
   haeuser: number;
   einheiten: number;
@@ -55,6 +90,7 @@ export interface Summen {
   restschuld: Decimal;
   zinsenJahr: Decimal;
   tilgungJahr: Decimal;
+  luecken: Luecken;
 }
 
 export interface Kennzahlen extends Summen {
@@ -87,6 +123,7 @@ export function leereSummen(): Summen {
   return {
     haeuser: 0, einheiten: 0, leereEinheiten: 0, flaeche: NULL, leerFlaeche: NULL, verkehrswert: NULL, kaufpreis: NULL,
     sollMonat: NULL, istMonat: NULL, erwartetLeerMonat: NULL, rueckstand: NULL, restschuld: NULL, zinsenJahr: NULL, tilgungJahr: NULL,
+    luecken: { verkehrswert: leer(), kaufpreis: leer(), restschuld: leer(), kapitaldienst: leer(), erwarteteMiete: leer() },
   };
 }
 
@@ -106,6 +143,13 @@ export function addiere(a: Summen, b: Summen): Summen {
     restschuld: a.restschuld.plus(b.restschuld),
     zinsenJahr: a.zinsenJahr.plus(b.zinsenJahr),
     tilgungJahr: a.tilgungJahr.plus(b.tilgungJahr),
+    luecken: {
+      verkehrswert: verbinde(a.luecken.verkehrswert, b.luecken.verkehrswert),
+      kaufpreis: verbinde(a.luecken.kaufpreis, b.luecken.kaufpreis),
+      restschuld: verbinde(a.luecken.restschuld, b.luecken.restschuld),
+      kapitaldienst: verbinde(a.luecken.kapitaldienst, b.luecken.kapitaldienst),
+      erwarteteMiete: verbinde(a.luecken.erwarteteMiete, b.luecken.erwarteteMiete),
+    },
   };
 }
 
@@ -113,19 +157,27 @@ export function istAktiv(m: Pick<MietverhaeltnisDaten, "beginn" | "ende">, stich
   return m.beginn <= stichtag && (m.ende === null || m.ende >= stichtag);
 }
 
-/** Aktuellster Verkehrswert bis zum Stichtag (sonst der früheste vorhandene). */
+/** Aktuellster Verkehrswert bis zum Stichtag mit seinem Stichtag; null, wenn es keinen gibt. */
+export function verkehrswertEintragAm(h: Pick<HausDaten, "verkehrswerte">, stichtag: IsoDatum): { stichtag: IsoDatum; wert: Decimal } | null {
+  let best: { stichtag: IsoDatum; wert: Decimal } | null = null;
+  for (const v of h.verkehrswerte) if (v.stichtag <= stichtag && (!best || v.stichtag > best.stichtag)) best = v;
+  return best;
+}
+
+/** Aktuellster Verkehrswert bis zum Stichtag; null (unbekannt), wenn es bis dahin keinen gibt. */
 export function verkehrswertAm(h: Pick<HausDaten, "verkehrswerte">, stichtag: IsoDatum): Decimal | null {
-  const sortiert = [...h.verkehrswerte].sort((a, b) => (a.stichtag < b.stichtag ? -1 : 1));
-  const bis = sortiert.filter((v) => v.stichtag <= stichtag);
-  return (bis[bis.length - 1] ?? sortiert[0])?.wert ?? null;
+  return verkehrswertEintragAm(h, stichtag)?.wert ?? null;
 }
 
 /** Werte eines Hauses ohne Kredite (Fläche, Miete, Wert). */
 export function hausSummen(h: HausDaten, stichtag: IsoDatum): Summen {
   const s = leereSummen();
   s.haeuser = 1;
-  s.verkehrswert = verkehrswertAm(h, stichtag) ?? NULL;
+  const vw = verkehrswertEintragAm(h, stichtag);
+  s.verkehrswert = vw?.wert ?? NULL;
+  s.luecken.verkehrswert = teil(vw !== null, vw?.stichtag ?? null);
   s.kaufpreis = h.kaufpreis ?? NULL;
+  s.luecken.kaufpreis = teil(h.kaufpreis !== null);
   for (const e of h.einheiten) {
     s.einheiten++;
     s.flaeche = s.flaeche.plus(e.flaeche);
@@ -134,6 +186,7 @@ export function hausSummen(h: HausDaten, stichtag: IsoDatum): Summen {
       s.leereEinheiten++;
       s.leerFlaeche = s.leerFlaeche.plus(e.flaeche);
       s.erwartetLeerMonat = s.erwartetLeerMonat.plus(e.erwarteteMiete ?? 0);
+      s.luecken.erwarteteMiete = verbinde(s.luecken.erwarteteMiete, teil(e.erwarteteMiete !== null));
     }
     for (const m of aktiv) {
       s.sollMonat = s.sollMonat.plus(m.sollMiete);
@@ -150,16 +203,19 @@ export function kreditSummen(k: KreditDaten, referenzwerte: ReferenzWert[], stic
   const s = leereSummen();
   const faktor = anteilProzent.dividedBy(100);
   const kd = kapitaldienstJahr(k, referenzwerte, stichtag);
-  s.restschuld = restschuld(k, stichtag).times(faktor);
-  s.zinsenJahr = kd.zins.times(faktor);
-  s.tilgungJahr = kd.tilgung.times(faktor);
+  const rest = restschuldNachweis(k, stichtag);
+  s.restschuld = rest ? rest.betrag.times(faktor) : NULL;
+  s.luecken.restschuld = teil(rest !== null, rest?.stichtag ?? null);
+  s.zinsenJahr = kd ? kd.zins.times(faktor) : NULL;
+  s.tilgungJahr = kd ? kd.tilgung.times(faktor) : NULL;
+  s.luecken.kapitaldienst = teil(kd !== null, null, kd?.quelle === "schaetzung");
   return s;
 }
 
 /** Leitet Quoten und Jahreswerte aus Summen ab. */
 export function kennzahlenAus(s: Summen): Kennzahlen {
-  const quote = (zaehler: Decimal, nenner: Decimal, mal = 1) =>
-    nenner.isZero() ? null : zaehler.times(mal).dividedBy(nenner);
+  const quote = (zaehler: Decimal, nenner: Decimal, mal = 1, ...grundlagen: LueckenArt[]) =>
+    nenner.isZero() || grundlagen.some((g) => !vollstaendig(s.luecken[g])) ? null : zaehler.times(mal).dividedBy(nenner);
   const sollJahr = jahresNettokaltmiete(s.sollMonat);
   const istJahr = jahresNettokaltmiete(s.istMonat);
   const kapitaldienst = s.zinsenJahr.plus(s.tilgungJahr);
@@ -172,12 +228,12 @@ export function kennzahlenAus(s: Summen): Kennzahlen {
     erwartetLeerJahr: jahresNettokaltmiete(s.erwartetLeerMonat),
     kapitaldienstJahr: kapitaldienst,
     leerstandQuote: quote(s.leerFlaeche, s.flaeche, 100),
-    ltv: quote(s.restschuld, s.verkehrswert, 100),
-    dscr: quote(istJahr, kapitaldienst),
-    icr: quote(istJahr, s.zinsenJahr),
-    bruttoanfangsrendite: quote(sollJahr, s.kaufpreis, 100),
-    kaufpreisfaktor: quote(s.kaufpreis, sollJahr),
-    mietrendite: quote(sollJahr, s.verkehrswert, 100),
+    ltv: quote(s.restschuld, s.verkehrswert, 100, "restschuld", "verkehrswert"),
+    dscr: quote(istJahr, kapitaldienst, 1, "kapitaldienst"),
+    icr: quote(istJahr, s.zinsenJahr, 1, "kapitaldienst"),
+    bruttoanfangsrendite: quote(sollJahr, s.kaufpreis, 100, "kaufpreis"),
+    kaufpreisfaktor: quote(s.kaufpreis, sollJahr, 1, "kaufpreis"),
+    mietrendite: quote(sollJahr, s.verkehrswert, 100, "verkehrswert"),
     sollProM2: quote(s.sollMonat, vermieteteFlaeche),
   };
 }
@@ -232,40 +288,54 @@ export function covenantKennzahlen(
 
 export interface ZeitreihenPunkt {
   datum: IsoDatum;
-  verkehrswert: Decimal;
-  restschuld: Decimal;
+  /** null, wenn für mindestens ein Haus kein Verkehrswert bis zu diesem Tag vorliegt */
+  verkehrswert: Decimal | null;
+  /** belegte Restschuld; null, wenn für mindestens einen ausgezahlten Kredit kein Beleg vorliegt */
+  restschuld: Decimal | null;
   /** Soll-Nettokaltmiete pro Monat der an diesem Tag laufenden Mietverhältnisse */
   sollMonat: Decimal;
 }
 
 /**
- * Verlauf von Verkehrswert, Restschuld und Soll-Miete zu den angegebenen Stichtagen.
- * Restschuld in der Zukunft folgt dem gültigen Tilgungsplan. Die Miete beruht auf den
+ * Verlauf von Verkehrswert, belegter Restschuld und Soll-Miete zu den angegebenen Stichtagen.
+ * Restschuld nur aus Belegen (jüngster Beleg bis zum Tag); Planwerte stehen je Kredit im
+ * Saldenvergleich (`saldenJahresvergleich`). Fehlt ein Wert, ist der Punkt unbekannt (keine Lücke als 0). Die Miete beruht auf den
  * heutigen Soll-Mieten der jeweils laufenden Mietverhältnisse (frühere Mieterhöhungen
  * werden nicht zurückgerechnet).
  */
 export function zeitreihe(haeuser: HausDaten[], kredite: KreditDaten[], stichtage: IsoDatum[]): ZeitreihenPunkt[] {
   return stichtage.map((datum) => {
-    let verkehrswert = NULL;
+    let verkehrswert: Decimal | null = NULL;
     let sollMonat = NULL;
     for (const h of haeuser) {
-      verkehrswert = verkehrswert.plus(verkehrswertAm(h, datum) ?? 0);
+      const vw = verkehrswertAm(h, datum);
+      verkehrswert = vw === null || verkehrswert === null ? null : verkehrswert.plus(vw);
       for (const e of h.einheiten) for (const m of e.mietverhaeltnisse) if (istAktiv(m, datum)) sollMonat = sollMonat.plus(m.sollMiete);
     }
-    const rest = kredite.reduce((s, k) => s.plus(restschuld(k, datum)), NULL);
+    let rest: Decimal | null = NULL;
+    for (const k of kredite) {
+      const r = restschuld(k, datum);
+      rest = r === null || rest === null ? null : rest.plus(r);
+    }
     return { datum, verkehrswert, restschuld: rest, sollMonat };
   });
 }
 
-/** Restschuld heute nach Jahr des Zinsbindungsendes; variable Kredite unter "variabel". */
-export function zinsbindungsProfil(kredite: KreditDaten[], stichtag: IsoDatum): Array<{ jahr: string; restschuld: Decimal; anzahl: number }> {
-  const gruppen = new Map<string, { restschuld: Decimal; anzahl: number }>();
+/**
+ * Belegte Restschuld heute nach Jahr des Zinsbindungsendes; variable Kredite unter "variabel".
+ * Kredite ohne belegte Restschuld werden nicht geschätzt, sondern unter `ohneBeleg` gezählt.
+ */
+export function zinsbindungsProfil(
+  kredite: KreditDaten[],
+  stichtag: IsoDatum,
+): Array<{ jahr: string; restschuld: Decimal; anzahl: number; ohneBeleg: number }> {
+  const gruppen = new Map<string, { restschuld: Decimal; anzahl: number; ohneBeleg: number }>();
   for (const k of kredite) {
     const rest = restschuld(k, stichtag);
-    if (rest.lessThanOrEqualTo(0)) continue;
+    if (rest !== null && rest.lessThanOrEqualTo(0)) continue;
     const jahr = k.zinsArt === "VARIABEL" || !k.zinsbindungBis ? "variabel" : k.zinsbindungBis < stichtag ? stichtag.slice(0, 4) : k.zinsbindungBis.slice(0, 4);
-    const g = gruppen.get(jahr) ?? { restschuld: NULL, anzahl: 0 };
-    gruppen.set(jahr, { restschuld: g.restschuld.plus(rest), anzahl: g.anzahl + 1 });
+    const g = gruppen.get(jahr) ?? { restschuld: NULL, anzahl: 0, ohneBeleg: 0 };
+    gruppen.set(jahr, { restschuld: g.restschuld.plus(rest ?? 0), anzahl: g.anzahl + 1, ohneBeleg: g.ohneBeleg + (rest === null ? 1 : 0) });
   }
   return [...gruppen.entries()]
     .map(([jahr, g]) => ({ jahr, ...g }))

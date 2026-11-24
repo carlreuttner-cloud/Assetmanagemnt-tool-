@@ -5,7 +5,10 @@ import {
   berechneTilgungsplan,
   kapitaldienstJahr,
   pruefeCovenant,
+  planRestschuld,
   restschuld,
+  restschuldNachweis,
+  saldenJahresvergleich,
   sortiereBuchungen,
   zinsbindung,
   zinssatz,
@@ -22,7 +25,7 @@ describe("Restschuld und Kennzahlen gegen die Sollwerte der Testdaten", () => {
   it("Restschuld je Kredit am Stichtag entspricht dem Generator", () => {
     for (const k of p.kredite) {
       const daten = kredite.find((x) => x.id === k.schluessel)!;
-      expect(restschuld(daten, STICHTAG).toFixed(2), k.schluessel).toBe(k.restschuldStichtag.toFixed(2));
+      expect(restschuld(daten, STICHTAG)!.toFixed(2), k.schluessel).toBe(k.restschuldStichtag.toFixed(2));
     }
   });
 
@@ -59,9 +62,9 @@ describe("Restschuld und Kennzahlen gegen die Sollwerte der Testdaten", () => {
   it("Kapitaldienst der letzten 12 Monate aus den Buchungen", () => {
     const k01 = kredite.find((k) => k.id === "K01")!;
     const kd = kapitaldienstJahr(k01, [], STICHTAG);
-    expect(kd.quelle).toBe("buchungen");
+    expect(kd!.quelle).toBe("buchungen");
     // monatliche Annuität: 12 Raten
-    expect(kd.summe.toFixed(2)).toBe(k01.ratenbetrag!.times(12).toFixed(2));
+    expect(kd!.summe.toFixed(2)).toBe(k01.ratenbetrag!.times(12).toFixed(2));
   });
 });
 
@@ -83,9 +86,43 @@ describe("Kreditfunktionen", () => {
     expect(zinssatz(basis, werte, "2019-01-01")).toBeNull();
   });
 
-  it("ohne Buchungen: Restschuld = Ursprungsbetrag, vor Auszahlung 0", () => {
-    expect(restschuld(basis, "2025-01-01").toFixed(2)).toBe("1000000.00");
-    expect(restschuld(basis, "2019-12-31").toFixed(2)).toBe("0.00");
+  it("ohne Beleg: Restschuld unbekannt (nie Ursprungsbetrag), vor Auszahlung 0", () => {
+    expect(restschuld(basis, "2025-01-01")).toBeNull();
+    expect(restschuld(basis, "2019-12-31")!.toFixed(2)).toBe("0.00");
+    expect(kapitaldienstJahr(basis, [], "2025-01-01")).toBeNull();
+  });
+
+  it("Restschuld nur aus belegten Darlehenssalden, nicht aus Entwürfen, Guthaben, unklaren Stichtagen oder Plänen", () => {
+    const k: KreditDaten = {
+      ...basis,
+      salden: [
+        { stichtag: "2023-12-31", art: "DARLEHEN", betrag: dezimal(950_000), quelle: "JAHRESABSCHLUSS", status: "BELEGT" },
+        { stichtag: "2024-12-31", art: "DARLEHEN", betrag: dezimal(930_000), quelle: "BANKBESTAETIGUNG", status: "ENTWURF" },
+        { stichtag: "2024-12-31", art: "GUTHABEN", betrag: dezimal(20_000), quelle: "KONTOAUSZUG", status: "BELEGT" },
+        { stichtag: null, stichtagHinweis: "Ende 2024?", art: "DARLEHEN", betrag: dezimal(900_000), quelle: "SONSTIGE", status: "BELEGT" },
+      ],
+      tilgungsplaene: [{ version: 1, gueltigAb: "2020-01-01", zeilen: [{ faelligAm: "2024-12-31", zins: dezimal(1), tilgung: dezimal(1), rate: dezimal(2), restschuld: dezimal(925_000) }] }],
+    };
+    const n = restschuldNachweis(k, "2025-06-30")!;
+    expect(n.betrag.toFixed(2)).toBe("950000.00");
+    expect(n.stichtag).toBe("2023-12-31");
+    expect(n.herkunft).toBe("saldo");
+    expect(planRestschuld(k, "2025-06-30")!.toFixed(2)).toBe("925000.00");
+    // jüngerer Kontostand aus einer Bankbuchung gewinnt
+    const mitBuchung = { ...k, buchungen: [{ datum: "2025-03-31", art: "TILGUNG" as const, betrag: dezimal(5000), saldoNach: dezimal(940_000) }] };
+    expect(restschuldNachweis(mitBuchung, "2025-06-30")!.herkunft).toBe("buchung");
+    expect(restschuld(mitBuchung, "2025-06-30")!.toFixed(2)).toBe("940000.00");
+
+    const vergleich = saldenJahresvergleich(mitBuchung);
+    expect(vergleich.jahre.map((j) => [j.jahr, j.saldo.betrag.toFixed(0), j.saldo.status])).toEqual([
+      [2023, "950000", "BELEGT"],
+      [2024, "930000", "ENTWURF"],
+      [2025, "940000", "BELEGT"],
+    ]);
+    expect(vergleich.jahre[1].veraenderung!.toFixed(0)).toBe("-20000");
+    expect(vergleich.jahre[1].plan!.toFixed(0)).toBe("925000");
+    expect(vergleich.unklar).toHaveLength(1);
+    expect(saldenJahresvergleich(mitBuchung, "GUTHABEN").jahre.map((j) => j.saldo.betrag.toFixed(0))).toEqual(["20000"]);
   });
 
   it("Buchungen am selben Tag: Tilgung nach Zins", () => {
@@ -126,5 +163,42 @@ describe("Kreditfunktionen", () => {
     expect(zeilen).toHaveLength(10);
     expect(zeilen[0].faelligAm).toBe("2026-03-31");
     expect(zeilen[9].restschuld.toFixed(2)).toBe("0.00");
+  });
+});
+
+describe("Unbekannt statt 0", () => {
+  it("Haus ohne Verkehrswert und Kredit ohne Beleg: Quoten unbekannt, Lücken gezählt", () => {
+    const h = { ...haeuser[0], verkehrswerte: [], kaufpreis: null };
+    const k = { ...kredite.find((x) => x.haeuser.some((a) => a.hausId === h.id))!, buchungen: [], salden: [] };
+    const kz = hausKennzahlen(h, [k], [], STICHTAG);
+    expect(kz.ltv).toBeNull();
+    expect(kz.mietrendite).toBeNull();
+    expect(kz.kaufpreisfaktor).toBeNull();
+    expect(kz.luecken.verkehrswert).toMatchObject({ bekannt: 0, fehlend: 1 });
+    expect(kz.luecken.restschuld).toMatchObject({ bekannt: 0, fehlend: 1 });
+    // Kapitaldienst aus Buchungen fehlt, Hochrechnung braucht belegte Restschuld: unbekannt
+    expect(kz.dscr).toBeNull();
+  });
+
+  it("Verkehrswert vor dem ersten Gutachten ist unbekannt, nicht der spätere Wert", () => {
+    const h = { ...haeuser[0], verkehrswerte: [{ stichtag: "2025-01-01", wert: dezimal(1_000_000) }] };
+    const kz = hausKennzahlen(h, [], [], "2024-06-30");
+    expect(kz.luecken.verkehrswert.fehlend).toBe(1);
+  });
+
+  it("Gruppe: Spanne der Saldo-Stichtage wird festgehalten", () => {
+    const kz = gruppenKennzahlen(haeuser, kredite, [], STICHTAG);
+    expect(kz.luecken.restschuld.fehlend).toBe(0);
+    expect(kz.luecken.restschuld.bis).toBe(STICHTAG);
+  });
+});
+
+describe("Jahresvergleich mit Bankbuchungen", () => {
+  it("nimmt am selben Tag den Kontostand nach der letzten Buchung (Tilgung nach Zins)", () => {
+    for (const k of kredite) {
+      const v = saldenJahresvergleich(k);
+      const letztes = v.jahre[v.jahre.length - 1];
+      expect(letztes.saldo.betrag.toFixed(2), k.id).toBe(restschuld(k, letztes.saldo.stichtag)!.toFixed(2));
+    }
   });
 });

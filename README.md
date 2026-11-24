@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht) und Phase 6 (Szenarien) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht), Phase 6 (Szenarien) und Phase 7 (Nachvollziehbarkeit und belegte Salden) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -117,7 +117,8 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 **Sprache und Währung.** Vorerst nur Deutsch und Euro. Vorbereitet ist: jeder Mandant hat `waehrung` und `sprache`, jeder Benutzer optional eine eigene `sprache`; alle Oberflächentexte liegen in `src/i18n/de.ts`. Für eine neue Sprache eine Datei mit derselben Struktur anlegen und in `src/i18n/index.ts` eintragen.
 
 **Kennzahlen.** Alle Berechnungen stehen als reine Funktionen in `src/lib/kredit.ts` und `src/lib/kennzahlen.ts` und werden in `test/kredit.test.ts` gegen die Sollwerte des Testdatengenerators geprüft. Festlegungen:
-- Restschuld: Saldo der jüngsten Buchung bis zum Stichtag, sonst Restschuld laut gültigem Tilgungsplan, sonst Ursprungsbetrag.
+- Restschuld: nur aus Belegen, also der jüngste belegte Darlehenssaldo (`Kreditsaldo`, Status „belegt“) oder Kontostand nach einer Bankbuchung bis zum Stichtag. Ohne Beleg ist sie unbekannt; Tilgungspläne liefern nur Vergleichswerte, Entwürfe, Guthaben und Salden mit unklarem Stichtag werden getrennt gezeigt.
+- Fehlende Werte werden nie als 0 gezählt: `Kennzahlen.luecken` zählt je Grundlage bekannte und fehlende Teile samt Spanne der Stichtage; Quoten mit Lücken sind unbekannt, Summen mit Lücken werden als „unvollständig“ markiert.
 - Variabler Zins: letzter Referenzzins bis heute, mindestens 0 % (Floor), plus Marge.
 - Kapitaldienst: Zins- und Tilgungsbuchungen der letzten 12 Monate ohne Sondertilgungen; fehlen sie, aus Rate und Zinssatz hochgerechnet.
 - LTV = Restschuld / Verkehrswert. DSCR (vereinfacht) = Ist-Jahresnettokaltmiete / Kapitaldienst, ohne Bewirtschaftungskosten.
@@ -127,6 +128,8 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 **Fotos.** Werden im Verzeichnis `UPLOAD_DIR` (Docker-Volume `uploads`) je Mandant abgelegt und nur über `/api/fotos/<id>` mit Mandanten- und Rechteprüfung ausgeliefert. Erlaubt sind JPEG, PNG und WebP bis 10 MB; der Typ wird am Dateiinhalt geprüft. Backups und S3-Speicher folgen in der Phase „Produktionsreife“.
 
 **Import.** Bank-CSVs und Mieterlisten werden nicht über feste Formate, sondern über bekannte Spaltennamen erkannt (deutsch und englisch, mit oder ohne Einheiten wie „(EUR)“). Neue Spaltennamen in `src/lib/import/kreditbuchungen.ts` bzw. `mieterliste.ts` ergänzen und in `test/import.test.ts` bzw. `test/mieterliste.test.ts` absichern. Jeder Import zeigt erst eine Vorschau; beim Übernehmen rechnet der Server den Plan aus der Datei neu und vertraut nicht der Vorschau im Browser. Dubletten bei Kreditbuchungen: gleicher Kredit, Tag, Art und Betrag. Eine Mieterliste ein zweites Mal hochzuladen ändert nichts. Jeder übernommene Import steht in `Importvorgang`, jede einzelne Änderung im Änderungsprotokoll.
+
+**Nachvollziehbarkeit.** Jede Kennzahl wird über `Kennzahl` bzw. `RestschuldWert`, `KapitaldienstWert` und `ZinssatzWert` (`src/components/herleitung.tsx`) angezeigt: ein Klick auf das ⓘ zeigt Berechnung, Zwischenwerte, Quelle, Stichtag und fehlende Angaben. Abkürzungen über `Begriff` und `Glossar` (Texte in `src/i18n`, Abschnitt `glossar`).
 
 **Szenarien.** Gespeichert werden nur die Annahmen (`Szenario.parameter`), gerechnet wird immer neu mit den aktuellen Daten und im Vergleich zur Basis (alles bleibt wie heute). Die Annahmen der Rechnung stehen oben in `src/lib/szenario.ts` und als Erläuterung auf der Seite.
 

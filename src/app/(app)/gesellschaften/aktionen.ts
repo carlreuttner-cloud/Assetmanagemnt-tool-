@@ -202,6 +202,48 @@ export async function buchungLoeschen(id: string): Promise<AktionsErgebnis> {
   });
 }
 
+const SALDOARTEN = ["DARLEHEN", "GUTHABEN"] as const;
+const SALDOQUELLEN = ["KONTOAUSZUG", "BANKBESTAETIGUNG", "JAHRESABSCHLUSS", "SONSTIGE"] as const;
+const SALDOSTATUS = ["BELEGT", "ENTWURF"] as const;
+
+/** Belegten Saldo (Restschuld oder Guthaben) zu einem Kredit erfassen. */
+export async function saldoHinzufuegen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db, t, sprache } = await schreibKontext();
+    const f = formularLeser(fd, sprache);
+    const k = t.kredite;
+    if (!(await db.kredit.findFirst({ where: { id: kreditId }, select: { id: true } }))) notFound();
+    const stichtag = f.datumOptional("stichtag", k.saldoStichtag);
+    const stichtagHinweis = f.text("stichtagHinweis");
+    if (!stichtag && !stichtagHinweis) throw new EingabeFehler(k.saldoStichtagFehlt);
+    const betrag = f.betrag("betrag", t.allgemein.betrag);
+    if (betrag.isNegative()) throw new EingabeFehler(k.saldoBetragFehlt);
+    await db.kreditsaldo.create({
+      data: {
+        kreditId,
+        stichtag: stichtag ? alsDbDatum(stichtag) : null,
+        stichtagHinweis: stichtag ? null : stichtagHinweis,
+        art: f.auswahl("art", k.saldoArt, SALDOARTEN),
+        betrag: zuText(betrag),
+        quelle: f.auswahl("quelle", k.saldoQuelle, SALDOQUELLEN),
+        quelleText: f.text("quelleText"),
+        status: f.auswahl("status", k.saldoStatus, SALDOSTATUS),
+        notiz: f.text("notiz"),
+      } as never,
+    });
+    refresh();
+    return { ok: k.saldoGespeichert };
+  });
+}
+
+export async function saldoLoeschen(id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    await db.kreditsaldo.delete({ where: { id } });
+    refresh();
+  });
+}
+
 export async function tilgungsplanBerechnen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
   let version = 0;
   const ergebnis = await fuehreAus(async () => {
@@ -212,7 +254,9 @@ export async function tilgungsplanBerechnen(kreditId: string, _v: AktionsErgebni
     const grundlage = await ladeRechengrundlage(kontext, { kreditId });
     const kredit = grundlage.kredite[0];
     if (!kredit) notFound();
+    // Ohne Eingabe nur die belegte Restschuld zum Vortag, nie ein Schätzwert.
     const saldo = f.betragOptional("saldo", k.planStartsaldo) ?? restschuld(kredit, plusTage(ab, -1));
+    if (saldo === null) throw new EingabeFehler(k.planStartsaldoFehlt);
     const zeilen = berechneTilgungsplan({
       saldo,
       ab,

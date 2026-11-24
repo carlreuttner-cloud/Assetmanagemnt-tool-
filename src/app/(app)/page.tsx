@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Balkendiagramm, Liniendiagramm } from "@/components/diagramme";
+import { Begriff, Glossar, Kennzahl } from "@/components/herleitung";
 import { Kachel, Kacheln, Karte, Leer, Marke, Reiter, Seitenkopf, Tabelle, rechts, MieteZelle } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -52,12 +53,10 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
     stichtag,
   );
 
-  // Verlauf: 24 Monate zurück, 60 Monate nach vorn
+  // Verlauf: 24 Monate zurück (nur belegte Werte; Planwerte je Kredit auf der Kreditseite)
   const jetzt = monatsNummer(stichtag);
   const vergangen = Array.from({ length: 25 }, (_, i) => monatsende(jetzt - 24 + i));
-  const zukunft = Array.from({ length: 61 }, (_, i) => monatsende(jetzt + i));
   const reiheVorher = zeitreihe(haeuser, kredite, [...vergangen.slice(0, -1), stichtag]);
-  const reiheSpaeter = zeitreihe(haeuser, kredite, [stichtag, ...zukunft.slice(1)]);
   const profil = zinsbindungsProfil(kredite, stichtag);
   const jeGesellschaft = gesellschaften
     .map((g) => ({
@@ -93,11 +92,11 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
     switch (w.art) {
       case "zinsbindung":
         return w.bis < stichtag
-          ? fuelle(tu.zinsbindungAbgelaufen, { datum: f.datum(w.bis), restschuld: f.betragGanz(w.restschuld) })
+          ? fuelle(tu.zinsbindungAbgelaufen, { datum: f.datum(w.bis), restschuld: w.restschuld ? f.betragGanz(w.restschuld) : t.allgemein.unbekannt })
           : fuelle(tu.zinsbindungText, {
               wann: w.monate === 0 ? tu.diesenMonat : w.monate === 1 ? tu.inEinemMonat : fuelle(tu.inMonaten, { monate: w.monate }),
               datum: f.datum(w.bis),
-              restschuld: f.betragGanz(w.restschuld),
+              restschuld: w.restschuld ? f.betragGanz(w.restschuld) : t.allgemein.unbekannt,
             });
       case "covenant": {
         const prozent = w.kennzahl === "LTV";
@@ -132,7 +131,7 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
     return s ? `/?${s}#warnungen` : "/#warnungen";
   };
 
-  const eigenkapital = gesamt.verkehrswert.minus(gesamt.restschuld);
+  const p = { k: gesamt, t, f, stichtag };
   const gesamtMiete = jeGesellschaft.reduce((s, x) => s.plus(x.k.sollJahr), dezimal(0));
 
   return (
@@ -140,36 +139,75 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
       <Seitenkopf titel={tu.titel} beschreibung={`${t.seiten.uebersicht} ${fuelle(tu.stand, { datum: f.datum(stichtag) })}`} />
 
       <Kacheln>
-        <Kachel titel={tk.verkehrswert} wert={f.betragGanz(gesamt.verkehrswert)} unter={`${tk.kaufpreis}: ${f.betragGanz(gesamt.kaufpreis)}`} />
         <Kachel
-          titel={tk.restschuld}
-          wert={f.betragGanz(gesamt.restschuld)}
-          unter={`${tk.ltv}: ${f.prozent(gesamt.ltv, 1)}`}
+          titel={tk.verkehrswert}
+          wert={<Kennzahl art="verkehrswert" {...p} ganz />}
+          unter={
+            <>
+              {tk.kaufpreis}: <Kennzahl art="kaufpreis" {...p} ganz />
+            </>
+          }
+        />
+        <Kachel
+          titel={<Begriff k="Restschuld" t={t}>{tk.restschuld}</Begriff>}
+          wert={<Kennzahl art="restschuld" {...p} ganz />}
+          unter={
+            <>
+              <Begriff k="LTV" t={t} />: <Kennzahl art="ltv" {...p} />
+            </>
+          }
           ton={gesamt.ltv && gesamt.ltv.greaterThan(70) ? "warnung" : undefined}
         />
-        <Kachel titel={tu.eigenkapital} wert={f.betragGanz(eigenkapital)} unter={`${gesamt.haeuser} ${tk.haeuser} · ${kredite.length} ${tk.kredite}`} />
+        <Kachel titel={tu.eigenkapital} wert={<Kennzahl art="eigenkapital" {...p} ganz />} unter={`${gesamt.haeuser} ${tk.haeuser} · ${kredite.length} ${tk.kredite}`} />
         <Kachel
-          titel={tk.sollMieteJahr}
-          wert={f.betragGanz(gesamt.sollJahr)}
-          unter={`${tk.sollMieteMonat}: ${f.betrag(gesamt.sollMonat)} · ${tk.istMieteJahr}: ${f.betragGanz(gesamt.istJahr)}`}
+          titel={
+            <>
+              {tk.sollMieteJahr} (<Begriff k="JNKM" t={t} />)
+            </>
+          }
+          wert={<Kennzahl art="sollJahr" {...p} />}
+          unter={
+            <>
+              {tk.sollMieteMonat}: <Kennzahl art="sollMonat" {...p} /> · {tk.istMieteJahr}: <Kennzahl art="istJahr" {...p} />
+            </>
+          }
         />
         <Kachel
-          titel={tk.leerstandFlaeche}
-          wert={f.prozent(gesamt.leerstandQuote, 1)}
-          unter={`${gesamt.leereEinheiten} / ${gesamt.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: ${f.betrag(gesamt.erwartetLeerMonat)} (${t.allgemein.jahr} ${f.jahresmiete(gesamt.erwartetLeerMonat)})`}
+          titel={<Begriff k="Leerstand" t={t}>{tk.leerstandFlaeche}</Begriff>}
+          wert={<Kennzahl art="leerstand" {...p} />}
+          unter={
+            <>
+              {`${gesamt.leereEinheiten} / ${gesamt.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: `}
+              <Kennzahl art="erwartetLeerMonat" {...p} /> ({t.allgemein.jahr} {f.jahresmiete(gesamt.erwartetLeerMonat)})
+            </>
+          }
           ton={gesamt.leerstandQuote && gesamt.leerstandQuote.greaterThanOrEqualTo(10) ? "warnung" : undefined}
         />
         <Kachel titel={tk.rueckstand} wert={f.betrag(gesamt.rueckstand)} ton={gesamt.rueckstand.greaterThan(0) ? "schlecht" : undefined} />
         <Kachel
-          titel={tk.dscrLang}
-          wert={f.faktor(gesamt.dscr)}
-          unter={`${tk.kapitaldienstJahr}: ${f.betragGanz(gesamt.kapitaldienstJahr)} · ${tk.icr}: ${f.faktor(gesamt.icr)}`}
+          titel={
+            <>
+              <Begriff k="DSCR" t={t} /> / <Begriff k="ICR" t={t} />
+            </>
+          }
+          wert={<Kennzahl art="dscr" {...p} />}
+          unter={
+            <>
+              <Begriff k="Kapitaldienst" t={t}>{tk.kapitaldienstJahr}</Begriff>: <Kennzahl art="kapitaldienst" {...p} ganz /> · <Begriff k="ICR" t={t} />:{" "}
+              <Kennzahl art="icr" {...p} />
+            </>
+          }
           ton={gesamt.dscr && gesamt.dscr.lessThan("1.2") ? "warnung" : undefined}
         />
         <Kachel
-          titel={tk.bruttoanfangsrendite}
-          wert={f.prozent(gesamt.bruttoanfangsrendite, 2)}
-          unter={`${tk.kaufpreisfaktor}: ${f.faktor(gesamt.kaufpreisfaktor, 1)} · ${tk.mietrendite}: ${f.prozent(gesamt.mietrendite, 2)}`}
+          titel={<Begriff k="BAR" t={t}>{tk.bruttoanfangsrendite}</Begriff>}
+          wert={<Kennzahl art="bruttoanfangsrendite" {...p} />}
+          unter={
+            <>
+              <Begriff k="Kaufpreisfaktor" t={t}>{tk.kaufpreisfaktor}</Begriff>: <Kennzahl art="kaufpreisfaktor" {...p} /> · {tk.mietrendite}:{" "}
+              <Kennzahl art="mietrendite" {...p} />
+            </>
+          }
         />
       </Kacheln>
 
@@ -221,9 +259,8 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
         <Karte titel={tu.entwicklung} className="xl:col-span-3">
           <Liniendiagramm
             reihen={[
-              { name: tk.verkehrswert, punkte: [...reiheVorher, ...reiheSpaeter.slice(1)].map((p) => ({ x: p.datum, y: p.verkehrswert })) },
-              { name: tk.restschuld, punkte: reiheVorher.map((p) => ({ x: p.datum, y: p.restschuld })) },
-              { name: tu.restschuldPlan, punkte: reiheSpaeter.map((p) => ({ x: p.datum, y: p.restschuld })), gestrichelt: true, farbe: "#1d4ed8" },
+              { name: tk.verkehrswert, punkte: reiheVorher.map((x) => ({ x: x.datum, y: x.verkehrswert })) },
+              { name: tu.restschuldBelegt, punkte: reiheVorher.map((x) => ({ x: x.datum, y: x.restschuld })) },
             ]}
             formatY={(w) => f.betragKurz(w)}
             formatX={(d) => formatMonat(d)}
@@ -236,7 +273,9 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
             balken={profil.map((g) => ({
               name: g.jahr === "variabel" ? tu.variabel : g.jahr,
               wert: g.restschuld,
-              zusatz: g.anzahl === 1 ? tu.einKredit : fuelle(tu.kreditAnzahl, { anzahl: g.anzahl }),
+              zusatz:
+                (g.anzahl === 1 ? tu.einKredit : fuelle(tu.kreditAnzahl, { anzahl: g.anzahl })) +
+                (g.ohneBeleg > 0 ? ` · ${fuelle(tu.ohneBeleg, { anzahl: g.ohneBeleg })}` : ""),
               farbe: g.jahr === "variabel" ? "#7c3aed" : Number(g.jahr) <= Number(stichtag.slice(0, 4)) + 1 ? "#be123c" : "#0f766e",
             }))}
             format={(w) => f.betragKurz(w)}
@@ -251,13 +290,17 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
                 <th>{t.gesellschaften.name}</th>
                 <th className={rechts}>{tk.verkehrswert}</th>
                 <th className={rechts}>{tk.restschuld}</th>
-                <th className={rechts}>{tk.ltv}</th>
+                <th className={rechts}>
+                  <Begriff k="LTV" t={t} />
+                </th>
                 <th className={rechts}>
                   {tk.sollMiete} ({t.allgemein.monat} / {t.allgemein.jahr})
                 </th>
                 <th className={rechts}>{tu.anteilMiete}</th>
                 <th className={rechts}>{tk.leerstand}</th>
-                <th className={rechts}>{tk.dscr}</th>
+                <th className={rechts}>
+                  <Begriff k="DSCR" t={t} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -272,20 +315,30 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
                       g.name
                     )}
                   </td>
-                  <td className={rechts}>{f.betragGanz(k.verkehrswert)}</td>
-                  <td className={rechts}>{f.betragGanz(k.restschuld)}</td>
-                  <td className={rechts}>{f.prozent(k.ltv, 1)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="verkehrswert" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="restschuld" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="ltv" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
                   </td>
                   <td className={rechts}>{gesamtMiete.isZero() ? "–" : f.prozent(k.sollJahr.dividedBy(gesamtMiete).times(100), 1)}</td>
                   <td className={rechts}>{f.prozent(k.leerstandQuote, 1)}</td>
-                  <td className={rechts}>{f.faktor(k.dscr)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </Tabelle>
         </Karte>
+
+      <Glossar begriffe={["Restschuld", "LTV", "DSCR", "ICR", "JNKM", "Kapitaldienst", "Leerstand", "BAR", "Kaufpreisfaktor", "Zinsbindung", "Covenant"]} t={t} />
     </div>
   );
 }

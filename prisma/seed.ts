@@ -159,6 +159,13 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     }))),
   });
 
+  await db.kreditsaldo.createMany({
+    data: p.kredite.flatMap((k) => k.salden.map((x) => ({
+      mandantId, kreditId: kredit.get(k.schluessel)!, stichtag: x.stichtag ? tag(x.stichtag) : null,
+      stichtagHinweis: x.stichtagHinweis, art: x.art, betrag: geld(x.betrag), quelle: x.quelle, quelleText: x.quelleText, status: x.status,
+    }))),
+  });
+
   // Referenzzinsen (Näherungswerte aus dem Generator), monatlich ab 01/2024.
   const referenzzinsen = [];
   for (let monat = monatsNummer("2024-01-01"); monat <= monatsNummer("2026-11-01"); monat++) {

@@ -214,6 +214,16 @@ export interface TestTilgungsplan {
   zeilen: { faelligAm: string; zins: Decimal; tilgung: Decimal; rate: Decimal; restschuld: Decimal }[];
 }
 
+export interface TestSaldo {
+  stichtag: string | null;
+  stichtagHinweis: string | null;
+  art: "DARLEHEN" | "GUTHABEN";
+  betrag: Decimal;
+  quelle: "KONTOAUSZUG" | "BANKBESTAETIGUNG" | "JAHRESABSCHLUSS" | "SONSTIGE";
+  quelleText: string;
+  status: "BELEGT" | "ENTWURF";
+}
+
 export interface TestKredit {
   schluessel: string;
   gesellschaft: string;
@@ -240,6 +250,8 @@ export interface TestKredit {
   restschuldStichtag: Decimal;
   saldoVorZeitraum: Decimal;
   buchungen: TestBuchung[];
+  /** Belegte Jahressalden (Saldenbestätigungen, Jahresabschlüsse) mit bewusst eingebauten Sonderfällen */
+  salden: TestSaldo[];
   tilgungsplaene: TestTilgungsplan[];
   covenants: NonNullable<KreditVorgabe["covenants"]>;
 }
@@ -353,6 +365,8 @@ export function baueKredite(zielSchuld: Map<string, Decimal>, kaufpreis: Map<str
       notiz = "Gesamtgrundschuld auf beiden Häusern, Aufteilung nach Kaufpreisverhältnis.";
     }
 
+    const salden = baueSalden(v.schluessel, perioden, ursprung, bank.name);
+
     const letzte = [...perioden].reverse().find((p) => p.datum <= STICHTAG)!;
     const ratenbetrag = v.variabel ? aufCent(ursprung.times(v.tilgung).dividedBy(100 * (v.zahlweise === "QUARTALSWEISE" ? 4 : 12))) : letzte.zins.plus(letzte.tilgung);
 
@@ -380,8 +394,52 @@ export function baueKredite(zielSchuld: Map<string, Decimal>, kaufpreis: Map<str
       restschuldStichtag: restschuldAm(perioden, ursprung, STICHTAG),
       saldoVorZeitraum,
       buchungen,
+      salden,
       tilgungsplaene,
       covenants: v.covenants ?? [],
     };
   });
+}
+
+/**
+ * Jahressalden zum 31.12. aus dem Tilgungsverlauf: bis 2023 aus dem Jahresabschluss, ab 2024
+ * als Saldenbestätigung der Bank. Sonderfälle zum Testen der Anzeige:
+ * - K03: Saldo 2025 nur als Entwurf (Jahresabschluss noch nicht festgestellt),
+ * - K05: zusätzlicher Saldo mit unklarem Stichtag,
+ * - K08: Guthaben auf einem Tilgungsersatzkonto (getrennt von der Restschuld),
+ * - K10: Saldo 2022 fehlt (Lücke im Jahresvergleich).
+ */
+function baueSalden(schluessel: string, perioden: Periode[], ursprung: Decimal, bankName: string): TestSaldo[] {
+  const salden: TestSaldo[] = [];
+  const jahre = [...new Set(perioden.map((p) => Number(p.datum.slice(0, 4))))].filter((j) => j <= 2025);
+  for (const jahr of jahre) {
+    const ende = `${jahr}-12-31`;
+    const bis = perioden.filter((p) => p.datum <= ende);
+    const betrag = bis.length ? bis[bis.length - 1].restschuld : ursprung;
+    if (schluessel === "K10" && jahr === 2022) continue;
+    const ausAbschluss = jahr < 2024;
+    salden.push({
+      stichtag: ende,
+      stichtagHinweis: null,
+      art: "DARLEHEN",
+      betrag,
+      quelle: ausAbschluss ? "JAHRESABSCHLUSS" : "BANKBESTAETIGUNG",
+      quelleText: ausAbschluss ? `Jahresabschluss ${jahr}, Verbindlichkeiten gegenüber Kreditinstituten` : `Saldenbestätigung ${bankName} zum 31.12.${jahr}`,
+      status: schluessel === "K03" && jahr === 2025 ? "ENTWURF" : "BELEGT",
+    });
+    if (schluessel === "K08" && jahr >= 2023) {
+      salden.push({
+        stichtag: ende, stichtagHinweis: null, art: "GUTHABEN", betrag: dezimal(12_000 * (jahr - 2022)),
+        quelle: "KONTOAUSZUG", quelleText: `Kontoauszug Tilgungsersatzkonto zum 31.12.${jahr}`, status: "BELEGT",
+      });
+    }
+  }
+  if (schluessel === "K05") {
+    const p = perioden.find((x) => x.datum.startsWith("2022-11")) ?? perioden[0];
+    salden.push({
+      stichtag: null, stichtagHinweis: "Ende 2022 (Notiz ohne Datum)", art: "DARLEHEN", betrag: p.restschuld,
+      quelle: "SONSTIGE", quelleText: "Handnotiz in der Kreditakte", status: "BELEGT",
+    });
+  }
+  return salden;
 }

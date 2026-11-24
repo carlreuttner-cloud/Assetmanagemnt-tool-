@@ -40,6 +40,7 @@ export function alsDaten(p: TestPortfolio): { haeuser: HausDaten[]; kredite: Kre
     ratenbetrag: k.ratenbetrag,
     haeuser: k.haeuser.map((x) => ({ hausId: x.haus, anteilProzent: x.anteilProzent })),
     buchungen: k.buchungen.map((b) => ({ datum: b.datum, art: b.art, betrag: b.betrag, saldoNach: b.saldoNach })),
+    salden: k.salden,
     tilgungsplaene: k.tilgungsplaene.map((t) => ({ version: t.version, gueltigAb: t.gueltigAb, zeilen: t.zeilen })),
   }));
   return { haeuser, kredite };

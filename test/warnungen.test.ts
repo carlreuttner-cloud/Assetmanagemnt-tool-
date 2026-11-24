@@ -41,7 +41,7 @@ describe("Warnungen der Übersicht", () => {
 describe("Verläufe", () => {
   it("Zeitreihe am Stichtag entspricht den Summen", () => {
     const [punkt] = zeitreihe(haeuser, kredite, [STICHTAG]);
-    expect(punkt.restschuld.toFixed(2)).toBe(kredite.reduce((s, k) => s.plus(restschuld(k, STICHTAG)), dezimal(0)).toFixed(2));
+    expect(punkt.restschuld!.toFixed(2)).toBe(kredite.reduce((s, k) => s.plus(restschuld(k, STICHTAG)!), dezimal(0)).toFixed(2));
     const soll = kennzahlen(p).reduce((s, k) => s.plus(k.sollMonat), dezimal(0));
     expect(punkt.sollMonat.toFixed(2)).toBe(soll.toFixed(2));
   });
@@ -49,7 +49,7 @@ describe("Verläufe", () => {
   it("Zinsbindungsprofil verteilt die gesamte Restschuld", () => {
     const profil = zinsbindungsProfil(kredite, STICHTAG);
     const summe = profil.reduce((s, g) => s.plus(g.restschuld), dezimal(0));
-    expect(summe.toFixed(2)).toBe(kredite.reduce((s, k) => s.plus(restschuld(k, STICHTAG)), dezimal(0)).toFixed(2));
+    expect(summe.toFixed(2)).toBe(kredite.reduce((s, k) => s.plus(restschuld(k, STICHTAG)!), dezimal(0)).toFixed(2));
     expect(profil[0].jahr).toBe("variabel");
     expect(profil.find((g) => g.jahr === "variabel")?.anzahl).toBe(7);
   });
