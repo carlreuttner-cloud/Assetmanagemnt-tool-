@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht), Phase 6 (Szenarien), Phase 7 (Nachvollziehbarkeit und belegte Salden), Phase 8 (Covenant-Headroom und Ausschüttungssperren) Phase 9 (Gutachtenhistorie) und Phase 10 (Finanzen der Gesellschaften) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht), Phase 6 (Szenarien), Phase 7 (Nachvollziehbarkeit und belegte Salden), Phase 8 (Covenant-Headroom und Ausschüttungssperren) Phase 9 (Gutachtenhistorie) Phase 10 (Finanzen der Gesellschaften) und Phase 11 (Dokumenten-Checkliste) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -127,6 +127,7 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 - Covenant-Einträge haben eine Art (`Covenant.folge`): Covenant oder Ausschüttungssperre (Lock-up). Der Puffer bis zur Grenze und der Spielraum von Verkehrswert, Miete, Kapitaldienst und Zinsen stehen in `src/lib/covenant.ts`. Nicht automatisch prüfbare Sperren (z. B. Vorlage des Jahresabschlusses) erscheinen als „manuell prüfen“.
 - Gutachten (`Gutachten`) gehören zu einem Haus und legen beim Speichern einen verknüpften Verkehrswert (Quelle „Gutachten“) an bzw. ändern ihn; Löschen entfernt beide. Die rechnerische Kontrolle (Barwertfaktor, Ertragswert, Rohertragsfaktor) in `src/lib/gutachten.ts` rechnet nur mit erfassten Angaben, fehlende bleiben „im Gutachten nicht angegeben“.
 - Finanzen der Gesellschaften (`Geschaeftsjahr`): je Gesellschaft und Jahr ein Eintrag mit GuV-, Bilanz- und Cashflow-Posten, Quelle (Jahresabschluss, BWA, sonstiger Beleg) und Status (endgültig/Entwurf). EBITDA, EBIT, EBT, Bilanzsummen und Kennzahlen rechnet `src/lib/finanzen.ts`; fehlt ein Posten, bleibt das Ergebnis unbekannt. Die Bankverbindlichkeiten werden mit den belegten Kreditsalden zum Bilanzstichtag abgeglichen. Fehlende Geschäftsjahre erscheinen als Lücke.
+- Dokumenten-Checkliste (Bereich `dokumente`): Pflichtdokumente (`Dokumentvorgabe`) je Gesellschaft, Haus oder Kredit mit Gültigkeit in Monaten, Nachweise (`Dokumentnachweis`) mit Dokumentdatum und Ablageort. Der Status (vorhanden, läuft ab, veraltet, Datum fehlt, fehlt, nicht erforderlich) kommt aus `src/lib/dokumente.ts`; Gutachten, endgültige Jahresabschlüsse und Saldenbestätigungen liefern den Stand automatisch. Dateien werden erst mit dem Dateispeicher der Produktionsreife abgelegt.
 
 **Fotos.** Werden im Verzeichnis `UPLOAD_DIR` (Docker-Volume `uploads`) je Mandant abgelegt und nur über `/api/fotos/<id>` mit Mandanten- und Rechteprüfung ausgeliefert. Erlaubt sind JPEG, PNG und WebP bis 10 MB; der Typ wird am Dateiinhalt geprüft. Backups und S3-Speicher folgen in der Phase „Produktionsreife“.
 

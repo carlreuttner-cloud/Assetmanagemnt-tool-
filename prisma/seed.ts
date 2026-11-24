@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { BANKEN, erzeugePortfolio, type TestPortfolio } from "./testdaten/portfolio";
 import { baueFinanzen } from "./testdaten/finanzen";
+import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 
 if (process.env.NODE_ENV === "production") {
@@ -189,6 +190,29 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       mandantId, gesellschaftId: gesellschaft.get(j.gesellschaft)!, jahr: j.jahr, beginn: tag(`${j.jahr}-01-01`), ende: tag(`${j.jahr}-12-31`),
       quelle: j.quelle, quelleText: j.quelleText, status: j.status,
       ...Object.fromEntries(Object.entries(j.werte).map(([k, w]) => [k, w === null ? null : geld(w)])),
+    })),
+  });
+
+  const vorgabe = new Map(TEST_VORGABEN.map((v) => [v.schluessel, randomUUID()]));
+  await db.dokumentvorgabe.createMany({
+    data: TEST_VORGABEN.map((v) => ({
+      id: vorgabe.get(v.schluessel)!, mandantId, name: v.name, beschreibung: v.beschreibung, bezug: v.bezug,
+      gueltigMonate: v.gueltigMonate, automatik: v.automatik, reihenfolge: v.reihenfolge,
+    })),
+  });
+  const nachweise = baueNachweise([
+    ...p.gesellschaften.map((g) => ({ bezug: "GESELLSCHAFT" as const, schluessel: g.schluessel })),
+    ...p.haeuser.map((h) => ({ bezug: "HAUS" as const, schluessel: h.schluessel, ort: h.ort })),
+    ...p.kredite.map((k) => ({ bezug: "KREDIT" as const, schluessel: k.schluessel })),
+  ]);
+  await db.dokumentnachweis.createMany({
+    data: nachweise.map((n) => ({
+      mandantId, vorgabeId: vorgabe.get(n.vorgabe)!,
+      gesellschaftId: n.bezug === "GESELLSCHAFT" ? gesellschaft.get(n.objekt)! : null,
+      hausId: n.bezug === "HAUS" ? haus.get(n.objekt)! : null,
+      kreditId: n.bezug === "KREDIT" ? kredit.get(n.objekt)! : null,
+      vorhanden: n.vorhanden, nichtErforderlich: n.nichtErforderlich, dokumentDatum: n.dokumentDatum ? tag(n.dokumentDatum) : null,
+      ablageort: n.ablageort, notiz: n.notiz,
     })),
   });
 

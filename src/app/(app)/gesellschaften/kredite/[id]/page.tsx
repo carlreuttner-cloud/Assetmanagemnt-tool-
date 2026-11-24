@@ -13,6 +13,8 @@ import { heute, isoDatum, monatsanfang, monatsNummer } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
+import { DokumenteKarte } from "@/components/dokumente";
+import { ladeCheckliste } from "@/lib/daten/dokumente";
 import { covenantKennzahlen } from "@/lib/kennzahlen";
 import {
   gueltigerTilgungsplan,
@@ -68,6 +70,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
   const { haeuser, kredite, referenzwerte } = grundlage;
 
   const schreiben = darf(kontext.rolle, "gesellschaften", "schreiben");
+  const dokumente = darf(kontext.rolle, "dokumente") ? await ladeCheckliste(kontext, { bezug: "KREDIT", id }) : null;
   const nachweis = restschuldNachweis(daten, stichtag);
   const satz = zinssatz(daten, referenzwerte, stichtag);
   const darlehen = saldenJahresvergleich(daten, "DARLEHEN");
@@ -485,6 +488,8 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           </>
         )}
       </Karte>
+
+      {dokumente && <DokumenteKarte checkliste={dokumente} bezug="KREDIT" id={id} t={t} />}
 
       <Glossar begriffe={["Restschuld", "Kapitaldienst", "Zinsbindung", "Covenant", "Ausschuettungssperre", "Headroom", "LTV", "DSCR", "ICR", "Entwurf", "Guthaben"]} t={t} />
 

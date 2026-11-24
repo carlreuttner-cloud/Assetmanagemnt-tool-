@@ -63,6 +63,8 @@ model Mandant {
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
   geschaeftsjahre         Geschaeftsjahr[]
+  dokumentvorgaben        Dokumentvorgabe[]
+  dokumentnachweise       Dokumentnachweis[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -144,13 +146,14 @@ model Gesellschaft {
   erstelltAm     DateTime @default(now())
   geaendertAm    DateTime @updatedAt
 
-  mandant     Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  haeuser     Haus[]
-  kredite     Kredit[]
-  dokumente   Dokument[]
-  zuweisungen GesellschaftZuweisung[]
-  szenarien   Szenario[]
-  abschluesse Geschaeftsjahr[]
+  mandant           Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haeuser           Haus[]
+  kredite           Kredit[]
+  dokumente         Dokument[]
+  zuweisungen       GesellschaftZuweisung[]
+  szenarien         Szenario[]
+  abschluesse       Geschaeftsjahr[]
+  dokumentnachweise Dokumentnachweis[]
 
   @@index([mandantId])
 }
@@ -170,17 +173,18 @@ model Haus {
   erstelltAm     DateTime  @default(now())
   geaendertAm    DateTime  @updatedAt
 
-  mandant       Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschaft  Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
-  verkehrswerte Verkehrswert[]
-  gutachten     Gutachten[]
-  fotos         Foto[]
-  einheiten     Einheit[]
-  kredite       KreditHaus[]
-  investitionen Investition[]
-  dokumente     Dokument[]
-  zuweisungen   HausZuweisung[]
-  importe       Importvorgang[]
+  mandant           Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft      Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  verkehrswerte     Verkehrswert[]
+  gutachten         Gutachten[]
+  fotos             Foto[]
+  einheiten         Einheit[]
+  kredite           KreditHaus[]
+  investitionen     Investition[]
+  dokumente         Dokument[]
+  zuweisungen       HausZuweisung[]
+  importe           Importvorgang[]
+  dokumentnachweise Dokumentnachweis[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -434,15 +438,16 @@ model Kredit {
   erstelltAm          DateTime    @default(now())
   geaendertAm         DateTime    @updatedAt
 
-  mandant        Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschaft   Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
-  haeuser        KreditHaus[]
-  covenants      Covenant[]
-  buchungen      Kreditbuchung[]
-  salden         Kreditsaldo[]
-  tilgungsplaene Tilgungsplan[]
-  dokumente      Dokument[]
-  importe        Importvorgang[]
+  mandant           Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft      Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  haeuser           KreditHaus[]
+  covenants         Covenant[]
+  buchungen         Kreditbuchung[]
+  salden            Kreditsaldo[]
+  tilgungsplaene    Tilgungsplan[]
+  dokumente         Dokument[]
+  importe           Importvorgang[]
+  dokumentnachweise Dokumentnachweis[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -816,4 +821,67 @@ model Geschaeftsjahr {
 
   @@unique([gesellschaftId, jahr])
   @@index([mandantId])
+}
+
+enum DokumentBezug {
+  GESELLSCHAFT
+  HAUS
+  KREDIT
+}
+
+/// Status, der sich aus vorhandenen Daten ableiten lässt, wenn kein eigener Nachweis erfasst ist.
+enum DokumentAutomatik {
+  GUTACHTEN
+  JAHRESABSCHLUSS
+  SALDENBESTAETIGUNG
+}
+
+/// Pflichtdokument (Art), das je Gesellschaft, Haus oder Kredit vorliegen soll.
+model Dokumentvorgabe {
+  id            String             @id @default(cuid())
+  mandantId     String
+  name          String
+  bezug         DokumentBezug
+  /// Wie lange ein Dokument als aktuell gilt (in Monaten ab Dokumentdatum); null = unbegrenzt
+  gueltigMonate Int?
+  automatik     DokumentAutomatik?
+  beschreibung  String?
+  reihenfolge   Int                @default(0)
+  aktiv         Boolean            @default(true)
+  angelegtAm    DateTime           @default(now())
+
+  mandant   Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  nachweise Dokumentnachweis[]
+
+  @@unique([mandantId, bezug, name])
+  @@index([mandantId])
+}
+
+/// Stand eines Pflichtdokuments für ein Objekt. Die Datei selbst folgt mit dem Dateispeicher (Produktionsreife).
+model Dokumentnachweis {
+  id                String    @id @default(cuid())
+  mandantId         String
+  vorgabeId         String
+  gesellschaftId    String?
+  hausId            String?
+  kreditId          String?
+  /// true = liegt vor, false = fehlt (bewusst so erfasst)
+  vorhanden         Boolean
+  /// Dokument wird für dieses Objekt nicht benötigt
+  nichtErforderlich Boolean   @default(false)
+  /// Datum bzw. Stand des Dokuments (z. B. Datum des Grundbuchauszugs)
+  dokumentDatum     DateTime? @db.Date
+  /// Wo das Dokument liegt (Ordner, Datenraum, Bank …)
+  ablageort         String?
+  notiz             String?
+  geaendertAm       DateTime  @updatedAt
+
+  mandant      Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  vorgabe      Dokumentvorgabe @relation(fields: [vorgabeId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft?   @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  haus         Haus?           @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  kredit       Kredit?         @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([vorgabeId])
 }

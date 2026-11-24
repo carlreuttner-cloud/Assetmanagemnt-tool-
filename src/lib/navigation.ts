@@ -13,6 +13,7 @@ export const NAVIGATION: NavEintrag[] = [
   { bereich: "gesellschaften", pfad: "/gesellschaften", textSchluessel: "gesellschaften" },
   { bereich: "haeuser", pfad: "/haeuser", textSchluessel: "haeuser" },
   { bereich: "mieter", pfad: "/mieter", textSchluessel: "mieter" },
+  { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
   { bereich: "szenarien", pfad: "/szenarien", textSchluessel: "szenarien" },
   { bereich: "berichte", pfad: "/berichte", textSchluessel: "berichte" },
   { bereich: "import", pfad: "/import", textSchluessel: "import" },
