@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { BANKEN, erzeugePortfolio, type TestPortfolio } from "./testdaten/portfolio";
 import { baueFinanzen } from "./testdaten/finanzen";
+import { baueWaterfall } from "./testdaten/waterfall";
 import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 
@@ -213,6 +214,26 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       kreditId: n.bezug === "KREDIT" ? kredit.get(n.objekt)! : null,
       vorhanden: n.vorhanden, nichtErforderlich: n.nichtErforderlich, dokumentDatum: n.dokumentDatum ? tag(n.dokumentDatum) : null,
       ablageort: n.ablageort, notiz: n.notiz,
+    })),
+  });
+
+  const waterfall = baueWaterfall(p.haeuser);
+  for (const gs of waterfall.gesellschafter) {
+    const gesellschafterId = randomUUID();
+    await db.gesellschafter.create({
+      data: {
+        id: gesellschafterId, mandantId, gesellschaftId: gesellschaft.get(gs.gesellschaft)!, name: gs.name,
+        beteiligungProzent: gs.beteiligungProzent?.toFixed(6) ?? null, gewinnanteilProzent: gs.gewinnanteilProzent?.toFixed(6) ?? null,
+      },
+    });
+    await db.kapitalbewegung.createMany({
+      data: gs.bewegungen.map((b) => ({ mandantId, gesellschafterId, art: b.art, datum: b.datum ? tag(b.datum) : null, betrag: geld(b.betrag), quelle: b.quelle })),
+    });
+  }
+  await db.waterfallvertrag.createMany({
+    data: waterfall.vertraege.map((v) => ({
+      mandantId, gesellschaftId: gesellschaft.get(v.gesellschaft)!, vorzugsrenditeProzent: v.vorzugsrenditeProzent.toFixed(6),
+      verzinsung: v.verzinsung, ausschuettungenAnrechnen: v.ausschuettungenAnrechnen, quelle: v.quelle,
     })),
   });
 

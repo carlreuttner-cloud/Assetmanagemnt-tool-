@@ -394,3 +394,131 @@ export async function geschaeftsjahrLoeschen(id: string, gesellschaftId: string)
   if (ergebnis.fehler) return ergebnis;
   redirect(`/gesellschaften/${gesellschaftId}/finanzen`);
 }
+
+// ---------------------------------------------------------------------------
+// Gesellschafter, Kapitalbewegungen und Verteilungsregeln (Waterfall)
+// ---------------------------------------------------------------------------
+
+const BEWEGUNGSARTEN = ["EINLAGE", "RUECKZAHLUNG", "AUSSCHUETTUNG"] as const;
+const VERZINSUNGEN = ["EINFACH", "ZINSESZINS"] as const;
+
+export async function gesellschafterSpeichern(gesellschaftId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    const f = formularLeser(fd, sprache);
+    const tw = t.waterfall;
+    await db.gesellschafter.create({
+      data: {
+        gesellschaftId,
+        name: f.pflicht("name", tw.name),
+        beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
+        gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
+        notiz: f.text("notiz"),
+      } as never,
+    });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+export async function gesellschafterAendern(ort: { id: string; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    await pruefeGesellschaft(kontext, ort.gesellschaftId);
+    const f = formularLeser(fd, sprache);
+    const tw = t.waterfall;
+    const g = await db.gesellschafter.findFirst({ where: { id: ort.id, gesellschaftId: ort.gesellschaftId }, select: { id: true } });
+    if (!g) notFound();
+    await db.gesellschafter.update({
+      where: { id: ort.id },
+      data: {
+        name: f.pflicht("name", tw.name),
+        beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
+        gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
+        notiz: f.text("notiz"),
+      },
+    });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+export async function gesellschafterLoeschen(id: string, gesellschaftId: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    const g = await db.gesellschafter.findFirst({ where: { id, gesellschaftId }, select: { id: true } });
+    if (!g) notFound();
+    await db.kapitalbewegung.deleteMany({ where: { gesellschafterId: id } });
+    await db.gesellschafter.delete({ where: { id } });
+    refresh();
+  });
+}
+
+export async function bewegungHinzufuegen(ort: { gesellschafterId: string; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    await pruefeGesellschaft(kontext, ort.gesellschaftId);
+    const g = await db.gesellschafter.findFirst({ where: { id: ort.gesellschafterId, gesellschaftId: ort.gesellschaftId }, select: { id: true } });
+    if (!g) notFound();
+    const f = formularLeser(fd, sprache);
+    const tw = t.waterfall;
+    const datum = f.datumOptional("datum", tw.datum);
+    const betrag = f.betrag("betrag", tw.betrag);
+    if (!betrag.greaterThan(0)) throw new EingabeFehler(fuelle(t.fehler.betrag, { feld: tw.betrag }));
+    await db.kapitalbewegung.create({
+      data: {
+        gesellschafterId: ort.gesellschafterId,
+        art: f.auswahl("art", tw.art, BEWEGUNGSARTEN),
+        datum: datum ? alsDbDatum(datum) : null,
+        betrag: zuText(betrag),
+        quelle: f.text("quelle"),
+        notiz: f.text("notiz"),
+      } as never,
+    });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+export async function bewegungLoeschen(id: string, gesellschaftId: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    const b = await db.kapitalbewegung.findFirst({ where: { id, gesellschafter: { gesellschaftId } }, select: { id: true } });
+    if (!b) notFound();
+    await db.kapitalbewegung.delete({ where: { id } });
+    refresh();
+  });
+}
+
+export async function waterfallvertragSpeichern(gesellschaftId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    const f = formularLeser(fd, sprache);
+    const tw = t.waterfall;
+    const daten = {
+      vorzugsrenditeProzent: zuText(f.prozent("vorzugsrenditeProzent", tw.vorzugsrendite))!,
+      verzinsung: f.auswahl("verzinsung", tw.verzinsung, VERZINSUNGEN),
+      ausschuettungenAnrechnen: fd.get("ausschuettungenAnrechnen") === "on",
+      quelle: f.pflicht("quelle", tw.vertragQuelle),
+      notiz: f.text("notiz"),
+    };
+    const bisher = await db.waterfallvertrag.findFirst({ where: { gesellschaftId }, select: { id: true } });
+    if (bisher) await db.waterfallvertrag.update({ where: { id: bisher.id }, data: daten });
+    else await db.waterfallvertrag.create({ data: { ...daten, gesellschaftId } as never });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+export async function waterfallvertragLoeschen(gesellschaftId: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    await db.waterfallvertrag.deleteMany({ where: { gesellschaftId } });
+    refresh();
+  });
+}
