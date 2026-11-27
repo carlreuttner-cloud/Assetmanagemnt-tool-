@@ -1,4 +1,4 @@
-# Lokaler Start: `docker compose up --build`
+# Lokaler Start: `docker compose up --build -d`
 # Passwörter und Schlüssel kommen aus der Datei .env (Vorlage: .env.example), nie aus dieser Datei.
 # Nur die Datenbank (für `npm run dev`): `docker compose up -d db`
 services:
@@ -20,14 +20,20 @@ services:
       retries: 10
 
   # Spielt ausstehende Datenbank-Migrationen ein und beendet sich dann.
+  # Testdaten: `docker compose run --rm migrate npm run db:seed`. Läuft als Benutzer „app“ mit
+  # demselben Volume „uploads“ wie die App, damit die Testdokumente dort ankommen.
   migrate:
     build:
       context: .
       target: builder
     command: npx prisma migrate deploy
+    user: app
     environment:
       DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
       SEED_PASSWORT: ${SEED_PASSWORT:-}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -41,6 +47,9 @@ services:
       DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET in .env setzen}
       AUTH_TRUST_HOST: "true"
+      # KI (optional): ohne Schlüssel läuft die App normal, KI-Funktionen zeigen einen Hinweis
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      KI_MODELL: ${KI_MODELL:-}
     ports:
       - "3000:3000"
     volumes:

@@ -9,6 +9,8 @@ import type { Rolle } from "@/generated/prisma/enums";
 import { darf, startseite, type Aktion, type Bereich } from "./rechte";
 
 export const MANDANT_COOKIE = "aktiver_mandant";
+/** Löscht eine ungültige Sitzung und leitet zur Anmeldung (siehe app/api/sitzung-beenden). */
+export const SITZUNG_BEENDEN = "/api/sitzung-beenden";
 
 export type Kontext = {
   benutzer: { id: string; name: string; email: string };
@@ -40,7 +42,9 @@ export const getKontext = cache(async (): Promise<Kontext> => {
       },
     },
   });
-  if (!benutzer || !benutzer.aktiv) redirect("/login");
+  // Sitzung zeigt auf einen gelöschten oder deaktivierten Benutzer (z. B. nach neuem Seed):
+  // Cookies löschen, sonst leitet /login wegen der „Sitzung“ zurück (Endlosschleife).
+  if (!benutzer || !benutzer.aktiv) redirect(SITZUNG_BEENDEN);
   if (benutzer.mitgliedschaften.length === 0) redirect("/kein-mandant");
 
   const gewuenscht = (await cookies()).get(MANDANT_COOKIE)?.value;

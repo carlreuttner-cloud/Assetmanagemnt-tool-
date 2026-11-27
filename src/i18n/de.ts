@@ -72,6 +72,7 @@ export const de = {
   },
   login: {
     titel: "Anmelden",
+    sitzungAbgelaufen: "Deine Sitzung war nicht mehr gültig (z. B. nach dem Neuanlegen der Testdaten). Bitte melde dich neu an.",
     email: "E-Mail",
     passwort: "Passwort",
     absenden: "Anmelden",
@@ -320,6 +321,7 @@ export const de = {
   suche: {
     titel: "Suche",
     platzhalter: "Suchen …",
+    kuerzel: "Strg K",
     label: "Suche in Gesellschaften, Häusern, Einheiten, Mietern und Krediten",
     hinweis: "Durchsucht Namen, Adressen, IBANs, Kredit- und Registernummern. Dokumentinhalte durchsucht der Reiter „Dateien und Importe“.",
     zuKurz: "Bitte mindestens 2 Zeichen eingeben.",
@@ -1273,7 +1275,7 @@ export const de = {
     generieren: "Vorschlag generieren",
     laeuft: "Vorschlag wird erstellt, das kann ein bis drei Minuten dauern …",
     bestaetigen: "Das Datenpaket dieses Hauses (ohne Personendaten) wird an Anthropic (Claude) gesendet. Fortfahren?",
-    nichtKonfiguriert: "Kein API-Schlüssel hinterlegt (Umgebungsvariable ANTHROPIC_API_KEY). Du kannst das Datenpaket ansehen, aber keinen Vorschlag erzeugen.",
+    nichtKonfiguriert: "Die KI ist nicht eingerichtet: Es ist kein API-Schlüssel hinterlegt. Du kannst das Datenpaket ansehen, aber keinen Vorschlag erzeugen. Zum Einrichten den Schlüssel in der Datei .env bei ANTHROPIC_API_KEY eintragen und die App neu starten (docker compose up -d).",
     nurLesen: "Mit deiner Rolle kannst du Vorschläge ansehen, aber keine erzeugen.",
     verlauf: "Bisherige Vorschläge für dieses Haus",
     keinVerlauf: "Noch keine Vorschläge für dieses Haus.",
@@ -1942,7 +1944,7 @@ export const de = {
       annahme: "Annahme: Die Marktmieten bleiben unverändert. Diese Aussage steht nicht in den Daten und ist deshalb als Annahme gekennzeichnet.",
       ungueltig: "Beispiel für einen ungültigen Verweis: Diese Empfehlung beruft sich auf einen Fakt, den es nicht gibt, und wird deshalb als ohne Beleg markiert.",
     },
-    nichtKonfiguriert: "Kein API-Schlüssel hinterlegt (Umgebungsvariable ANTHROPIC_API_KEY). Du kannst das Datenpaket ansehen, aber keine Analyse starten.",
+    nichtKonfiguriert: "Die KI ist nicht eingerichtet: Es ist kein API-Schlüssel hinterlegt. Du kannst das Datenpaket ansehen, aber keine Analyse starten. Zum Einrichten den Schlüssel in der Datei .env bei ANTHROPIC_API_KEY eintragen und die App neu starten (docker compose up -d).",
     starten: "Analyse starten",
     laeuft: "Analyse läuft, das kann ein bis drei Minuten dauern …",
     startenBestaetigen: "Das Datenpaket dieser Gesellschaft (ohne Personendaten) wird zur Analyse an Anthropic (Claude) gesendet. Fortfahren?",
