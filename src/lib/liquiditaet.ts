@@ -10,6 +10,7 @@
  * - Kapitaldienst: Zeile des gültigen Tilgungsplans im Monat; ohne Plan aus belegter Restschuld,
  *   heutigem Zinssatz und Rate gerechnet (Zahlung am Ende jeder Periode wie in den Szenarien).
  *   Endet die Laufzeit im Planzeitraum, ist die verbleibende Restschuld als Schlusszahlung fällig.
+ *   Variable Kredite mit Zinssicherung: heutiger Referenzzins, Cap/Swap nur bis zu ihrem Ende.
  * - Investitionen: Budget − Ist-Kosten geplanter und laufender Maßnahmen, gleichmäßig auf die
  *   Monate bis zum geplanten Ende verteilt. Ohne Budget oder Ende: Datenlücke, nichts geschätzt.
  * - Engpass: Bestand am Monatsende unter 0; Warnung, wenn er unter der Mindestliquidität liegt.
@@ -17,7 +18,7 @@
 import { aufCent, Decimal, dezimal } from "./geld";
 import { monatsanfang, monatsende, monatsNummer, type IsoDatum } from "./datum";
 import type { HausDaten } from "./kennzahlen";
-import { gueltigerTilgungsplan, PERIODEN_PRO_JAHR, restschuldNachweis, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
+import { gesicherterSatz, gueltigerTilgungsplan, PERIODEN_PRO_JAHR, referenzzinsAm, restschuldNachweis, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
 
 export type PlanpositionArt = "AUSSCHUETTUNG" | "EINNAHME" | "AUSGABE";
 
@@ -128,6 +129,8 @@ export interface Liquiditaetsplan {
     variabel: string[];
     /** Maßnahmen mit Ende vor Planbeginn: Restbudget im ersten Monat */
     massnahmeUeberfaellig: string[];
+    /** Kredite, deren Zinssicherung im Planzeitraum endet */
+    sicherungEndet: string[];
   };
   vollstaendig: boolean;
   summen: {
@@ -204,6 +207,7 @@ export function kapitaldienstPlan(
   const monate = new Map<number, KreditMonat>();
   const nachweis = restschuldNachweis(k, heute);
   const satz = zinssatz(k, referenzwerte, heute);
+  const ref = k.zinsArt === "VARIABEL" && k.referenzzins && k.sicherungen?.length ? referenzzinsAm(referenzwerte, k.referenzzins, heute) : null;
   let saldo: Decimal | null = nachweis ? nachweis.betrag : null;
   const n = PERIODEN_PRO_JAHR[k.zahlweise];
   const anfTilgung = k.anfaenglicheTilgung ? aufCent(k.ursprungsbetrag.times(k.anfaenglicheTilgung).dividedBy(100 * n)) : NULL;
@@ -244,7 +248,8 @@ export function kapitaldienstPlan(
     let zins = NULL;
     let tilgung = NULL;
     if ((m + 1) % (12 / n) === 0) {
-      zins = aufCent(saldo.times(satz).dividedBy(100 * n));
+      const satzMonat = ref ? (gesicherterSatz(k, ref.satz, monatsende(m), saldo)?.satz ?? satz) : satz;
+      zins = aufCent(saldo.times(satzMonat).dividedBy(100 * n));
       if (k.tilgungsart === "ANNUITAET") {
         rate ??= k.ratenbetrag ?? zins.plus(anfTilgung);
         tilgung = rate.minus(zins);
@@ -339,6 +344,9 @@ export function rechneLiquiditaet(e: LiquiditaetEingabe): Liquiditaetsplan {
         .map((k) => k.id),
       variabel: e.kredite.filter((k) => k.zinsArt === "VARIABEL" && kreditPlaene.find((p) => p.k.id === k.id)!.monate.size > 0).map((k) => k.id),
       massnahmeUeberfaellig: massnahmen.filter((x) => x.ueberfaellig).map((x) => x.m.id),
+      sicherungEndet: e.kredite
+        .filter((k) => k.zinsArt === "VARIABEL" && (k.sicherungen ?? []).some((x) => x.ende >= e.heute && x.ende < planEndeDatum))
+        .map((k) => k.id),
     },
     vollstaendig: luecken.kredite.length + luecken.massnahmeOhneBudget.length + luecken.massnahmeOhneEnde.length === 0,
     summen: {

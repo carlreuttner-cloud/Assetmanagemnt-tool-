@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { notFound, redirect } from "next/navigation";
-import { fuelle, texte } from "@/i18n";
+import { fuelle, texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { alsDbDatum, plusTage } from "@/lib/datum";
@@ -521,6 +521,58 @@ export async function waterfallvertragLoeschen(gesellschaftId: string): Promise<
     const { kontext, db } = await schreibKontext();
     await pruefeGesellschaft(kontext, gesellschaftId);
     await db.waterfallvertrag.deleteMany({ where: { gesellschaftId } });
+    refresh();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Zinssicherungen (Cap, Swap) zu variablen Krediten
+// ---------------------------------------------------------------------------
+
+/** Variabler Kredit, der in der Sichtbarkeit liegt; sonst Eingabefehler. */
+async function sichtbarerKredit(kontext: Awaited<ReturnType<typeof schreibKontext>>["kontext"], kreditId: string, t: Texte) {
+  const sicht = await sichtbarkeit(kontext);
+  const k = await kontext.db.kredit.findFirst({ where: { id: kreditId, gesellschaftId: erlaubt(sicht.gesellschaftIds) }, select: { id: true, zinsArt: true } });
+  if (!k) throw new EingabeFehler(t.zinssicherungen.kreditFehlt);
+  return k;
+}
+
+export async function zinssicherungHinzufuegen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    const tz = t.zinssicherungen;
+    const k = await sichtbarerKredit(kontext, kreditId, t);
+    if (k.zinsArt !== "VARIABEL") throw new EingabeFehler(tz.nichtVariabel);
+    const f = formularLeser(fd, sprache);
+    const beginn = f.datum("beginn", tz.beginn);
+    const ende = f.datum("ende", tz.ende);
+    if (ende <= beginn) throw new EingabeFehler(tz.endeVorBeginn);
+    const nominal = f.betragOptional("nominal", tz.nominal);
+    if (nominal !== null && nominal.lessThanOrEqualTo(0)) throw new EingabeFehler(fuelle(t.fehler.betrag, { feld: tz.nominal }));
+    await db.zinssicherung.create({
+      data: {
+        kreditId,
+        art: f.auswahl("art", tz.art, ["CAP", "SWAP"] as const),
+        satz: zuText(f.prozent("satz", tz.satz)),
+        nominal: zuText(nominal),
+        beginn: alsDbDatum(beginn),
+        ende: alsDbDatum(ende),
+        bank: f.text("bank"),
+        praemie: zuText(f.betragOptional("praemie", tz.praemie)),
+        quelle: f.text("quelle"),
+        notiz: f.text("notiz"),
+      } as never,
+    });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+export async function zinssicherungLoeschen(kreditId: string, id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    await sichtbarerKredit(kontext, kreditId, t);
+    await db.zinssicherung.deleteMany({ where: { id, kreditId } });
     refresh();
   });
 }

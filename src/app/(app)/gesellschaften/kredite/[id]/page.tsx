@@ -6,7 +6,7 @@ import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/com
 import { covenantPuffer, sperrenStatus } from "@/lib/covenant";
 import { Jahressaeulen } from "@/components/diagramme";
 import { Begriff, Glossar, Hinweismarke, KapitaldienstWert, MitHerleitung, RestschuldWert, Unbekannt, ZinssatzWert, type GlossarBegriff } from "@/components/herleitung";
-import { Angaben, Auswahl, Feld, Felder, Kachel, Kacheln, Karte, KnopfLink, Leer, Seitenkopf, Tabelle, rechts } from "@/components/ui";
+import { Angaben, Auswahl, Feld, Felder, Kachel, Kacheln, Karte, KnopfLink, Leer, Marke, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -18,8 +18,10 @@ import { DokumenteKarte } from "@/components/dokumente";
 import { ladeCheckliste } from "@/lib/daten/dokumente";
 import { covenantKennzahlen } from "@/lib/kennzahlen";
 import {
+  gesicherterSatz,
   gueltigerTilgungsplan,
   kapitaldienstJahr,
+  referenzzinsAm,
   pruefeCovenant,
   restschuldNachweis,
   saldenJahresvergleich,
@@ -36,6 +38,8 @@ import {
   saldoLoeschen,
   tilgungsplanBerechnen,
   tilgungsplanLoeschen,
+  zinssicherungHinzufuegen,
+  zinssicherungLoeschen,
 } from "../../aktionen";
 
 const SICHTBARE_BUCHUNGEN = 24;
@@ -64,6 +68,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
       covenants: { orderBy: { kennzahl: "asc" } },
       buchungen: { orderBy: [{ datum: "desc" }] },
       tilgungsplaene: { orderBy: { version: "desc" }, include: { zeilen: { orderBy: { faelligAm: "asc" } } } },
+      zinssicherungen: { orderBy: { beginn: "asc" } },
     },
   });
   if (!kredit) notFound();
@@ -79,6 +84,9 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
   const erfassteSalden = [...(daten.salden ?? [])].sort((a, b) => ((a.stichtag ?? "") < (b.stichtag ?? "") ? 1 : -1));
   const kd = kapitaldienstJahr(daten, referenzwerte, stichtag);
   const werte = covenantKennzahlen(daten, haeuser, kredite, referenzwerte, stichtag);
+  const tz = t.zinssicherungen;
+  const refHeute = kredit.referenzzins ? referenzzinsAm(referenzwerte, kredit.referenzzins, stichtag) : null;
+  const wirkung = refHeute ? gesicherterSatz(daten, refHeute.satz, stichtag, nachweis?.betrag ?? null) : null;
 
   // Buchungen: neueste zuerst, am selben Tag Tilgung vor Zins (umgekehrte Buchungsreihenfolge)
   const buchungen = sortiereBuchungen(kredit.buchungen.map((b) => ({ ...b, datum: isoDatum(b.datum) }))).reverse();
@@ -129,6 +137,105 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           unter={kredit.zinsbindungBis ? f.datum(kredit.zinsbindungBis) : undefined}
         />
       </Kacheln>
+
+      {(kredit.zinsArt === "VARIABEL" || kredit.zinssicherungen.length > 0) && (
+        <Karte titel={<span id="zinssicherungen">{tz.titel}</span>}>
+          <p className="mb-3 text-xs text-slate-500">{kredit.zinsArt === "VARIABEL" ? tz.hinweis : tz.nurVariabel}</p>
+          {kredit.zinssicherungen.length === 0 ? (
+            <Leer>{tz.keine}</Leer>
+          ) : (
+            <Tabelle>
+              <thead>
+                <tr>
+                  <th>{tz.art}</th>
+                  <th className={rechts}>{tz.satz}</th>
+                  <th className={rechts}>
+                    <Begriff k="Nominal" t={t}>{tz.nominal}</Begriff>
+                  </th>
+                  <th>{tz.laufzeit}</th>
+                  <th>{tz.status}</th>
+                  <th>{tz.wirkung}</th>
+                  <th>{tz.quelle}</th>
+                  {schreiben && <th />}
+                </tr>
+              </thead>
+              <tbody>
+                {kredit.zinssicherungen.map((z) => {
+                  const beginn = isoDatum(z.beginn);
+                  const ende = isoDatum(z.ende);
+                  const monate = monatsNummer(ende) - monatsNummer(stichtag);
+                  const status =
+                    ende < stichtag ? (
+                      <Marke>{tz.stati.abgelaufen}</Marke>
+                    ) : beginn > stichtag ? (
+                      <Marke>{tz.stati.kuenftig}</Marke>
+                    ) : monate <= 12 ? (
+                      <Marke ton="warnung">{fuelle(tz.stati.endetBald, { monate })}</Marke>
+                    ) : (
+                      <Marke ton="gut">{tz.stati.aktiv}</Marke>
+                    );
+                  const teil = wirkung?.teile.find((x) => x.sicherung?.id === z.id);
+                  return (
+                    <tr key={z.id}>
+                      <td className="font-medium">
+                        <Begriff k={z.art === "CAP" ? "Cap" : "Swap"} t={t}>{tz.arten[z.art]}</Begriff>
+                        {z.bank && <div className="text-xs font-normal text-slate-500">{z.bank}</div>}
+                      </td>
+                      <td className={rechts}>{f.prozent(z.satz, 3)}</td>
+                      <td className={rechts}>{z.nominal ? f.betrag(z.nominal) : <span className="text-slate-500">{tz.nominalGanz}</span>}</td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {f.datum(beginn)} – {f.datum(ende)}
+                      </td>
+                      <td>{status}</td>
+                      <td className="text-xs">
+                        {teil && refHeute
+                          ? fuelle(tz.wirkungTeil, { anteil: f.prozent(teil.anteil.times(100), 1), referenz: f.prozent(teil.referenz, 3), roh: f.prozent(refHeute.satz, 3) })
+                          : beginn <= stichtag && ende >= stichtag && !wirkung
+                            ? tz.wirkungUnbekannt
+                            : tz.wirkungKeine}
+                      </td>
+                      <td className="text-xs text-slate-600">
+                        {z.quelle}
+                        {z.praemie && (
+                          <div className="text-slate-500">
+                            {tz.praemie}: {f.betrag(z.praemie)}
+                          </div>
+                        )}
+                        {z.notiz && <div className="text-slate-500">{z.notiz}</div>}
+                      </td>
+                      {schreiben && (
+                        <td className="text-right">
+                          <Formular aktion={zinssicherungLoeschen.bind(null, id, z.id)} absenden={t.allgemein.loeschen} art="gefahr" bestaetigen={t.allgemein.loeschenBestaetigen} inline />
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Tabelle>
+          )}
+          {schreiben && kredit.zinsArt === "VARIABEL" && (
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">{tz.hinzufuegen}</summary>
+              <div className="mt-3">
+                <Formular aktion={zinssicherungHinzufuegen.bind(null, id)} absenden={tz.hinzufuegen} zuruecksetzen>
+                  <Felder>
+                    <Auswahl name="art" label={tz.art} wert="CAP" optionen={(["CAP", "SWAP"] as const).map((a) => ({ wert: a, text: tz.arten[a] }))} pflicht />
+                    <Feld name="satz" label={tz.satz} inputMode="decimal" hinweis={tz.satzHinweis} pflicht />
+                    <Feld name="nominal" label={tz.nominal} inputMode="decimal" hinweis={tz.nominalHinweis} />
+                    <Feld name="bank" label={tz.bank} wert={kredit.bank} />
+                    <Feld name="beginn" label={tz.beginn} typ="date" pflicht />
+                    <Feld name="ende" label={tz.ende} typ="date" pflicht />
+                    <Feld name="praemie" label={tz.praemie} inputMode="decimal" />
+                    <Feld name="quelle" label={tz.quelle} platzhalter={tz.quelleHinweis} />
+                    <Feld name="notiz" label={tz.notiz} breit />
+                  </Felder>
+                </Formular>
+              </div>
+            </details>
+          )}
+        </Karte>
+      )}
 
       <Karte titel={<span id="salden">{tk.salden}</span>}>
         <p className="mb-3 text-xs text-slate-500">{tk.saldenHinweis}</p>
@@ -495,7 +602,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
 
       {dokumente && <DokumenteKarte checkliste={dokumente} bezug="KREDIT" id={id} t={t} />}
 
-      <Glossar begriffe={["Restschuld", "Kapitaldienst", "Zinsbindung", "Covenant", "Ausschuettungssperre", "Headroom", "LTV", "DSCR", "ICR", "Entwurf", "Guthaben"]} t={t} />
+      <Glossar begriffe={["Restschuld", "Kapitaldienst", "Zinsbindung", "Covenant", "Ausschuettungssperre", "Headroom", "LTV", "DSCR", "ICR", "Entwurf", "Guthaben", "Cap", "Swap", "Nominal"]} t={t} />
 
       <Karte titel={<span id="tilgungsplaene">{tk.tilgungsplaene}</span>}>
         {kredit.tilgungsplaene.length === 0 ? (

@@ -54,6 +54,20 @@ export interface ReferenzWert {
   satz: Decimal;
 }
 
+export type ZinssicherungArt = "CAP" | "SWAP";
+
+/** Cap oder Swap zu einem variablen Kredit; `nominal` null = gesamte Restschuld. */
+export interface ZinssicherungDaten {
+  id: string;
+  art: ZinssicherungArt;
+  satz: Decimal;
+  nominal: Decimal | null;
+  beginn: IsoDatum;
+  ende: IsoDatum;
+  bank?: string | null;
+  quelle?: string | null;
+}
+
 export interface KreditDaten {
   id: string;
   gesellschaftId: string;
@@ -75,6 +89,8 @@ export interface KreditDaten {
   /** Belegte Salden; fehlt das Feld, gibt es keine */
   salden?: SaldoDaten[];
   tilgungsplaene: TilgungsplanDaten[];
+  /** Zinssicherungen (nur bei variablen Krediten wirksam); fehlt das Feld, gibt es keine */
+  sicherungen?: ZinssicherungDaten[];
 }
 
 const NULL = dezimal(0);
@@ -233,11 +249,12 @@ export function referenzzinsAm(werte: ReferenzWert[], referenz: string, stichtag
 
 /**
  * Zinssatz am Stichtag in Prozentpunkten.
- * Fest: Sollzins. Variabel: Referenzzins (mindestens 0 %, übliche Floor-Klausel) plus Marge.
+ * Fest: Sollzins. Variabel: Referenzzins (mindestens 0 %, übliche Floor-Klausel) plus Marge,
+ * mit den am Stichtag laufenden Zinssicherungen (siehe `gesicherterSatz`).
  * null, wenn die Angaben fehlen.
  */
 export function zinssatz(
-  k: Pick<KreditDaten, "zinsArt" | "sollzins" | "referenzzins" | "marge">,
+  k: Pick<KreditDaten, "zinsArt" | "sollzins" | "referenzzins" | "marge"> & Partial<KreditDaten>,
   referenzwerte: ReferenzWert[],
   stichtag: IsoDatum,
 ): Decimal | null {
@@ -245,7 +262,67 @@ export function zinssatz(
   if (!k.referenzzins) return null;
   const ref = referenzzinsAm(referenzwerte, k.referenzzins, stichtag);
   if (!ref) return null;
-  return Decimal.max(ref.satz, 0).plus(k.marge ?? 0);
+  const braucheSaldo = aktiveSicherungen(k, stichtag).some((x) => x.nominal !== null);
+  const saldo = braucheSaldo && k.buchungen ? restschuld(k as KreditDaten, stichtag) : null;
+  return gesicherterSatz(k, ref.satz, stichtag, saldo)?.satz ?? null;
+}
+
+/** Zinssicherungen, die am Stichtag laufen (Beginn und Ende einschließlich). */
+export function aktiveSicherungen(k: Pick<KreditDaten, "sicherungen">, stichtag: IsoDatum): ZinssicherungDaten[] {
+  return (k.sicherungen ?? []).filter((x) => x.beginn <= stichtag && x.ende >= stichtag);
+}
+
+export interface SicherungsTeil {
+  sicherung: ZinssicherungDaten | null;
+  /** Anteil an der Restschuld (0 bis 1) */
+  anteil: Decimal;
+  /** wirksamer Referenzzins dieses Teils */
+  referenz: Decimal;
+  satz: Decimal;
+}
+
+export interface GesicherterSatz {
+  satz: Decimal;
+  /** Satz ohne Sicherung: Referenzzins (mindestens 0 %) + Marge */
+  ungesichert: Decimal;
+  teile: SicherungsTeil[];
+}
+
+/**
+ * Zinssatz eines variablen Kredits mit Zinssicherungen, gewichtet nach dem gesicherten Anteil
+ * der Restschuld. Erst Swaps, dann Caps; ohne Nominal deckt eine Sicherung die restliche Schuld.
+ * - Cap: Referenzzins höchstens bis zum Cap-Satz.
+ * - Swap: Der Kreditnehmer zahlt den festen Swap-Satz und erhält den Referenzzins; mit dem
+ *   0-%-Floor im Kredit ist der wirksame Referenzzins Swap-Satz + max(Ref, 0) − Ref.
+ * null, wenn eine Sicherung ein Nominal hat, aber die Restschuld unbekannt ist.
+ */
+export function gesicherterSatz(
+  k: Pick<KreditDaten, "marge" | "sicherungen">,
+  referenz: Decimal,
+  stichtag: IsoDatum,
+  saldo: Decimal | null,
+): GesicherterSatz | null {
+  const marge = k.marge ?? NULL;
+  const basis = Decimal.max(referenz, 0);
+  const ungesichert = basis.plus(marge);
+  const aktiv = aktiveSicherungen(k, stichtag).sort((a, b) => (a.art === b.art ? a.beginn.localeCompare(b.beginn) : a.art === "SWAP" ? -1 : 1));
+  const teile: SicherungsTeil[] = [];
+  let rest = dezimal(1);
+  for (const x of aktiv) {
+    if (rest.lessThanOrEqualTo(0)) break;
+    let anteil = rest;
+    if (x.nominal !== null) {
+      if (saldo === null) return null;
+      anteil = saldo.isZero() ? NULL : Decimal.min(x.nominal.dividedBy(saldo), rest);
+    }
+    if (anteil.isZero()) continue;
+    const ref = x.art === "SWAP" ? x.satz.plus(basis).minus(referenz) : Decimal.min(basis, x.satz);
+    teile.push({ sicherung: x, anteil, referenz: ref, satz: ref.plus(marge) });
+    rest = rest.minus(anteil);
+  }
+  if (rest.greaterThan(0)) teile.push({ sicherung: null, anteil: rest, referenz: basis, satz: ungesichert });
+  const satz = teile.reduce((s, t) => s.plus(t.anteil.times(t.satz)), NULL);
+  return { satz, ungesichert, teile };
 }
 
 export interface Kapitaldienst {

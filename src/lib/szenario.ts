@@ -7,7 +7,9 @@
  *   Einnahmen = Soll-Miete × heutige Ist-Quote des Hauses (Ist/Soll) × (1 − Mietausfall).
  * - Leerstand: bleibt leer oder wird nach N Monaten zur erwarteten Miete vermietet.
  * - Kredite: Ausgang ist die heutige Restschuld. Zinssatz fest bis Zinsbindungsende, danach der
- *   Anschlusszins (ohne Angabe unverändert). Variable Kredite: heutiger Satz plus Zinsänderung.
+ *   Anschlusszins (ohne Angabe unverändert). Variable Kredite: heutiger Referenzzins plus
+ *   Zinsänderung; laufende Zinssicherungen (Cap, Swap) begrenzen bzw. fixieren den Referenzzins
+ *   bis zu ihrem Ende, danach gilt der ungesicherte Satz.
  *   Ändert sich der Zins, bleibt der Tilgungsbetrag je Rate gleich, die Rate passt sich an.
  *   Endfällige Kredite werden bei Laufzeitende als verlängert angenommen.
  * - Verkauf: ab dem Verkaufsmonat keine Miete und kein Wert mehr; der Anteil des Hauses an jedem
@@ -16,9 +18,9 @@
  * - Wertentwicklung: Verkehrswert heute × (1 + Satz) je Jahr.
  */
 import { aufCent, dezimal, Decimal } from "./geld";
-import { monatsNummer, type IsoDatum } from "./datum";
+import { monatsanfang, monatsNummer, type IsoDatum } from "./datum";
 import { hausSummen, verkehrswertAm, type HausDaten } from "./kennzahlen";
-import { PERIODEN_PRO_JAHR, restschuld, restschuldNachweis, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
+import { gesicherterSatz, PERIODEN_PRO_JAHR, referenzzinsAm, restschuld, restschuldNachweis, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
 
 export interface Verkauf {
   hausId: string;
@@ -119,6 +121,8 @@ interface KreditZustand {
   bindungBis: number | null;
   /** Summe der Hausanteile, die noch nicht verkauft sind */
   restAnteil: Decimal;
+  /** Variabel mit Zinssicherungen: Referenzzins im Szenario (heute + Änderung); sonst null */
+  referenz: Decimal | null;
 }
 
 function startZustand(
@@ -154,8 +158,13 @@ function startZustand(
     n,
     bindungBis: k.zinsArt === "FEST" && k.zinsbindungBis ? monatsNummer(k.zinsbindungBis) : null,
     restAnteil: k.haeuser.reduce((s, h) => s.plus(h.anteilProzent), NULL),
+    referenz: null,
   };
-  if (k.zinsArt === "VARIABEL") neuerSatz(z, heuteSatz.plus(p.zinsVariabelPP));
+  const ref = k.zinsArt === "VARIABEL" && k.referenzzins ? referenzzinsAm(referenzwerte, k.referenzzins, stichtag) : null;
+  if (ref && k.sicherungen?.length) {
+    z.referenz = ref.satz.plus(p.zinsVariabelPP);
+    neuerSatz(z, gesicherterSatz(k, z.referenz, stichtag, saldo)?.satz ?? heuteSatz);
+  } else if (k.zinsArt === "VARIABEL") neuerSatz(z, heuteSatz.plus(p.zinsVariabelPP));
   if (z.bindungBis !== null && z.bindungBis < monatsNummer(stichtag) && p.anschlusszins) neuerSatz(z, p.anschlusszins);
   return z;
 }
@@ -250,6 +259,10 @@ export function rechneSzenario(
     // Kredite: Zinsbindungsende, dann Zahlung am Monatsende
     for (const z of zustaende) {
       if (z.bindungBis !== null && m === z.bindungBis + 1 && p.anschlusszins) neuerSatz(z, p.anschlusszins);
+      if (z.referenz !== null) {
+        const g = gesicherterSatz(z.k, z.referenz, monatsanfang(m), z.saldo);
+        if (g && !g.satz.equals(z.satz)) neuerSatz(z, g.satz);
+      }
       if ((m + 1) % (12 / z.n) !== 0 || z.saldo.isZero()) continue;
       const zins = aufCent(z.saldo.times(z.satz).dividedBy(100 * z.n));
       let tilgung = z.k.tilgungsart === "ANNUITAET" ? z.rate.minus(zins) : z.k.tilgungsart === "RATENTILGUNG" ? z.tilgungFix : NULL;

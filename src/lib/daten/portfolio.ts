@@ -50,6 +50,7 @@ export async function ladeRechengrundlage(
         buchungen: { select: { datum: true, art: true, betrag: true, saldoNach: true } },
         salden: { select: { id: true, stichtag: true, stichtagHinweis: true, art: true, betrag: true, quelle: true, quelleText: true, status: true } },
         tilgungsplaene: { select: { version: true, gueltigAb: true, zeilen: true } },
+        zinssicherungen: { select: { id: true, art: true, satz: true, nominal: true, beginn: true, ende: true, bank: true, quelle: true }, orderBy: { beginn: "asc" } },
       },
     }),
     db.referenzzinssatz.findMany({ select: { referenz: true, stichtag: true, satz: true } }),
@@ -123,6 +124,16 @@ type KreditZeile = {
     gueltigAb: Date;
     zeilen: { faelligAm: Date; zins: { toFixed(): string }; tilgung: { toFixed(): string }; rate: { toFixed(): string }; restschuld: { toFixed(): string } }[];
   }[];
+  zinssicherungen?: {
+    id: string;
+    art: "CAP" | "SWAP";
+    satz: { toFixed(): string };
+    nominal: { toFixed(): string } | null;
+    beginn: Date;
+    ende: Date;
+    bank: string | null;
+    quelle: string | null;
+  }[];
 };
 
 export function alsKreditDaten(k: KreditZeile): KreditDaten {
@@ -165,6 +176,16 @@ export function alsKreditDaten(k: KreditZeile): KreditDaten {
         rate: dezimal(z.rate),
         restschuld: dezimal(z.restschuld),
       })),
+    })),
+    sicherungen: (k.zinssicherungen ?? []).map((x) => ({
+      id: x.id,
+      art: x.art,
+      satz: dezimal(x.satz),
+      nominal: d(x.nominal),
+      beginn: isoDatum(x.beginn),
+      ende: isoDatum(x.ende),
+      bank: x.bank,
+      quelle: x.quelle,
     })),
   };
 }

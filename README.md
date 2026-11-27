@@ -92,7 +92,7 @@ src/
     db/mandant.ts        Mandantenfilter und Änderungsprotokoll
     geld.ts              Rechnen, Einlesen und Formatieren von Beträgen
     datum.ts             Kalenderdaten als "JJJJ-MM-TT", Monatsrechnung, Formatierung
-    kredit.ts            Restschuld, Zinssatz, Kapitaldienst, Zinsbindung, Tilgungspläne, Covenants
+    kredit.ts            Restschuld, Zinssatz (mit Cap/Swap), Kapitaldienst, Zinsbindung, Tilgungspläne, Covenants
     bewertung.ts         Bewertung je Haus und Portfolio: letztes Gutachten, Vorgutachten, Boden-/Gebäudewert, Jahresverlauf
     kapitalkonto.ts      Kapitalkonten der Gesellschafter: Einlagen, Rückzahlungen, Ausschüttungen, Saldo, Jahresverlauf
     liquiditaet.ts       Liquiditätsplanung je Gesellschaft: 12 Monate aus Mieten, Kapitaldienst, Investitionen und Planpositionen, Engpass-Warnung

@@ -8,7 +8,7 @@ import { fuelle, type Texte } from "@/i18n";
 import type { Formatierer } from "@/lib/format";
 import type { Decimal } from "@/lib/geld";
 import { summeOderUnbekannt, vollstaendig, type Kennzahlen, type LueckenArt, type Vollstaendigkeit } from "@/lib/kennzahlen";
-import { referenzzinsAm, zinssatz, type Kapitaldienst, type KreditDaten, type ReferenzWert, type RestschuldNachweis } from "@/lib/kredit";
+import { aktiveSicherungen, gesicherterSatz, referenzzinsAm, restschuld, zinssatz, type Kapitaldienst, type KreditDaten, type ReferenzWert, type RestschuldNachweis } from "@/lib/kredit";
 
 export interface HerleitungDaten {
   berechnung?: ReactNode;
@@ -458,10 +458,29 @@ export function ZinssatzWert({
       : ref
         ? fuelle(th.zinssatzVariabel, { referenz: ref.referenz, datum: f.datum(ref.stichtag), satz: f.prozent(ref.satz, 3), marge: f.prozent(k.marge, 3) })
         : th.zinssatzUnbekannt;
+  // Zinssicherungen: Teile der Restschuld mit Cap/Swap einzeln zeigen
+  const aktiv = k.zinsArt === "VARIABEL" ? aktiveSicherungen(k, stichtag) : [];
+  const werte: Array<[ReactNode, ReactNode]> = [];
+  let fehlt: ReactNode[] | undefined;
+  if (ref && aktiv.length > 0) {
+    const g = gesicherterSatz(k, ref.satz, stichtag, restschuld(k, stichtag));
+    if (!g) fehlt = [th.zinssatzSicherungUnbekannt];
+    for (const teil of g?.teile ?? []) {
+      werte.push([
+        teil.sicherung ? `${t.zinssicherungen.arten[teil.sicherung.art]} ${f.prozent(teil.sicherung.satz, 3)} (${f.datum(teil.sicherung.ende)})` : th.zinssatzOhneSicherung,
+        fuelle(th.zinssatzTeil, { anteil: f.prozent(teil.anteil.times(100), 1), referenz: f.prozent(teil.referenz, 3), satz: f.prozent(teil.satz, 3) }),
+      ]);
+    }
+  }
   return (
     <MitHerleitung
       wert={satz === null ? <Unbekannt t={t} /> : f.prozent(satz, 3)}
-      herleitung={{ berechnung, stichtag: ref ? f.datum(ref.stichtag) : undefined }}
+      herleitung={{
+        berechnung: aktiv.length > 0 ? <>{berechnung}. {th.zinssatzGesichert}</> : berechnung,
+        werte,
+        fehlt,
+        stichtag: ref ? f.datum(ref.stichtag) : undefined,
+      }}
       t={t}
       ausrichtung={ausrichtung}
     />
