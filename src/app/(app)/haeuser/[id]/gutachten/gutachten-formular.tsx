@@ -23,6 +23,7 @@ export type GutachtenZeile = {
   gesamtnutzungsdauer: number | null;
   barwertfaktor: Zahl;
   bodenwert: Zahl;
+  gebaeudewert: Zahl;
   ertragswert: Zahl;
   sachwert: Zahl;
   vergleichswert: Zahl;
@@ -80,6 +81,7 @@ export function GutachtenFormular({ t, f, hausId, g }: { t: Texte; f: Formatiere
         <Feld name="gesamtnutzungsdauer" label={tg.gesamtnutzungsdauer} wert={n(g?.gesamtnutzungsdauer)} inputMode="numeric" hinweis={tg.formular.jahreHinweis} />
         <Feld name="barwertfaktor" label={tg.barwertfaktor} wert={f.eingabe(g?.barwertfaktor)} inputMode="decimal" />
         <Feld name="bodenwert" label={tg.bodenwert} wert={f.eingabe(g?.bodenwert, 2)} inputMode="decimal" />
+        <Feld name="gebaeudewert" label={tg.gebaeudewert} hinweis={tg.gebaeudewertHinweis} wert={f.eingabe(g?.gebaeudewert, 2)} inputMode="decimal" />
         <Feld name="ertragswert" label={tg.ertragswert} wert={f.eingabe(g?.ertragswert, 2)} inputMode="decimal" />
         <Feld name="sachwert" label={tg.sachwert} wert={f.eingabe(g?.sachwert, 2)} inputMode="decimal" />
         <Feld name="vergleichswert" label={tg.vergleichswert} wert={f.eingabe(g?.vergleichswert, 2)} inputMode="decimal" />

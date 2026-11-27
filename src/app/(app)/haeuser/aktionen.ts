@@ -243,6 +243,7 @@ export async function gutachtenSpeichern(ort: { id: string | null; hausId: strin
       gesamtnutzungsdauer: zahl("gesamtnutzungsdauer", g.gesamtnutzungsdauer),
       barwertfaktor: zuText(f.zahlOptional("barwertfaktor", g.barwertfaktor)),
       bodenwert: zuText(f.betragOptional("bodenwert", g.bodenwert)),
+      gebaeudewert: zuText(f.betragOptional("gebaeudewert", g.gebaeudewert)),
       ertragswert: zuText(f.betragOptional("ertragswert", g.ertragswert)),
       sachwert: zuText(f.betragOptional("sachwert", g.sachwert)),
       vergleichswert: zuText(f.betragOptional("vergleichswert", g.vergleichswert)),
