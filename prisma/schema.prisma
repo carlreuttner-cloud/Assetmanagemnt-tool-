@@ -58,6 +58,7 @@ model Mandant {
   tilgungsplanZeilen      TilgungsplanZeile[]
   referenzzinssaetze      Referenzzinssatz[]
   investitionen           Investition[]
+  massnahmen              Massnahme[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
@@ -215,6 +216,7 @@ model Haus {
   einheiten         Einheit[]
   kredite           KreditHaus[]
   investitionen     Investition[]
+  massnahmen        Massnahme[]
   dokumente         Dokument[]
   zuweisungen       HausZuweisung[]
   importe           Importvorgang[]
@@ -361,6 +363,7 @@ model Einheit {
   haus              Haus              @relation(fields: [hausId], references: [id], onDelete: Cascade)
   mietverhaeltnisse Mietverhaeltnis[]
   investitionen     Investition[]
+  massnahmen        Massnahme[]
   dokumente         Dokument[]
 
   @@index([mandantId])
@@ -680,12 +683,54 @@ model Investition {
   /// z. B. "Dach", "Heizung", "Modernisierung Wohnung"
   kategorie    String?
   beschreibung String
+  /// Maßnahme, zu der diese Kostenposition gehört (Ist-Kosten); null = keiner Maßnahme zugeordnet
+  massnahmeId  String?
   erstelltAm   DateTime @default(now())
   geaendertAm  DateTime @updatedAt
 
-  mandant Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  haus    Haus     @relation(fields: [hausId], references: [id], onDelete: Cascade)
-  einheit Einheit? @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+  mandant   Mandant    @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus      Haus       @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  einheit   Einheit?   @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+  massnahme Massnahme? @relation(fields: [massnahmeId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
+  @@index([hausId])
+  @@index([massnahmeId])
+}
+
+enum MassnahmeStatus {
+  GEPLANT
+  LAUFEND
+  ABGESCHLOSSEN
+}
+
+/// Investitionsmaßnahme mit Budget; die Ist-Kosten sind die zugeordneten Investitionen (Kostenpositionen).
+model Massnahme {
+  id              String          @id @default(cuid())
+  mandantId       String
+  hausId          String
+  einheitId       String?
+  bezeichnung     String
+  kategorie       String?
+  status          MassnahmeStatus @default(GEPLANT)
+  /// Budget; null = kein Budget festgelegt (Abweichung unbekannt)
+  budget          Decimal?        @db.Decimal(14, 2)
+  budgetQuelle    String?
+  beginn          DateTime?       @db.Date
+  ende            DateTime?       @db.Date
+  /// Mehrmiete netto kalt je Monat durch die Maßnahme (nur der Monatswert wird gespeichert); null = unbekannt, 0 = keine Mehrmiete
+  mehrmieteMonat  Decimal?        @db.Decimal(12, 2)
+  /// true = durch Mietverträge/Mieterhöhungen belegt, false = erwartet
+  mehrmieteBelegt Boolean         @default(false)
+  mehrmieteQuelle String?
+  notiz           String?
+  erstelltAm      DateTime        @default(now())
+  geaendertAm     DateTime        @updatedAt
+
+  mandant Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus          @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  einheit Einheit?      @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+  kosten  Investition[]
 
   @@index([mandantId])
   @@index([hausId])
@@ -750,7 +795,7 @@ enum DokumentTextQuelle {
 
 /// Durchsuchbarer Text je Seite (aus der Textebene oder per OCR), für die Volltextsuche mit Seitenangabe.
 model DokumentSeite {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   mandantId  String
   dokumentId String
   /// Seitennummer ab 1

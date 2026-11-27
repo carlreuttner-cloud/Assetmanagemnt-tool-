@@ -6,13 +6,14 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "@node-rs/argon2";
 import { randomUUID } from "node:crypto";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient, type Prisma } from "../src/generated/prisma/client";
 import { BANKEN, erzeugePortfolio, PORTFOLIOS, type TestPortfolio } from "./testdaten/portfolio";
 import { baueFinanzen } from "./testdaten/finanzen";
 import { baueWaterfall } from "./testdaten/waterfall";
 import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 import { legeTestdokumenteAn } from "./testdaten/dateien";
+import { baueMassnahmen } from "./testdaten/massnahmen";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Der Seed löscht alle Daten und darf nicht in Produktion laufen.");
@@ -123,7 +124,9 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     }))),
   });
 
-  const einheiten = [], mieter = [], mietverhaeltnisse = [], investitionen = [];
+  const einheiten = [], mieter = [], mietverhaeltnisse = [];
+  const investitionen: Prisma.InvestitionCreateManyInput[] = [];
+  const massnahmen: Prisma.MassnahmeCreateManyInput[] = [];
   for (const h of p.haeuser) {
     const einheitIds = new Map<string, string>();
     for (const e of h.einheiten) {
@@ -145,16 +148,30 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
         });
       }
     }
-    for (const i of h.investitionen) {
+    const plan = baueMassnahmen(h.schluessel, h.investitionen);
+    const massnahmeIds = plan.massnahmen.map((m) => {
+      const id = randomUUID();
+      massnahmen.push({
+        id, mandantId, hausId: haus.get(h.schluessel)!, einheitId: m.einheit ? einheitIds.get(m.einheit)! : null,
+        bezeichnung: m.bezeichnung, kategorie: m.kategorie, status: m.status, budget: m.budget ? geld(m.budget) : null,
+        budgetQuelle: m.budgetQuelle, beginn: m.beginn ? tag(m.beginn) : null, ende: m.ende ? tag(m.ende) : null,
+        mehrmieteMonat: m.mehrmieteMonat ? geld(m.mehrmieteMonat) : null, mehrmieteBelegt: m.mehrmieteBelegt, mehrmieteQuelle: m.mehrmieteQuelle,
+      });
+      return id;
+    });
+    h.investitionen.forEach((i, n) => {
+      const zu = plan.zuordnung[n];
       investitionen.push({
         mandantId, hausId: haus.get(h.schluessel)!, einheitId: i.einheit ? einheitIds.get(i.einheit)! : null,
         datum: tag(i.datum), betrag: geld(i.betrag), kategorie: i.kategorie, beschreibung: i.beschreibung,
+        massnahmeId: zu === null ? null : massnahmeIds[zu],
       });
-    }
+    });
   }
   await db.einheit.createMany({ data: einheiten });
   await db.mieter.createMany({ data: mieter });
   await db.mietverhaeltnis.createMany({ data: mietverhaeltnisse });
+  await db.massnahme.createMany({ data: massnahmen });
   await db.investition.createMany({ data: investitionen });
 
   await db.kredit.createMany({
