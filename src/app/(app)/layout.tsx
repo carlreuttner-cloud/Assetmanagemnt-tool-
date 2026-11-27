@@ -42,12 +42,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 shrink-0 flex-col bg-slate-900 p-4 text-white">
-        <div className="mb-6 px-3">
+      {/* Volle Fensterhöhe, bleibt beim Scrollen stehen. Nur der mittlere Teil scrollt; Suche und Konto bleiben unten. */}
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-slate-900 text-white">
+        <div className="shrink-0 px-7 pb-4 pt-4">
           <div className="text-sm font-semibold">{t.app.titel}</div>
           <div className="mt-1 text-xs text-slate-400">{kontext.mandant.name}</div>
         </div>
 
+        <div data-seitenleiste-mitte className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {mitAuswahl && (
           <div className="mb-5 px-3">
             <Suspense>
@@ -70,12 +72,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         {darf(kontext.rolle, "suche") && (
           <Merkliste texte={{ favoriten: t.lesezeichen.favoriten, zuletzt: t.lesezeichen.zuletzt, keineFavoriten: t.lesezeichen.keineFavoriten }} />
         )}
+        </div>
 
-        <div className="mt-auto space-y-3 border-t border-slate-800 px-3 pt-4 text-xs text-slate-400">
+        <div data-seitenleiste-unten className="shrink-0 space-y-3 border-t border-slate-800 px-7 pb-4 pt-4 text-xs text-slate-400">
           {darf(kontext.rolle, "suche") && (
             <GlobaleSuche
               texte={{
                 platzhalter: t.suche.platzhalter,
+                kuerzel: t.suche.kuerzel,
                 label: t.suche.label,
                 alleAnzeigen: t.suche.alleAnzeigen,
                 laeuft: t.suche.laeuft,

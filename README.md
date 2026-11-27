@@ -27,6 +27,12 @@ docker compose run --rm migrate npm run db:seed   # Testdaten anlegen (löscht a
 
 Danach die App unter <http://localhost:3000> öffnen.
 
+- Texterkennung (poppler, tesseract Deutsch/Englisch) ist in beiden Images enthalten; der Seed meldet
+  „Testdokumente: 3 (davon 3 mit erkanntem Text)“ und legt die Dateien im Volume `uploads` der App ab.
+- KI (optional): Schlüssel in der `.env` bei `ANTHROPIC_API_KEY` eintragen, dann `docker compose up -d`.
+  Ohne Schlüssel läuft alles andere normal; die KI-Seiten zeigen einen Hinweis.
+- Nach einem neuen Seed ist die alte Anmeldung ungültig; die App leitet dann zur Anmeldung weiter.
+
 Stoppen mit `docker compose down`. Die Daten bleiben im Docker-Volume erhalten; `docker compose down -v` löscht auch sie.
 
 ## Entwicklung ohne App-Container
