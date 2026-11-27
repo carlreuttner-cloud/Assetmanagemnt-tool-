@@ -14,6 +14,7 @@ export const BEREICHE = [
   "berichte",
   "import",
   "kiAssistent",
+  "suche",
   "benutzerverwaltung",
 ] as const;
 export type Bereich = (typeof BEREICHE)[number];
@@ -34,6 +35,7 @@ const RECHTE: Record<Rolle, Partial<Record<Bereich, Aktion[]>>> = {
     berichte: ALLES,
     import: ALLES,
     kiAssistent: ALLES,
+    suche: LESEN,
   },
   // Darf ausschließlich Mieterlisten für die ihr zugewiesenen Häuser hochladen.
   HAUSVERWALTUNG: {
@@ -49,6 +51,7 @@ const RECHTE: Record<Rolle, Partial<Record<Bereich, Aktion[]>>> = {
     szenarien: LESEN,
     berichte: LESEN,
     kiAssistent: LESEN,
+    suche: LESEN,
   },
 };
 

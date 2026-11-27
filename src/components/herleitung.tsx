@@ -31,28 +31,55 @@ export function MitHerleitung({ wert, herleitung, t, ausrichtung = "links" }: { 
   for (const l of herleitung.fehlt ?? []) zeilen.push([th.fehlt, <span key="fehlt" className="text-amber-700">{l}</span>]);
   if (herleitung.hinweis) zeilen.push([th.hinweis, herleitung.hinweis]);
   return (
-    <details className={`group relative ${ausrichtung === "rechts" ? "inline-flex flex-col items-end" : "inline-block"}`}>
-      <summary className="inline-flex cursor-pointer list-none items-baseline gap-1 whitespace-nowrap [&::-webkit-details-marker]:hidden" title={th.oeffnen}>
-        <span>{wert}</span>
-        <span aria-hidden className="text-xs font-normal text-slate-400 group-open:text-teal-700">ⓘ</span>
-        <span className="sr-only">{th.oeffnen}</span>
-      </summary>
-      {/* In Tabellen (rechts ausgerichtet) im Fluss, damit Tabellen mit Scrollbereich nichts abschneiden. */}
-      <div
-        className={`z-20 mt-1 w-72 max-w-[85vw] rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal normal-case tracking-normal whitespace-normal text-slate-700 shadow-lg ${
-          ausrichtung === "rechts" ? "relative ml-auto" : "absolute left-0"
-        }`}
-      >
-        <dl className="space-y-1.5">
-          {zeilen.map(([k, v], i) => (
-            <div key={i}>
-              <dt className="font-medium text-slate-500">{k}</dt>
-              <dd className="whitespace-normal">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </details>
+    <>
+      <details className={`group relative ${ausrichtung === "rechts" ? "inline-flex flex-col items-end" : "inline-block"}`}>
+        <summary className="inline-flex cursor-pointer list-none items-baseline gap-1 whitespace-nowrap [&::-webkit-details-marker]:hidden" title={th.oeffnen}>
+          <span>{wert}</span>
+          <span aria-hidden className="text-xs font-normal text-slate-400 group-open:text-teal-700">ⓘ</span>
+          <span className="sr-only">{th.oeffnen}</span>
+        </summary>
+        {/* In Tabellen (rechts ausgerichtet) im Fluss, damit Tabellen mit Scrollbereich nichts abschneiden. */}
+        <div
+          className={`z-20 mt-1 w-72 max-w-[85vw] rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal normal-case tracking-normal whitespace-normal text-slate-700 shadow-lg ${
+            ausrichtung === "rechts" ? "relative ml-auto" : "absolute left-0"
+          }`}
+        >
+          <dl className="space-y-1.5">
+            {zeilen.map(([k, v], i) => (
+              <div key={i}>
+                <dt className="font-medium text-slate-500">{k}</dt>
+                <dd className="whitespace-normal">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </details>
+      <QuellenZeile herleitung={herleitung} t={t} ausrichtung={ausrichtung} />
+    </>
+  );
+}
+
+/**
+ * Stichtag und Quelle direkt unter dem Wert; sichtbar nur mit dem Schalter „Stichtage und Quellen“
+ * (CSS über `[data-quellen="an"]` in globals.css, damit das Umschalten ohne Neuladen wirkt).
+ */
+function QuellenZeile({ herleitung, t, ausrichtung }: { herleitung: HerleitungDaten; t: Texte; ausrichtung: "links" | "rechts" }) {
+  const tq = t.quellen;
+  if (!herleitung.stichtag && !herleitung.quelle && !herleitung.fehlt?.length) return null;
+  return (
+    <span className={`quellen-info max-w-64 text-[10px] leading-tight font-normal normal-case tracking-normal whitespace-normal text-slate-500 ${ausrichtung === "rechts" ? "text-right" : "text-left"}`}>
+      {herleitung.stichtag && (
+        <span className="block">
+          {tq.stichtag}: {herleitung.stichtag}
+        </span>
+      )}
+      {herleitung.quelle && (
+        <span className="block">
+          {tq.quelle}: {herleitung.quelle}
+        </span>
+      )}
+      {!!herleitung.fehlt?.length && <span className="block text-amber-700">{tq.luecke}: {herleitung.fehlt.length}</span>}
+    </span>
   );
 }
 
