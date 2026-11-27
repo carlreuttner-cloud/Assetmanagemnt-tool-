@@ -251,3 +251,83 @@ export function Jahressaeulen({
     </div>
   );
 }
+
+export type WasserfallSchritt = {
+  name: string;
+  titel: string;
+  wert: Decimal | null;
+  /** start: Balken ab 0; abzug/verteilung: hängt am laufenden Stand; summe: Zwischensumme ab 0 */
+  art: "start" | "abzug" | "summe" | "verteilung";
+};
+
+/**
+ * Waterfall-Diagramm: Abzüge hängen am laufenden Stand. Ist ein Schritt unbekannt, sind auch alle
+ * folgenden Positionen unbekannt; sie werden als „?“ gezeigt statt mit 0 weitergerechnet.
+ */
+export function Wasserfall({ schritte, format, formatKurz, unbekannt }: { schritte: WasserfallSchritt[]; format: (w: Decimal) => string; formatKurz: (w: Decimal) => string; unbekannt: string }) {
+  if (schritte.length === 0) return null;
+  const balken: Array<{ s: WasserfallSchritt; von: Decimal; bis: Decimal } | { s: WasserfallSchritt; von: null; bis: null }> = [];
+  let stand: Decimal | null = null;
+  for (const s of schritte) {
+    if (s.wert === null || (s.art !== "start" && stand === null)) {
+      balken.push({ s, von: null, bis: null });
+      stand = null;
+      continue;
+    }
+    if (s.art === "start") {
+      balken.push({ s, von: s.wert.times(0), bis: s.wert });
+      stand = s.wert;
+    } else if (s.art === "summe") {
+      balken.push({ s, von: s.wert.times(0), bis: s.wert });
+      stand = s.wert;
+    } else {
+      const neu: Decimal = stand!.minus(s.wert);
+      balken.push({ s, von: neu, bis: stand! });
+      stand = neu;
+    }
+  }
+  const werte = balken.flatMap((b) => (b.von === null ? [] : [b.von, b.bis]));
+  if (werte.length === 0) return null;
+  const null0 = werte[0].times(0);
+  const max = werte.reduce((m, w) => (w.greaterThan(m) ? w : m), null0);
+  const min = werte.reduce((m, w) => (w.lessThan(m) ? w : m), null0);
+  const spanne = max.minus(min);
+  const hoehe = H - RAND.o - RAND.u;
+  const y = (w: Decimal) => RAND.o + hoehe - (spanne.isZero() ? 0 : w.minus(min).dividedBy(spanne).toNumber()) * hoehe;
+  const breite = (B - RAND.l - RAND.r) / balken.length;
+  const linien = [0, 1, 2, 3, 4].map((i) => min.plus(spanne.times(i).dividedBy(4)));
+  const farbe = (art: WasserfallSchritt["art"]) => (art === "abzug" ? "#be123c" : art === "summe" ? "#334155" : art === "verteilung" ? FARBEN[1] : FARBEN[0]);
+  return (
+    <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full" role="img">
+      {linien.map((w, i) => (
+        <g key={i}>
+          <line x1={RAND.l} x2={B - RAND.r} y1={y(w)} y2={y(w)} stroke="#e2e8f0" />
+          <text x={RAND.l - 6} y={y(w) + 4} textAnchor="end" fontSize="11" fill="#64748b">
+            {formatKurz(w)}
+          </text>
+        </g>
+      ))}
+      {min.lessThan(0) && <line x1={RAND.l} x2={B - RAND.r} y1={y(null0)} y2={y(null0)} stroke="#94a3b8" />}
+      {balken.map((b, i) => {
+        const x0 = RAND.l + i * breite + breite * 0.15;
+        const bb = breite * 0.7;
+        return (
+          <g key={b.s.name}>
+            {b.von === null ? (
+              <text x={x0 + bb / 2} y={y(null0) - 6} textAnchor="middle" fontSize="14" fill="#b45309">
+                ?<title>{`${b.s.titel}: ${unbekannt}`}</title>
+              </text>
+            ) : (
+              <rect x={x0} y={Math.min(y(b.von), y(b.bis))} width={bb} height={Math.max(1, Math.abs(y(b.bis) - y(b.von)))} fill={farbe(b.s.art)}>
+                <title>{`${b.s.titel}: ${format(b.s.wert!)}`}</title>
+              </rect>
+            )}
+            <text x={x0 + bb / 2} y={H - 8} textAnchor="middle" fontSize="10" fill="#64748b">
+              {b.s.name}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

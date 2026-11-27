@@ -65,15 +65,19 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         beschreibung={g.rechtsform}
         zurueck={{ href: "/gesellschaften", text: t.gesellschaften.titel }}
         aktionen={
-          schreiben && (
-            <>
-              <KnopfLink href={`/gesellschaften/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
-              <KnopfLink href={`/haeuser/neu?gesellschaft=${id}`}>{t.haeuser.neu}</KnopfLink>
-              <KnopfLink href={`/gesellschaften/kredite/neu?gesellschaft=${id}`} art="primaer">
-                {t.kredite.neu}
-              </KnopfLink>
-            </>
-          )
+          <>
+            <KnopfLink href={`/gesellschaften/${id}/waterfall`}>{t.waterfall.titel}</KnopfLink>
+            <KnopfLink href={`/gesellschaften/${id}/gesellschafter`}>{t.waterfall.gesellschafterVerwalten}</KnopfLink>
+            {schreiben && (
+              <>
+                <KnopfLink href={`/gesellschaften/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+                <KnopfLink href={`/haeuser/neu?gesellschaft=${id}`}>{t.haeuser.neu}</KnopfLink>
+                <KnopfLink href={`/gesellschaften/kredite/neu?gesellschaft=${id}`} art="primaer">
+                  {t.kredite.neu}
+                </KnopfLink>
+              </>
+            )}
+          </>
         }
       />
 

@@ -64,6 +64,9 @@ model Mandant {
   szenarien               Szenario[]
   geschaeftsjahre         Geschaeftsjahr[]
   dokumentvorgaben        Dokumentvorgabe[]
+  gesellschafter          Gesellschafter[]
+  kapitalbewegungen       Kapitalbewegung[]
+  waterfallvertraege      Waterfallvertrag[]
   dokumentnachweise       Dokumentnachweis[]
 }
 
@@ -154,6 +157,8 @@ model Gesellschaft {
   szenarien         Szenario[]
   abschluesse       Geschaeftsjahr[]
   dokumentnachweise Dokumentnachweis[]
+  gesellschafter    Gesellschafter[]
+  waterfallvertrag  Waterfallvertrag?
 
   @@index([mandantId])
 }
@@ -884,4 +889,76 @@ model Dokumentnachweis {
 
   @@index([mandantId])
   @@index([vorgabeId])
+}
+
+enum KapitalbewegungArt {
+  EINLAGE
+  RUECKZAHLUNG
+  AUSSCHUETTUNG
+}
+
+enum Verzinsung {
+  EINFACH
+  ZINSESZINS
+}
+
+/// Gesellschafter einer Gesellschaft (für die Verteilung eines Verkaufserlöses).
+model Gesellschafter {
+  id                  String   @id @default(cuid())
+  mandantId           String
+  gesellschaftId      String
+  name                String
+  /// Beteiligung am Kapital in Prozent (nur Anzeige)
+  beteiligungProzent  Decimal? @db.Decimal(9, 6)
+  /// Anteil an der Gewinnverteilung nach Vorzugsrendite in Prozent; null = laut Vertrag unbekannt
+  gewinnanteilProzent Decimal? @db.Decimal(9, 6)
+  notiz               String?
+  angelegtAm          DateTime @default(now())
+
+  mandant      Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft      @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  bewegungen   Kapitalbewegung[]
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
+}
+
+/// Einlage, Rückzahlung oder Ausschüttung eines Gesellschafters.
+model Kapitalbewegung {
+  id               String             @id @default(cuid())
+  mandantId        String
+  gesellschafterId String
+  art              KapitalbewegungArt
+  /// null = Datum unbekannt (dann keine Vorzugsrendite berechenbar)
+  datum            DateTime?          @db.Date
+  betrag           Decimal            @db.Decimal(14, 2)
+  quelle           String?
+  notiz            String?
+
+  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschafter Gesellschafter @relation(fields: [gesellschafterId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([gesellschafterId])
+}
+
+/// Verteilungsregeln eines Verkaufserlöses laut Gesellschaftsvertrag. Fehlt der Eintrag, sind die Regeln unbekannt.
+model Waterfallvertrag {
+  id                       String     @id @default(cuid())
+  mandantId                String
+  gesellschaftId           String     @unique
+  /// Vorzugsrendite auf das eingezahlte Kapital in Prozent p. a. (0 = keine)
+  vorzugsrenditeProzent    Decimal    @db.Decimal(9, 6)
+  verzinsung               Verzinsung
+  /// Bereits erhaltene Ausschüttungen auf die Vorzugsrendite anrechnen
+  ausschuettungenAnrechnen Boolean    @default(true)
+  /// Beleg, z. B. "Gesellschaftsvertrag § 14"
+  quelle                   String
+  notiz                    String?
+  geaendertAm              DateTime   @updatedAt
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
 }
