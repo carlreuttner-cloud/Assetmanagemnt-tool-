@@ -27,7 +27,11 @@ export function Seitenkopf({
           <h1 className="text-2xl font-semibold">{titel}</h1>
           {beschreibung && <p className="mt-1 text-slate-600">{beschreibung}</p>}
         </div>
-        {aktionen && <div className="flex flex-wrap gap-2">{aktionen}</div>}
+        {aktionen && (
+          <div className="flex flex-wrap gap-2" data-nicht-drucken>
+            {aktionen}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -49,10 +53,18 @@ export function Karte({ titel, aktionen, children, className = "" }: { titel?: R
 
 export function Kachel({ titel, wert, unter, ton }: { titel: ReactNode; wert: ReactNode; unter?: ReactNode; ton?: Ton }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{titel}</div>
-      <div className={`mt-1 text-xl font-semibold tabular-nums ${ton ? TON_TEXT[ton] : ""}`}>{wert}</div>
-      {unter && <div className="mt-1 text-xs text-slate-500">{unter}</div>}
+    <div className="rounded-xl border border-slate-200 bg-white p-4" data-kachel>
+      <div className="text-xs font-medium uppercase tracking-wide text-slate-500" data-kachel-titel>
+        {titel}
+      </div>
+      <div className={`mt-1 text-xl font-semibold tabular-nums ${ton ? TON_TEXT[ton] : ""}`} data-kachel-wert>
+        {wert}
+      </div>
+      {unter && (
+        <div className="mt-1 text-xs text-slate-500" data-kachel-unter>
+          {unter}
+        </div>
+      )}
     </div>
   );
 }
@@ -64,9 +76,11 @@ export function Kacheln({ children }: { children: ReactNode }) {
 /** Zwei Werte untereinander: Monatsmiete und daraus berechnete Jahresmiete. */
 export function MieteZelle({ monat, jahr }: { monat: ReactNode; jahr: ReactNode }) {
   return (
-    <div className="tabular-nums">
-      <div>{monat}</div>
-      <div className="text-xs text-slate-500">{jahr}</div>
+    <div className="tabular-nums" data-teile>
+      <div data-teil>{monat}</div>
+      <div className="text-xs text-slate-500" data-teil>
+        {jahr}
+      </div>
     </div>
   );
 }
@@ -240,11 +254,12 @@ export function Ankreuzfeld({ name, label, wert }: { name: string; label: ReactN
 /** Umschalter als Links (z. B. Filter), der aktive ist hervorgehoben. */
 export function Reiter({ eintraege }: { eintraege: Array<{ href: string; text: ReactNode; aktiv: boolean }> }) {
   return (
-    <div className="mb-4 flex flex-wrap gap-2 text-sm">
+    <div className="mb-4 flex flex-wrap gap-2 text-sm" data-reiter>
       {eintraege.map((e) => (
         <Link
           key={e.href}
           href={e.href}
+          aria-current={e.aktiv ? "true" : undefined}
           className={`rounded-full px-3 py-1 ring-1 ring-inset ${e.aktiv ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
         >
           {e.text}

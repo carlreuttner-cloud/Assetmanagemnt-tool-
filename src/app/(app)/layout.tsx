@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { abmelden, mandantWechseln, portfolioWaehlen } from "@/app/aktionen";
+import { ExportLeiste } from "@/components/export-leiste";
 import { GlobaleSuche } from "@/components/globale-suche";
 import { Merkliste } from "@/components/lesezeichen";
 import { PortfolioAuswahl } from "@/components/portfolio-auswahl";
@@ -12,6 +13,7 @@ import { AUSWAHL_OHNE, ladeAuswahl } from "@/lib/auth/auswahl";
 import { getKontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
+import { formatDatum, heute } from "@/lib/datum";
 import { erlaubteNavigation } from "@/lib/navigation";
 import { QUELLEN_COOKIE } from "@/lib/quellen";
 
@@ -115,9 +117,34 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <div className="min-w-0 flex-1">
             <Reiterzeile gruppen={gruppen} />
           </div>
-          <div className="mb-4 ml-auto">
+          <div className="mb-4 ml-auto flex flex-wrap items-center gap-2" data-nicht-drucken>
+            <ExportLeiste
+              texte={{
+                excel: t.export.excel,
+                pdf: t.export.pdf,
+                excelTitel: t.export.excelTitel,
+                pdfTitel: t.export.pdfTitel,
+                laeuft: t.export.laeuft,
+                info: t.export.info,
+                ansicht: t.export.ansicht,
+                adresse: t.export.adresse,
+                exportiertAm: t.export.exportiertAm,
+                hinweis: t.export.hinweis,
+                kennzahlen: t.export.kennzahlen,
+                titel: t.export.titel,
+                wert: t.export.wert,
+                zusatz: t.export.zusatz,
+                quellen: t.export.quellen,
+                monat: t.allgemein.monat,
+                jahr: t.allgemein.jahr,
+              }}
+            />
             <QuellenSchalter an={quellenAn} texte={{ schalter: t.quellen.schalter, an: t.quellen.an, aus: t.quellen.aus, hinweis: t.quellen.hinweis }} />
           </div>
+        </div>
+        <div className="druckkopf mb-4 border-b border-slate-300 pb-2 text-xs text-slate-600">
+          {fuelle(t.export.druckkopf, { datum: formatDatum(heute(), kontext.mandant.sprache), mandant: kontext.mandant.name })}{" "}
+          <span data-ansicht>{auswahlName ?? t.auswahl.alle}</span>
         </div>
         {auswahlName && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-sky-50 px-4 py-2 text-sm text-sky-900">

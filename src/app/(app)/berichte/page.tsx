@@ -1,9 +1,8 @@
-import { PlatzhalterSeite } from "@/components/platzhalter-seite";
-import { texte } from "@/i18n";
+import { redirect } from "next/navigation";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 
+/** „Berichte“ ist im Export aufgegangen (Excel/PDF oben rechts in jeder Ansicht); alte Links führen zur Übersicht. */
 export default async function BerichteSeite() {
-  const kontext = await pruefeZugriff("berichte");
-  const t = texte(kontext.mandant.sprache);
-  return <PlatzhalterSeite titel={t.navigation.berichte} beschreibung={t.seiten.berichte} />;
+  await pruefeZugriff("berichte");
+  redirect("/");
 }
