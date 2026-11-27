@@ -10,6 +10,7 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { restschuldNachweis, zinsbindung } from "@/lib/kredit";
+import { ibanLesbar } from "@/lib/suche";
 
 const ZINSARTEN = ["FEST", "VARIABEL"] as const;
 
@@ -111,7 +112,7 @@ export default async function KrediteSeite({ searchParams }: PageProps<"/kredite
                       </Link>
                     </td>
                     <td>{k.bank}</td>
-                    <td className="whitespace-nowrap font-mono text-xs">{k.iban}</td>
+                    <td className="whitespace-nowrap font-mono text-xs">{k.iban && ibanLesbar(k.iban)}</td>
                     <td>
                       {t.zinsArten[k.zinsArt]}
                       {k.referenzzins && <div className="text-xs text-slate-500">{k.referenzzins}</div>}

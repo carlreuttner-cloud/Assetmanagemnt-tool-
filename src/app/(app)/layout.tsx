@@ -1,6 +1,10 @@
+import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { abmelden, mandantWechseln, portfolioWaehlen } from "@/app/aktionen";
+import { GlobaleSuche } from "@/components/globale-suche";
 import { PortfolioAuswahl } from "@/components/portfolio-auswahl";
+import { QuellenSchalter } from "@/components/quellen-schalter";
+import { Sprungziel } from "@/components/sprungziel";
 import { Reiterzeile, SeitenleistenNavigation, type NavGruppeMitText } from "@/components/seitenleiste";
 import { fuelle, texte } from "@/i18n";
 import { AUSWAHL_OHNE, ladeAuswahl } from "@/lib/auth/auswahl";
@@ -8,6 +12,7 @@ import { getKontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { erlaubteNavigation } from "@/lib/navigation";
+import { QUELLEN_COOKIE } from "@/lib/quellen";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const kontext = await getKontext();
@@ -28,6 +33,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         select: { id: true, name: true },
       })
     : [];
+  const quellenAn = (await cookies()).get(QUELLEN_COOKIE)?.value === "an";
   const auswahlWert = auswahl?.art === "portfolio" ? auswahl.id : auswahl?.art === "ohne" ? AUSWAHL_OHNE : "";
   const auswahlName = auswahl?.art === "portfolio" ? auswahl.name : auswahl?.art === "ohne" ? t.auswahl.ohne : null;
 
@@ -60,6 +66,18 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <SeitenleistenNavigation gruppen={gruppen} />
 
         <div className="mt-auto space-y-3 border-t border-slate-800 px-3 pt-4 text-xs text-slate-400">
+          {darf(kontext.rolle, "suche") && (
+            <GlobaleSuche
+              texte={{
+                platzhalter: t.suche.platzhalter,
+                label: t.suche.label,
+                alleAnzeigen: t.suche.alleAnzeigen,
+                laeuft: t.suche.laeuft,
+                keineTreffer: t.suche.keineTreffer,
+                arten: t.suche.arten,
+              }}
+            />
+          )}
           {kontext.mandanten.length > 1 && (
             <form action={mandantWechseln} className="space-y-1">
               <label htmlFor="mandantId" className="block">{t.konto.mandant}</label>
@@ -88,8 +106,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-8">
-        <Reiterzeile gruppen={gruppen} />
+      <main id="inhalt" data-quellen={quellenAn ? "an" : "aus"} className="min-w-0 flex-1 p-8">
+        <div className="flex flex-wrap items-start gap-x-4">
+          <div className="min-w-0 flex-1">
+            <Reiterzeile gruppen={gruppen} />
+          </div>
+          <div className="mb-4 ml-auto">
+            <QuellenSchalter an={quellenAn} texte={{ schalter: t.quellen.schalter, an: t.quellen.an, aus: t.quellen.aus, hinweis: t.quellen.hinweis }} />
+          </div>
+        </div>
         {auswahlName && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-sky-50 px-4 py-2 text-sm text-sky-900">
             <span>{fuelle(t.auswahl.hinweis, { name: auswahlName })}</span>
@@ -101,6 +126,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         )}
         {children}
+        <Sprungziel />
       </main>
     </div>
   );

@@ -225,7 +225,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                   const ist = aktiv.reduce((s, m) => s.plus(dezimal(m.istMiete)), dezimal(0));
                   const leer = aktiv.length === 0;
                   return (
-                    <tr key={e.id} className={leer ? "bg-amber-50/40" : undefined}>
+                    <tr key={e.id} id={`einheit-${e.id}`} className={leer ? "bg-amber-50/40" : undefined}>
                       <td className="font-medium">
                         {e.bezeichnung}
                         <div className="text-xs font-normal text-slate-500">{t.einheitArten[e.art]}</div>
