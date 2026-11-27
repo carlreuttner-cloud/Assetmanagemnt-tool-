@@ -26,6 +26,8 @@ export interface TestGutachten {
   gesamtnutzungsdauer: number | null;
   barwertfaktor: Decimal | null;
   bodenwert: Decimal | null;
+  /** Gebäudeertragswert, nur in einem Teil der neuesten Gutachten angegeben */
+  gebaeudewert: Decimal | null;
   ertragswert: Decimal | null;
   zuAbschlaege: Decimal | null;
   baujahr: number | null;
@@ -127,6 +129,7 @@ export function baueGutachten(
       gesamtnutzungsdauer: ohneFaktoren ? null : gesamtnutzungsdauer,
       barwertfaktor: ohneFaktoren ? null : bwf,
       bodenwert: ohneFaktoren ? null : bodenwert,
+      gebaeudewert: neuestes && Number(schluessel.replace(/\D/g, "")) % 2 === 1 ? w.wert.minus(bodenwert) : null,
       ertragswert: w.wert,
       zuAbschlaege: dezimal(0),
       baujahr,

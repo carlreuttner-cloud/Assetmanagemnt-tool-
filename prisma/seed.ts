@@ -116,7 +116,7 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       verkehrswert: geld(g.verkehrswert), rohertragJahr: optGeld(g.rohertragJahr), bewirtschaftungskosten: optGeld(g.bewirtschaftungskosten),
       reinertragJahr: optGeld(g.reinertragJahr), liegenschaftszins: g.liegenschaftszins?.toFixed(6) ?? null,
       restnutzungsdauer: g.restnutzungsdauer, gesamtnutzungsdauer: g.gesamtnutzungsdauer, barwertfaktor: g.barwertfaktor?.toFixed(6) ?? null,
-      bodenwert: optGeld(g.bodenwert), ertragswert: optGeld(g.ertragswert), zuAbschlaege: optGeld(g.zuAbschlaege),
+      bodenwert: optGeld(g.bodenwert), gebaeudewert: optGeld(g.gebaeudewert), ertragswert: optGeld(g.ertragswert), zuAbschlaege: optGeld(g.zuAbschlaege),
       baujahr: g.baujahr, wohnflaeche: g.wohnflaeche?.toFixed(2) ?? null, gewerbeflaeche: g.gewerbeflaeche?.toFixed(2) ?? null,
       grundstuecksflaeche: g.grundstuecksflaeche?.toFixed(2) ?? null, einheiten: g.einheiten, zustand: g.zustand, energieklasse: g.energieklasse,
       lage: g.lage, staerken: g.staerken, schwaechen: g.schwaechen, chancen: g.chancen, risiken: g.risiken,

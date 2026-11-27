@@ -280,6 +280,8 @@ model Gutachten {
   /// Barwertfaktor (Vervielfältiger) laut Gutachten
   barwertfaktor          Decimal? @db.Decimal(9, 6)
   bodenwert              Decimal? @db.Decimal(14, 2)
+  /// Gebäudewert laut Gutachten (z. B. Gebäudeertragswert oder Sachwert der baulichen Anlagen); fehlt er, zeigt die Ansicht Verkehrswert − Bodenwert als abgeleiteten Wert
+  gebaeudewert           Decimal? @db.Decimal(14, 2)
   ertragswert            Decimal? @db.Decimal(14, 2)
   sachwert               Decimal? @db.Decimal(14, 2)
   vergleichswert         Decimal? @db.Decimal(14, 2)

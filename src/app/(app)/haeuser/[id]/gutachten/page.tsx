@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { Liniendiagramm } from "@/components/diagramme";
+import { Liniendiagramm, type Reihe } from "@/components/diagramme";
 import { Begriff, Glossar, MitHerleitung, Unbekannt, type GlossarBegriff } from "@/components/herleitung";
 import { Karte, KnopfLink, Leer, Seitenkopf, Tabelle } from "@/components/ui";
 import { fuelle, texte, type Texte } from "@/i18n";
@@ -12,6 +12,7 @@ import { isoDatum } from "@/lib/datum";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { formatierer, type Formatierer } from "@/lib/format";
 import { dezimal, type Decimal } from "@/lib/geld";
+import { gebaeudewert } from "@/lib/bewertung";
 import { gutachtenVerlauf, swotPunkte, type GutachtenDaten, type GutachtenPruefwerte } from "@/lib/gutachten";
 
 const opt = (w: { toFixed(): string } | null) => (w === null ? null : dezimal(w));
@@ -25,7 +26,12 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
   const sicht = await sichtbarkeit(kontext);
   const haus = await kontext.db.haus.findFirst({
     where: { id: erlaubt(sicht.hausIds, id) },
-    select: { id: true, bezeichnung: true, gutachten: true },
+    select: {
+      id: true,
+      bezeichnung: true,
+      gutachten: true,
+      verkehrswerte: { where: { gutachten: null }, orderBy: { stichtag: "asc" }, select: { id: true, stichtag: true, wert: true, quelle: true } },
+    },
   });
   if (!haus) notFound();
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
@@ -66,6 +72,8 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
       zeilen: [
         zeile(tg.verkehrswert, ({ g }) => <span className="font-semibold">{f.betragGanz(g.verkehrswert)}</span>),
         zeile(tg.veraenderung, ({ p }) => <Veraenderung p={p} f={f} />),
+        zeile(begriff("Bodenwert", tg.bodenwert), ({ g }) => wert(g.bodenwert && f.betragGanz(g.bodenwert))),
+        zeile(begriff("Gebaeudewert", tg.gebaeudewert), ({ g }) => <GebaeudewertZelle g={g.roh} t={t} f={f} />),
         zeile(tg.verfahren, ({ g }) => wert(g.roh.verfahren && tg.verfahrenArten[g.roh.verfahren])),
         zeile(tg.anlass, ({ g }) => wert(g.roh.anlass)),
         zeile(tg.erstelltAm, ({ g }) => wert(g.roh.erstelltAm && f.datum(g.roh.erstelltAm))),
@@ -85,7 +93,6 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
         zeile(begriff("Restnutzungsdauer", tg.restnutzungsdauer), ({ g }) => wert(g.restnutzungsdauer !== null && fuelle(tg.jahre, { jahre: String(g.restnutzungsdauer) }))),
         zeile(tg.gesamtnutzungsdauer, ({ g }) => wert(g.roh.gesamtnutzungsdauer !== null && fuelle(tg.jahre, { jahre: String(g.roh.gesamtnutzungsdauer) }))),
         zeile(begriff("Barwertfaktor", tg.barwertfaktor), ({ g }) => wert(g.barwertfaktor && f.faktor(g.barwertfaktor, 4))),
-        zeile(begriff("Bodenwert", tg.bodenwert), ({ g }) => wert(g.bodenwert && f.betragGanz(g.bodenwert))),
       ],
     },
     {
@@ -114,7 +121,15 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
     },
   ];
 
-  const diagramm = [...verlauf].reverse().map(({ g }) => ({ x: g.stichtag, y: g.verkehrswert }));
+  const chronologisch = [...verlauf].reverse();
+  const reihen: Reihe[] = [
+    { name: tg.verkehrswert, punkte: chronologisch.map(({ g }) => ({ x: g.stichtag, y: g.verkehrswert })) },
+    { name: tg.bodenwert, punkte: chronologisch.map(({ g }) => ({ x: g.stichtag, y: g.bodenwert })) },
+    { name: tg.gebaeudewert, punkte: chronologisch.map(({ g }) => ({ x: g.stichtag, y: gebaeudewert({ verkehrswert: g.verkehrswert, bodenwert: g.bodenwert, gebaeudewert: opt(g.roh.gebaeudewert) }).wert })) },
+    ...(haus.verkehrswerte.length > 0
+      ? [{ name: tg.marktwerte, gestrichelt: true, punkte: haus.verkehrswerte.map((v) => ({ x: isoDatum(v.stichtag), y: dezimal(v.wert) })) }]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -137,9 +152,32 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
         </Karte>
       ) : (
         <>
-          {diagramm.length > 1 && (
-            <Karte titel={tg.diagramm} className="max-w-3xl">
-              <Liniendiagramm reihen={[{ name: tg.verkehrswert, punkte: diagramm }]} formatY={(w) => f.betragKurz(w)} formatX={(d) => f.datum(d)} />
+          {chronologisch.length + haus.verkehrswerte.length > 1 && (
+            <Karte titel={tg.diagrammWerte} className="max-w-3xl">
+              <Liniendiagramm reihen={reihen} formatY={(w) => f.betragKurz(w)} formatX={(d) => f.datum(d)} ab0 />
+            </Karte>
+          )}
+
+          {haus.verkehrswerte.length > 0 && (
+            <Karte titel={<Begriff k="Marktwert" t={t}>{tg.marktwerte}</Begriff>} className="max-w-3xl">
+              <Tabelle>
+                <thead>
+                  <tr>
+                    <th>{t.bewertung.stichtag}</th>
+                    <th className="text-right">{t.bewertung.wert}</th>
+                    <th>{t.herleitung.quelle}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...haus.verkehrswerte].reverse().map((v) => (
+                    <tr key={v.id}>
+                      <td>{f.datum(v.stichtag)}</td>
+                      <td className="text-right tabular-nums">{f.betragGanz(v.wert)}</td>
+                      <td>{v.quelle ?? <Unbekannt t={t} />}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Tabelle>
             </Karte>
           )}
 
@@ -202,10 +240,39 @@ export default async function GutachtenSeite({ params }: PageProps<"/haeuser/[id
       )}
 
       <Glossar
-        begriffe={["Rohertrag", "Bewirtschaftungskosten", "Reinertrag", "Liegenschaftszins", "Restnutzungsdauer", "Barwertfaktor", "Bodenwert", "Ertragswert", "Rohertragsfaktor", "SWOT"]}
+        begriffe={["Bodenwert", "Gebaeudewert", "Marktwert", "Rohertrag", "Bewirtschaftungskosten", "Reinertrag", "Liegenschaftszins", "Restnutzungsdauer", "Barwertfaktor", "Ertragswert", "Rohertragsfaktor", "SWOT"]}
         t={t}
       />
     </div>
+  );
+}
+
+function GebaeudewertZelle({ g, t, f }: { g: { verkehrswert: { toFixed(): string }; bodenwert: { toFixed(): string } | null; gebaeudewert: { toFixed(): string } | null; stichtag: Date; gutachter: string | null }; t: Texte; f: Formatierer }) {
+  const tg = t.gutachten;
+  const gw = gebaeudewert({ verkehrswert: dezimal(g.verkehrswert), bodenwert: opt(g.bodenwert), gebaeudewert: opt(g.gebaeudewert) });
+  if (!gw.wert) return <MitHerleitung wert={<Unbekannt t={t} />} herleitung={{ berechnung: tg.gebaeudewertFormel, fehlt: [tg.bodenwert] }} t={t} />;
+  return (
+    <MitHerleitung
+      wert={
+        <>
+          {f.betragGanz(gw.wert)}
+          {gw.art === "abgeleitet" && <span className="ml-1 text-xs text-slate-500">({tg.gebaeudewertAbgeleitet})</span>}
+        </>
+      }
+      herleitung={{
+        berechnung: gw.art === "gutachten" ? tg.gebaeudewertLautGutachten : tg.gebaeudewertFormel,
+        werte:
+          gw.art === "abgeleitet"
+            ? [
+                [tg.verkehrswert, f.betragGanz(g.verkehrswert)],
+                [tg.bodenwert, f.betragGanz(g.bodenwert)],
+              ]
+            : [],
+        quelle: g.gutachter ?? tg.titel,
+        stichtag: f.datum(g.stichtag),
+      }}
+      t={t}
+    />
   );
 }
 
