@@ -18,7 +18,7 @@
 import { aufCent, dezimal, Decimal } from "./geld";
 import { monatsNummer, type IsoDatum } from "./datum";
 import { hausSummen, verkehrswertAm, type HausDaten } from "./kennzahlen";
-import { PERIODEN_PRO_JAHR, restschuld, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
+import { PERIODEN_PRO_JAHR, restschuld, restschuldNachweis, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
 
 export interface Verkauf {
   hausId: string;
@@ -83,8 +83,22 @@ export interface SzenarioJahr {
   haeuser: number;
 }
 
+/**
+ * Datenlücken des Startbestands. Betroffene Kredite rechnen nicht mit (kein Schätzwert), betroffene
+ * Häuser gehen ohne Wert ein; LTV wird dann nicht ausgewiesen. `saldoVon`/`saldoBis`: Spanne der
+ * Stichtage der belegten Start-Restschulden.
+ */
+export interface SzenarioLuecken {
+  kreditOhneSaldo: string[];
+  kreditOhneZinssatz: string[];
+  hausOhneWert: string[];
+  saldoVon: IsoDatum | null;
+  saldoBis: IsoDatum | null;
+}
+
 export interface SzenarioErgebnis {
   heute: { restschuld: Decimal; verkehrswert: Decimal; sollMieteJahr: Decimal; ltv: Decimal | null };
+  luecken: SzenarioLuecken;
   jahre: SzenarioJahr[];
   summe: { einnahmen: Decimal; zinsen: Decimal; tilgung: Decimal; cashflow: Decimal; verkaufNetto: Decimal };
 }
@@ -107,10 +121,24 @@ interface KreditZustand {
   restAnteil: Decimal;
 }
 
-function startZustand(k: KreditDaten, referenzwerte: ReferenzWert[], stichtag: IsoDatum, p: SzenarioParameter): KreditZustand {
+function startZustand(
+  k: KreditDaten,
+  referenzwerte: ReferenzWert[],
+  stichtag: IsoDatum,
+  p: SzenarioParameter,
+  luecken: SzenarioLuecken,
+): KreditZustand | null {
   const n = PERIODEN_PRO_JAHR[k.zahlweise];
-  const saldo = restschuld(k, stichtag);
-  const heuteSatz = zinssatz(k, referenzwerte, stichtag) ?? NULL;
+  const nachweis = restschuldNachweis(k, stichtag);
+  const heuteSatz = zinssatz(k, referenzwerte, stichtag);
+  if (!nachweis) luecken.kreditOhneSaldo.push(k.id);
+  else if (heuteSatz === null && nachweis.betrag.greaterThan(0)) luecken.kreditOhneZinssatz.push(k.id);
+  if (!nachweis || heuteSatz === null) return null;
+  if (nachweis.herkunft !== "nichtAusgezahlt") {
+    if (!luecken.saldoVon || nachweis.stichtag < luecken.saldoVon) luecken.saldoVon = nachweis.stichtag;
+    if (!luecken.saldoBis || nachweis.stichtag > luecken.saldoBis) luecken.saldoBis = nachweis.stichtag;
+  }
+  const saldo = nachweis.betrag;
   const anfTilgung = k.anfaenglicheTilgung ? aufCent(k.ursprungsbetrag.times(k.anfaenglicheTilgung).dividedBy(100 * n)) : NULL;
   const zinsHeute = aufCent(saldo.times(heuteSatz).dividedBy(100 * n));
   let rate = NULL;
@@ -161,12 +189,16 @@ export function rechneSzenario(
       soll: s.sollMonat,
       leer: s.erwartetLeerMonat,
       quote: s.sollMonat.isZero() ? dezimal(1) : s.istMonat.dividedBy(s.sollMonat),
-      wert: verkehrswertAm(h, stichtag) ?? NULL,
+      wert: verkehrswertAm(h, stichtag),
       verkaufMonat: verkauf ? monatsNummer(verkauf.datum) : Infinity,
       verkauf,
     };
   });
-  const zustaende = kredite.map((k) => startZustand(k, referenzwerte, stichtag, p)).filter((z) => z.saldo.greaterThan(0));
+  const luecken: SzenarioLuecken = { kreditOhneSaldo: [], kreditOhneZinssatz: [], hausOhneWert: haus.filter((x) => x.wert === null).map((x) => x.h.id), saldoVon: null, saldoBis: null };
+  const zustaende = kredite
+    .map((k) => startZustand(k, referenzwerte, stichtag, p, luecken))
+    .filter((z): z is KreditZustand => z !== null && z.saldo.greaterThan(0));
+  const vollstaendig = luecken.kreditOhneSaldo.length + luecken.kreditOhneZinssatz.length + luecken.hausOhneWert.length === 0;
   const ausfall = dezimal(1).minus(p.mietausfall.dividedBy(100));
 
   const jahre = new Map<number, SzenarioJahr>();
@@ -186,7 +218,8 @@ export function rechneSzenario(
 
     // Verkäufe zu Monatsbeginn
     for (const x of haus.filter((x) => x.verkaufMonat === m)) {
-      const preis = x.verkauf!.preis ?? hoch(x.wert, p.wertentwicklung, (m - startMonat) / 12);
+      // Ohne Preis und ohne Verkehrswert kein geschätzter Erlös (Lücke); die Kredite werden trotzdem abgelöst.
+      const preis = x.verkauf!.preis ?? (x.wert ? hoch(x.wert, p.wertentwicklung, (m - startMonat) / 12) : NULL);
       let netto = preis.minus(preis.times(p.verkaufskosten).dividedBy(100));
       for (const z of zustaende) {
         const anteil = z.k.haeuser.find((a) => a.hausId === x.h.id)?.anteilProzent;
@@ -233,7 +266,7 @@ export function rechneSzenario(
       zeile.restschuld = zustaende.reduce((s, z) => s.plus(z.saldo), NULL);
       const imBestand = haus.filter((x) => m < x.verkaufMonat);
       zeile.haeuser = imBestand.length;
-      zeile.verkehrswert = imBestand.reduce((s, x) => s.plus(hoch(x.wert, p.wertentwicklung, j - startJahr)), NULL);
+      zeile.verkehrswert = imBestand.reduce((s, x) => s.plus(x.wert ? hoch(x.wert, p.wertentwicklung, j - startJahr) : 0), NULL);
     }
   }
 
@@ -244,20 +277,21 @@ export function rechneSzenario(
     z.verkehrswert = aufCent(z.verkehrswert);
     z.kapitaldienst = z.zinsen.plus(z.tilgung);
     z.cashflow = z.einnahmen.minus(z.kapitaldienst);
-    z.ltv = z.verkehrswert.isZero() ? null : z.restschuld.dividedBy(z.verkehrswert).times(100);
+    z.ltv = z.verkehrswert.isZero() || !vollstaendig ? null : z.restschuld.dividedBy(z.verkehrswert).times(100);
     z.dscr = z.kapitaldienst.isZero() ? null : z.einnahmen.dividedBy(z.kapitaldienst);
   }
 
-  const restHeute = zustaende.reduce((s, z) => s.plus(restschuld(z.k, stichtag)), NULL);
-  const wertHeute = haus.reduce((s, x) => s.plus(x.wert), NULL);
+  const restHeute = zustaende.reduce((s, z) => s.plus(restschuld(z.k, stichtag) ?? 0), NULL);
+  const wertHeute = haus.reduce((s, x) => s.plus(x.wert ?? 0), NULL);
   const summe = (f: (z: SzenarioJahr) => Decimal) => liste.reduce((s, z) => s.plus(f(z)), NULL);
   return {
     heute: {
       restschuld: restHeute,
       verkehrswert: wertHeute,
       sollMieteJahr: haus.reduce((s, x) => s.plus(x.soll), NULL).times(12),
-      ltv: wertHeute.isZero() ? null : restHeute.dividedBy(wertHeute).times(100),
+      ltv: wertHeute.isZero() || !vollstaendig ? null : restHeute.dividedBy(wertHeute).times(100),
     },
+    luecken,
     jahre: liste,
     summe: {
       einnahmen: summe((z) => z.einnahmen),

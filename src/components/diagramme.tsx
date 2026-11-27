@@ -7,7 +7,8 @@ import { alsDbDatum, type IsoDatum } from "@/lib/datum";
 
 export const FARBEN = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed", "#be123c", "#4d7c0f", "#0369a1", "#a16207"];
 
-export type Reihe = { name: string; farbe?: string; punkte: { x: IsoDatum; y: Decimal }[]; gestrichelt?: boolean };
+/** Punkte mit y = null sind unbekannt: die Linie wird dort unterbrochen statt auf 0 gezogen. */
+export type Reihe = { name: string; farbe?: string; punkte: { x: IsoDatum; y: Decimal | null }[]; gestrichelt?: boolean };
 
 const B = 600;
 const H = 240;
@@ -39,7 +40,7 @@ export function Liniendiagramm({
   /** y-Achse bei 0 beginnen */
   ab0?: boolean;
 }) {
-  const alle = reihen.flatMap((r) => r.punkte);
+  const alle = reihen.flatMap((r) => r.punkte).filter((p): p is { x: IsoDatum; y: Decimal } => p.y !== null);
   if (alle.length === 0) return null;
   const xs = alle.map((p) => alsDbDatum(p.x).getTime());
   const xMin = Math.min(...xs);
@@ -80,16 +81,28 @@ export function Liniendiagramm({
         ))}
         {reihen.map((r, i) => {
           const farbe = r.farbe ?? FARBEN[i % FARBEN.length];
-          const punkte = [...r.punkte].sort((a, b) => (a.x < b.x ? -1 : 1));
+          const sortiert = [...r.punkte].sort((a, b) => (a.x < b.x ? -1 : 1));
+          // in zusammenhängende Abschnitte ohne unbekannte Werte zerlegen
+          const abschnitte: { x: IsoDatum; y: Decimal }[][] = [[]];
+          for (const p of sortiert) {
+            if (p.y === null) abschnitte.push([]);
+            else abschnitte[abschnitte.length - 1].push({ x: p.x, y: p.y });
+          }
+          const punkte = abschnitte.flat();
           return (
             <g key={r.name}>
-              <polyline
-                fill="none"
-                stroke={farbe}
-                strokeWidth="2"
-                strokeDasharray={r.gestrichelt ? "5 4" : undefined}
-                points={punkte.map((p) => `${x(p.x)},${px(p.y, yMin, yMax)}`).join(" ")}
-              />
+              {abschnitte
+                .filter((a) => a.length > 0)
+                .map((a, j) => (
+                  <polyline
+                    key={j}
+                    fill="none"
+                    stroke={farbe}
+                    strokeWidth="2"
+                    strokeDasharray={r.gestrichelt ? "5 4" : undefined}
+                    points={a.map((p) => `${x(p.x)},${px(p.y, yMin, yMax)}`).join(" ")}
+                  />
+                ))}
               {punkte.length <= 40 &&
                 punkte.map((p) => (
                   <circle key={p.x} cx={x(p.x)} cy={px(p.y, yMin, yMax)} r="3" fill={farbe}>
@@ -147,6 +160,82 @@ export function Balkendiagramm({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Senkrechte Säulen je Jahr (z. B. belegte Restschuld). Fehlende Jahre bleiben leer statt 0,
+ * Entwürfe sind schraffiert, ein Planwert erscheint als waagerechter Strich.
+ */
+export function Jahressaeulen({
+  jahre,
+  format,
+  formatKurz,
+  legende,
+}: {
+  jahre: { jahr: number; wert: Decimal | null; entwurf?: boolean; plan?: Decimal | null; titel?: string }[];
+  format: (w: Decimal) => string;
+  formatKurz: (w: Decimal) => string;
+  legende: { beleg: string; entwurf: string; plan: string };
+}) {
+  if (jahre.length === 0) return null;
+  const werte = jahre.flatMap((j) => [j.wert, j.plan ?? null]).filter((w): w is Decimal => w !== null);
+  if (werte.length === 0) return null;
+  const max = werte.reduce((m, w) => (w.greaterThan(m) ? w : m), werte[0]);
+  const hoehe = H - RAND.o - RAND.u;
+  const y = (w: Decimal) => RAND.o + hoehe - (max.isZero() ? 0 : w.dividedBy(max).toNumber()) * hoehe;
+  const breite = (B - RAND.l - RAND.r) / jahre.length;
+  const linien = [0, 1, 2, 3, 4].map((i) => max.times(i).dividedBy(4));
+  const farbe = FARBEN[0];
+  const mitPlan = jahre.some((j) => j.plan);
+  const mitEntwurf = jahre.some((j) => j.entwurf);
+  return (
+    <div>
+      <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full" role="img">
+        <defs>
+          <pattern id="schraffur" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill="#ccfbf1" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke={farbe} strokeWidth="2" />
+          </pattern>
+        </defs>
+        {linien.map((w, i) => (
+          <g key={i}>
+            <line x1={RAND.l} x2={B - RAND.r} y1={y(w)} y2={y(w)} stroke="#e2e8f0" />
+            <text x={RAND.l - 6} y={y(w) + 4} textAnchor="end" fontSize="11" fill="#64748b">
+              {formatKurz(w)}
+            </text>
+          </g>
+        ))}
+        {jahre.map((j, i) => {
+          const x0 = RAND.l + i * breite + breite * 0.2;
+          const b = breite * 0.6;
+          return (
+            <g key={j.jahr}>
+              {j.wert !== null ? (
+                <rect x={x0} y={y(j.wert)} width={b} height={RAND.o + hoehe - y(j.wert)} fill={j.entwurf ? "url(#schraffur)" : farbe} stroke={farbe}>
+                  <title>{`${j.jahr}: ${format(j.wert)}${j.titel ? ` · ${j.titel}` : ""}`}</title>
+                </rect>
+              ) : (
+                <text x={x0 + b / 2} y={RAND.o + hoehe - 4} textAnchor="middle" fontSize="12" fill="#94a3b8">
+                  –
+                </text>
+              )}
+              {j.plan && <line x1={x0 - 4} x2={x0 + b + 4} y1={y(j.plan)} y2={y(j.plan)} stroke={FARBEN[2]} strokeWidth="2" strokeDasharray="4 3" />}
+              <text x={x0 + b / 2} y={H - 8} textAnchor="middle" fontSize="11" fill="#64748b">
+                {j.jahr}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <Legende
+        eintraege={[
+          { name: legende.beleg, farbe },
+          ...(mitEntwurf ? [{ name: legende.entwurf, farbe: "#99f6e4" }] : []),
+          ...(mitPlan ? [{ name: legende.plan, farbe: FARBEN[2] }] : []),
+        ]}
+      />
     </div>
   );
 }

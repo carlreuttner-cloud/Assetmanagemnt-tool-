@@ -4,7 +4,7 @@ import { idFilter, sichtbarkeit, type Sichtbarkeit } from "@/lib/auth/sichtbarke
 import { isoDatum } from "@/lib/datum";
 import { dezimal } from "@/lib/geld";
 import type { HausDaten } from "@/lib/kennzahlen";
-import type { KreditDaten, ReferenzWert } from "@/lib/kredit";
+import type { KreditDaten, ReferenzWert, SaldoArt, SaldoQuelle, SaldoStatus } from "@/lib/kredit";
 
 /**
  * Lädt die Rechengrundlage (Häuser mit Einheiten und Mietverhältnissen, Kredite mit
@@ -46,6 +46,7 @@ export async function ladeRechengrundlage(
       include: {
         haeuser: { select: { hausId: true, anteilProzent: true } },
         buchungen: { select: { datum: true, art: true, betrag: true, saldoNach: true } },
+        salden: { select: { id: true, stichtag: true, stichtagHinweis: true, art: true, betrag: true, quelle: true, quelleText: true, status: true } },
         tilgungsplaene: { select: { version: true, gueltigAb: true, zeilen: true } },
       },
     }),
@@ -105,6 +106,16 @@ type KreditZeile = {
   ratenbetrag: { toFixed(): string } | null;
   haeuser: { hausId: string; anteilProzent: { toFixed(): string } }[];
   buchungen: { datum: Date; art: KreditDaten["buchungen"][number]["art"]; betrag: { toFixed(): string }; saldoNach: { toFixed(): string } | null }[];
+  salden?: {
+    id: string;
+    stichtag: Date | null;
+    stichtagHinweis: string | null;
+    art: SaldoArt;
+    betrag: { toFixed(): string };
+    quelle: SaldoQuelle;
+    quelleText: string | null;
+    status: SaldoStatus;
+  }[];
   tilgungsplaene: {
     version: number;
     gueltigAb: Date;
@@ -132,6 +143,16 @@ export function alsKreditDaten(k: KreditZeile): KreditDaten {
     ratenbetrag: d(k.ratenbetrag),
     haeuser: k.haeuser.map((x) => ({ hausId: x.hausId, anteilProzent: dezimal(x.anteilProzent) })),
     buchungen: k.buchungen.map((b) => ({ datum: isoDatum(b.datum), art: b.art, betrag: dezimal(b.betrag), saldoNach: d(b.saldoNach) })),
+    salden: (k.salden ?? []).map((x) => ({
+      id: x.id,
+      stichtag: isoDatum(x.stichtag),
+      stichtagHinweis: x.stichtagHinweis,
+      art: x.art,
+      betrag: dezimal(x.betrag),
+      quelle: x.quelle,
+      quelleText: x.quelleText,
+      status: x.status,
+    })),
     tilgungsplaene: k.tilgungsplaene.map((t) => ({
       version: t.version,
       gueltigAb: isoDatum(t.gueltigAb),

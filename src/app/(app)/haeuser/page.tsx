@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Begriff, Kennzahl } from "@/components/herleitung";
 import { KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -6,7 +7,7 @@ import { darf } from "@/lib/auth/rechte";
 import { heute } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
-import { gruppenKennzahlen, hausKennzahlen } from "@/lib/kennzahlen";
+import { addiere, hausKennzahlen, kennzahlenAus, leereSummen, type Summen } from "@/lib/kennzahlen";
 
 export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser">) {
   const { gesellschaft } = await searchParams;
@@ -33,8 +34,7 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
   const daten = new Map(grundlage.haeuser.map((h) => [h.id, h]));
   const zeilen = haeuser.map((h) => ({ h, k: hausKennzahlen(daten.get(h.id)!, kredite, referenzwerte, stichtag) }));
   // Summenzeile: Häuser plus anteilige Kredite (über die Häuser summiert)
-  const summe = gruppenKennzahlen(haeuser.map((h) => daten.get(h.id)!), [], referenzwerte, stichtag);
-  const restschuld = zeilen.reduce((s, z) => s.plus(z.k.restschuld), summe.restschuld);
+  const summe = kennzahlenAus(zeilen.reduce<Summen>((s, z) => addiere(s, z.k), leereSummen()));
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
   const tk = t.kennzahlen;
 
@@ -69,7 +69,9 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
                 <th className={rechts}>{tk.flaeche}</th>
                 <th className={rechts}>{tk.verkehrswert}</th>
                 <th className={rechts}>{tk.restschuld}</th>
-                <th className={rechts}>{tk.ltv}</th>
+                <th className={rechts}>
+                  <Begriff k="LTV" t={t} />
+                </th>
                 <th className={rechts}>
                   {tk.sollMiete} ({t.allgemein.monat} / {t.allgemein.jahr})
                 </th>
@@ -95,9 +97,15 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
                     {k.leereEinheiten > 0 && <div className="text-xs text-slate-500">{k.leereEinheiten} {t.haeuser.leer}</div>}
                   </td>
                   <td className={rechts}>{f.zahl(k.flaeche)} m²</td>
-                  <td className={rechts}>{f.betragGanz(k.verkehrswert)}</td>
-                  <td className={rechts}>{f.betragGanz(k.restschuld)}</td>
-                  <td className={rechts}>{f.prozent(k.ltv, 1)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="verkehrswert" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="restschuld" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="ltv" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
                   </td>
@@ -114,9 +122,15 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
                   <td>{t.allgemein.summe}</td>
                   <td className={rechts}>{summe.einheiten}</td>
                   <td className={rechts}>{f.zahl(summe.flaeche)} m²</td>
-                  <td className={rechts}>{f.betragGanz(summe.verkehrswert)}</td>
-                  <td className={rechts}>{f.betragGanz(restschuld)}</td>
-                  <td className={rechts}>{f.prozent(summe.verkehrswert.isZero() ? null : restschuld.times(100).dividedBy(summe.verkehrswert), 1)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="verkehrswert" k={summe} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="restschuld" k={summe} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="ltv" k={summe} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(summe.sollMonat)} jahr={f.betrag(summe.sollJahr)} />
                   </td>

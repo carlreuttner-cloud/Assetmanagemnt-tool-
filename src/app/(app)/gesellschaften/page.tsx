@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Begriff, Kennzahl } from "@/components/herleitung";
 import { KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -62,12 +63,16 @@ export default async function GesellschaftenSeite() {
                 <th className={rechts}>{t.kennzahlen.kredite}</th>
                 <th className={rechts}>{t.kennzahlen.verkehrswert}</th>
                 <th className={rechts}>{t.kennzahlen.restschuld}</th>
-                <th className={rechts}>{t.kennzahlen.ltv}</th>
+                <th className={rechts}>
+                  <Begriff k="LTV" t={t} />
+                </th>
                 <th className={rechts}>
                   {t.kennzahlen.sollMiete} ({t.allgemein.monat} / {t.allgemein.jahr})
                 </th>
                 <th className={rechts}>{t.kennzahlen.leerstand}</th>
-                <th className={rechts}>{t.kennzahlen.dscr}</th>
+                <th className={rechts}>
+                  <Begriff k="DSCR" t={t} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -81,14 +86,22 @@ export default async function GesellschaftenSeite() {
                   </td>
                   <td className={rechts}>{k.haeuser}</td>
                   <td className={rechts}>{anzahlKredite}</td>
-                  <td className={rechts}>{f.betragGanz(k.verkehrswert)}</td>
-                  <td className={rechts}>{f.betragGanz(k.restschuld)}</td>
-                  <td className={rechts}>{f.prozent(k.ltv, 1)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="verkehrswert" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="restschuld" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="ltv" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
                   </td>
                   <td className={rechts}>{f.prozent(k.leerstandQuote, 1)}</td>
-                  <td className={rechts}>{f.faktor(k.dscr)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -98,14 +111,22 @@ export default async function GesellschaftenSeite() {
                   <td>{t.gesellschaften.summePortfolio}</td>
                   <td className={rechts}>{gesamt.haeuser}</td>
                   <td className={rechts}>{kredite.length}</td>
-                  <td className={rechts}>{f.betragGanz(gesamt.verkehrswert)}</td>
-                  <td className={rechts}>{f.betragGanz(gesamt.restschuld)}</td>
-                  <td className={rechts}>{f.prozent(gesamt.ltv, 1)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="verkehrswert" k={gesamt} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="restschuld" k={gesamt} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
+                  </td>
+                  <td className={rechts}>
+                    <Kennzahl art="ltv" k={gesamt} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(gesamt.sollMonat)} jahr={f.betrag(gesamt.sollJahr)} />
                   </td>
                   <td className={rechts}>{f.prozent(gesamt.leerstandQuote, 1)}</td>
-                  <td className={rechts}>{f.faktor(gesamt.dscr)}</td>
+                  <td className={rechts}>
+                    <Kennzahl art="dscr" k={gesamt} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
+                  </td>
                 </tr>
               </tfoot>
             )}

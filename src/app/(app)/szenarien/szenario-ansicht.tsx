@@ -182,6 +182,33 @@ export async function SzenarioAnsicht({
         </Kacheln>
       )}
 
+      {(szenario.luecken.kreditOhneSaldo.length > 0 || szenario.luecken.kreditOhneZinssatz.length > 0 || szenario.luecken.hausOhneWert.length > 0) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="font-medium">{ts.lueckenTitel}</div>
+          <ul className="mt-1 list-disc pl-5">
+            {szenario.luecken.kreditOhneSaldo.length > 0 && (
+              <li>{fuelle(ts.lueckeSaldo, { namen: szenario.luecken.kreditOhneSaldo.map((id) => kredite.find((k) => k.id === id)?.bezeichnung ?? id).join(", ") })}</li>
+            )}
+            {szenario.luecken.kreditOhneZinssatz.length > 0 && (
+              <li>{fuelle(ts.lueckeZinssatz, { namen: szenario.luecken.kreditOhneZinssatz.map((id) => kredite.find((k) => k.id === id)?.bezeichnung ?? id).join(", ") })}</li>
+            )}
+            {szenario.luecken.hausOhneWert.length > 0 && (
+              <li>{fuelle(ts.lueckeWert, { namen: szenario.luecken.hausOhneWert.map((id) => hausNamen.find((h) => h.id === id)?.bezeichnung ?? id).join(", ") })}</li>
+            )}
+          </ul>
+        </div>
+      )}
+      {szenario.luecken.saldoVon && (
+        <p className="text-xs text-slate-500">
+          {fuelle(ts.startSalden, {
+            spanne:
+              szenario.luecken.saldoVon === szenario.luecken.saldoBis
+                ? f.datum(szenario.luecken.saldoVon)
+                : fuelle(t.herleitung.spanne, { von: f.datum(szenario.luecken.saldoVon), bis: f.datum(szenario.luecken.saldoBis) }),
+          })}
+        </p>
+      )}
+
       <Karte titel={`${ts.ergebnis} · ${ts.vergleichBasis}`}>
         <Tabelle>
           <thead>
