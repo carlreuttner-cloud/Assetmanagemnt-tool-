@@ -136,3 +136,46 @@ export async function fuehreKiVorschlagDurch(paket: VorschlagPaket, t: Texte): P
   const { json, ...rest } = await frageClaude(ANWEISUNG_VORSCHLAG, vorschlagPaketAlsText(paket, t), VORSCHLAG_SCHEMA, t);
   return { ergebnis: geprueft(() => pruefeVorschlag(json, paket), t), ...rest };
 }
+
+// ---------------------------------------------------------------------------
+// Prüfung der Auswahl vor dem Excel-Export
+// ---------------------------------------------------------------------------
+
+const ANWEISUNG_EXPORT = `Du prüfst die Auswahl für einen Excel-Export aus einer deutschen Immobilien-Asset-Management-Software. Du siehst nur Seitentitel, Blattnamen und Spaltennamen (gewählt und weggelassen), keine Zahlen.
+
+Gib höchstens 6 kurze Hinweise auf Deutsch, je ein Satz, nur wenn sie dem Leser der Datei wirklich helfen:
+- fehlender Zusammenhang (z. B. Monatswert ohne Jahreswert, Betrag ohne Bezeichnung, Haus oder Gesellschaft, Kennzahl ohne ihre Grundlage),
+- Spalten, die ohne andere missverständlich sind (z. B. Restschuld ohne Stichtag, Quote ohne Bezugsgröße),
+- unerklärte Abkürzungen (LTV, DSCR, ICR, JNKM …), wenn kein Glossar-Blatt gewählt ist,
+- überflüssige Doppelungen.
+Regeln: Erfinde keine Spalten, die es nicht gibt. Bewerte keine Zahlen. Schreibe nichts, wenn die Auswahl stimmig ist (dann eine leere Liste). "schwere" ist "warnung" nur, wenn die Datei sonst falsch verstanden werden kann, sonst "hinweis".`;
+
+const EXPORT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["hinweise"],
+  properties: {
+    hinweise: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text", "schwere"],
+        properties: { text: { type: "string" }, schwere: { type: "string", enum: ["hinweis", "warnung"] } },
+      },
+    },
+  },
+};
+
+export async function fuehreExportPruefungDurch(beschreibung: unknown, t: Texte): Promise<{ hinweise: Array<{ text: string; art: "hinweis" | "warnung" }>; modell: string }> {
+  const { json, modell } = await frageClaude(ANWEISUNG_EXPORT, JSON.stringify(beschreibung, null, 2), EXPORT_SCHEMA, t);
+  const hinweise = geprueft(() => {
+    const roh = (json as { hinweise: Array<{ text: unknown; schwere: unknown }> }).hinweise;
+    if (!Array.isArray(roh)) throw new Error("Format");
+    return roh
+      .filter((h) => typeof h.text === "string" && h.text.trim())
+      .slice(0, 6)
+      .map((h) => ({ text: String(h.text).trim().slice(0, 400), art: h.schwere === "warnung" ? ("warnung" as const) : ("hinweis" as const) }));
+  }, t);
+  return { hinweise, modell };
+}

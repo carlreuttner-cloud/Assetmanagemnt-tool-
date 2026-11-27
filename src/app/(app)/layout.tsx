@@ -141,7 +141,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 quellen: t.export.quellen,
                 monat: t.allgemein.monat,
                 jahr: t.allgemein.jahr,
+                glossar: Object.fromEntries(
+                  Object.entries(t.glossar)
+                    .filter(([k]) => k !== "titel")
+                    .map(([, v]) => [(v as { kurz: string }).kurz, (v as { lang: string }).lang]),
+                ),
+                auswahl: { ...t.exportAuswahl, regeln: { ...t.exportAuswahl.regeln } },
               }}
+              ki={{ erlaubt: darf(kontext.rolle, "kiAssistent") }}
             />
             <QuellenSchalter an={quellenAn} texte={{ schalter: t.quellen.schalter, an: t.quellen.an, aus: t.quellen.aus, hinweis: t.quellen.hinweis }} />
           </div>
