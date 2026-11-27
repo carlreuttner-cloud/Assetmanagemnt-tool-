@@ -48,7 +48,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
       },
       verkehrswerte: { orderBy: { stichtag: "desc" }, include: { gutachten: { select: { id: true } } } },
       gutachten: { orderBy: { stichtag: "desc" } },
-      investitionen: { orderBy: { datum: "desc" }, include: { einheit: { select: { bezeichnung: true } } } },
+      investitionen: { orderBy: { datum: "desc" }, include: { einheit: { select: { bezeichnung: true } }, massnahme: { select: { id: true, bezeichnung: true } } } },
       fotos: { orderBy: { reihenfolge: "asc" } },
       kredite: { include: { kredit: { select: { id: true, bezeichnung: true, bank: true, kreditnummer: true, gesellschaftId: true } } } },
     },
@@ -408,6 +408,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                 <th>{th.kategorie}</th>
                 <th>{th.beschreibung}</th>
                 <th>{th.einheit}</th>
+                <th>{t.massnahmen.massnahme}</th>
                 <th className={rechts}>{t.allgemein.betrag}</th>
                 {schreiben && <th />}
               </tr>
@@ -419,6 +420,15 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                   <td>{i.kategorie}</td>
                   <td>{i.beschreibung}</td>
                   <td>{i.einheit?.bezeichnung ?? <span className="text-slate-400">{th.ganzesHaus}</span>}</td>
+                  <td>
+                    {i.massnahme ? (
+                      <Link href={`/investitionen/${i.massnahme.id}`} className="hover:underline">
+                        {i.massnahme.bezeichnung}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-amber-700">{t.massnahmen.ohneMassnahme}</span>
+                    )}
+                  </td>
                   <td className={rechts}>{f.betrag(i.betrag)}</td>
                   {schreiben && (
                     <td className="text-right">
