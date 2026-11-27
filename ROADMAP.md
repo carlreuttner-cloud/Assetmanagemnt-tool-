@@ -27,7 +27,7 @@ Fachliche Regeln für alle Phasen stehen in `CLAUDE.md` (Quelle, Stichtag und Be
 - [x] **Phase 10: Finanzen der Gesellschaften.** Bilanz, GuV, Cashflow und EBITDA je Geschäftsjahr mit Historie und Quelle (Jahresabschluss, BWA, Entwurf).
 - [x] **Phase 11: Dokumenten-Checkliste.** Pflichtdokumente je Gesellschaft und Haus (z. B. Grundbuchauszug, Gutachten, Darlehensvertrag, Jahresabschluss) mit Status vorhanden/fehlt/veraltet. Ablage der Dateien selbst erst mit dem Dateispeicher der Produktionsreife.
 - [x] **Phase 12: Verkaufsszenarien mit Waterfall.** Verteilung eines Verkaufserlöses (Kosten, Kreditablösung, Vorfälligkeit, Rückzahlung Einlagen, Vorzugsrendite, Gewinnverteilung); unbekannte Einzahlungen und Vertragsregeln als Lücke statt Schätzung.
-- [ ] **Phase 13: KI-Analyse.** Manuell gestartete Analyse nur aus gespeicherten Daten, mit Quellenbezug je Aussage und klarer Kennzeichnung von Annahmen und Datenlücken.
+- [x] **Phase 13: KI-Analyse.** Manuell gestartete Analyse nur aus gespeicherten Daten, mit Quellenbezug je Aussage und klarer Kennzeichnung von Annahmen und Datenlücken.
 - [ ] Berichte (danach)
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
@@ -39,4 +39,5 @@ Bis diese Phase abgeschlossen ist, werden **keine echten Mieter-, Kredit- oder G
 - [ ] **Login-Sperre:** Begrenzung fehlgeschlagener Anmeldeversuche je Konto und je IP-Adresse, mit Protokollierung.
 - [ ] **Dateispeicher:** Ablage für Fotos und Dokumente (S3-kompatibel in Deutschland oder gesichertes Volume), Zugriff nur über die App mit Mandanten- und Rechteprüfung, Größen- und Typprüfung beim Hochladen.
 - [ ] **Geheimnisse:** eigenes `AUTH_SECRET` und Datenbank-Passwort auf dem Server, nicht im Repository; Demo-Zugänge entfernt.
+- [ ] **KI-Analyse:** Auftragsverarbeitungsvertrag mit Anthropic prüfen und abschließen, erst danach `ANTHROPIC_API_KEY` auf dem Server setzen.
 - [ ] **Server:** Hetzner (Standort Deutschland), Firewall, automatische Sicherheitsupdates, Datenbank nicht öffentlich erreichbar.

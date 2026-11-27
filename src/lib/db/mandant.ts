@@ -24,7 +24,7 @@ export type DbKontext = {
 /** Modelle ohne eigene Spalte `mandantId`. */
 const OHNE_MANDANT = new Set(["Mandant", "Benutzer"]);
 /** Modelle, deren Änderungen nicht protokolliert werden. */
-const OHNE_PROTOKOLL = new Set(["Aenderungsprotokoll", "Mandant", "Benutzer"]);
+const OHNE_PROTOKOLL = new Set(["Aenderungsprotokoll", "Mandant", "Benutzer", "KiAnalyse"]);
 
 /** Fremdschlüssel, deren Ziel zum selben Mandanten gehören muss. */
 const FREMDSCHLUESSEL: Record<string, string> = {

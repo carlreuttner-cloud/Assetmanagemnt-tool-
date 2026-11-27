@@ -68,6 +68,7 @@ model Mandant {
   kapitalbewegungen       Kapitalbewegung[]
   waterfallvertraege      Waterfallvertrag[]
   dokumentnachweise       Dokumentnachweis[]
+  kiAnalysen              KiAnalyse[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -86,6 +87,7 @@ model Benutzer {
   aenderungsprotokoll Aenderungsprotokoll[]
   importvorgaenge     Importvorgang[]
   szenarien           Szenario[]
+  kiAnalysen          KiAnalyse[]
 }
 
 model Mitgliedschaft {
@@ -159,6 +161,7 @@ model Gesellschaft {
   dokumentnachweise Dokumentnachweis[]
   gesellschafter    Gesellschafter[]
   waterfallvertrag  Waterfallvertrag?
+  kiAnalysen        KiAnalyse[]
 
   @@index([mandantId])
 }
@@ -961,4 +964,36 @@ model Waterfallvertrag {
   gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
 
   @@index([mandantId])
+}
+
+enum KiAnalyseStatus {
+  ERFOLGREICH
+  FEHLER
+}
+
+/// Manuell gestartete KI-Analyse einer Gesellschaft. Gespeichert werden das gesendete
+/// Datenpaket (nur gespeicherte Daten, ohne Personendaten) und das geprüfte Ergebnis.
+model KiAnalyse {
+  id             String          @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  benutzerId     String?
+  stichtag       DateTime        @db.Date
+  /// Optionaler Schwerpunkt, den der Benutzer vorgibt
+  schwerpunkt    String?
+  modell         String
+  status         KiAnalyseStatus
+  datenpaket     Json
+  ergebnis       Json?
+  fehler         String?
+  tokensEingabe  Int?
+  tokensAusgabe  Int?
+  erstelltAm     DateTime        @default(now())
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  benutzer     Benutzer?    @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
 }
