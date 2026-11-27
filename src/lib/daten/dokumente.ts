@@ -1,6 +1,7 @@
 import "server-only";
 import { fuelle, texte } from "@/i18n";
 import type { Kontext } from "@/lib/auth/kontext";
+import { bereichsSicht } from "@/lib/auth/auswahl";
 import { idFilter, sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { alsDbDatum, formatDatum, heute, isoDatum, type IsoDatum } from "@/lib/datum";
 import { dokumentStatus, zaehleStatus, type AutomatischerStand, type Bezug, type DokumentBewertung } from "@/lib/dokumente";
@@ -16,11 +17,11 @@ export type ChecklistenZelle = {
  * Lädt die Checkliste für den sichtbaren Ausschnitt (optional nur ein Objekt): aktive Vorgaben,
  * erfasste Nachweise und den automatischen Stand aus Gutachten, Jahresabschlüssen und Saldenbestätigungen.
  */
-export async function ladeCheckliste(kontext: Kontext, nur?: { bezug: Bezug; id: string }) {
+export async function ladeCheckliste(kontext: Kontext, nur?: { bezug: Bezug; id: string }, optionen: { bereich?: boolean } = {}) {
   const { db } = kontext;
   const t = texte(kontext.mandant.sprache);
   const sprache = kontext.mandant.sprache;
-  const sicht = await sichtbarkeit(kontext);
+  const sicht = optionen.bereich ? await bereichsSicht(kontext) : await sichtbarkeit(kontext);
   const stichtag = heute();
   const gFilter = idFilter(sicht.gesellschaftIds);
   const hFilter = idFilter(sicht.hausIds);

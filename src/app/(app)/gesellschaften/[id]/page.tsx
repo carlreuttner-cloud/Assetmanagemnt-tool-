@@ -30,6 +30,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
   const g = await kontext.db.gesellschaft.findFirst({
     where: { id: erlaubt(grundlage.sicht.gesellschaftIds, id) },
     include: {
+      portfolio: { select: { id: true, name: true } },
       haeuser: { orderBy: { bezeichnung: "asc" }, select: { id: true, bezeichnung: true, plz: true, ort: true } },
       kredite: { orderBy: { bezeichnung: "asc" }, include: { covenants: true } },
     },
@@ -62,7 +63,20 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
     <div className="space-y-6">
       <Seitenkopf
         titel={g.name}
-        beschreibung={g.rechtsform}
+        beschreibung={
+          <>
+            {g.rechtsform}
+            {g.rechtsform && " · "}
+            {t.gesellschaften.portfolio}:{" "}
+            {g.portfolio ? (
+              <Link href={`/portfolios/${g.portfolio.id}`} className="hover:underline">
+                {g.portfolio.name}
+              </Link>
+            ) : (
+              t.portfolios.ohne
+            )}
+          </>
+        }
         zurueck={{ href: "/gesellschaften", text: t.gesellschaften.titel }}
         aktionen={
           <>

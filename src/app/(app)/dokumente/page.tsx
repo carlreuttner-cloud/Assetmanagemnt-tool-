@@ -16,7 +16,7 @@ export default async function DokumenteSeite() {
   const f = formatierer(kontext.mandant);
   const td = t.dokumente;
   const schreiben = darf(kontext.rolle, "dokumente", "schreiben");
-  const { vorgaben, zeilen, zaehlung, stichtag } = await ladeCheckliste(kontext);
+  const { vorgaben, zeilen, zaehlung, stichtag } = await ladeCheckliste(kontext, undefined, { bereich: true });
 
   return (
     <div className="space-y-6">

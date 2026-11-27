@@ -7,7 +7,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "@node-rs/argon2";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { BANKEN, erzeugePortfolio, type TestPortfolio } from "./testdaten/portfolio";
+import { BANKEN, erzeugePortfolio, PORTFOLIOS, type TestPortfolio } from "./testdaten/portfolio";
 import { baueFinanzen } from "./testdaten/finanzen";
 import { baueWaterfall } from "./testdaten/waterfall";
 import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
@@ -79,10 +79,15 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
   const haus = new Map(p.haeuser.map((h) => [h.schluessel, randomUUID()]));
   const kredit = new Map(p.kredite.map((k) => [k.schluessel, randomUUID()]));
 
+  const portfolio = new Map(PORTFOLIOS.map((x) => [x.schluessel as string, randomUUID()]));
+  await db.portfolio.createMany({
+    data: PORTFOLIOS.map((x) => ({ id: portfolio.get(x.schluessel)!, mandantId, name: x.name, beschreibung: x.beschreibung })),
+  });
   await db.gesellschaft.createMany({
     data: p.gesellschaften.map((g) => ({
       id: gesellschaft.get(g.schluessel)!, mandantId, name: g.name, rechtsform: g.rechtsform,
       registernummer: g.registernummer, steuernummer: g.steuernummer,
+      portfolioId: g.portfolio ? portfolio.get(g.portfolio)! : null,
     })),
   });
   await db.haus.createMany({

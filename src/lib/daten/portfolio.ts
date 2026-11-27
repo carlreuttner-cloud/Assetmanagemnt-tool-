@@ -1,5 +1,6 @@
 import "server-only";
 import type { Kontext } from "@/lib/auth/kontext";
+import { bereichsSicht } from "@/lib/auth/auswahl";
 import { idFilter, sichtbarkeit, type Sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { isoDatum } from "@/lib/datum";
 import { dezimal } from "@/lib/geld";
@@ -9,14 +10,15 @@ import type { KreditDaten, ReferenzWert, SaldoArt, SaldoQuelle, SaldoStatus } fr
 /**
  * Lädt die Rechengrundlage (Häuser mit Einheiten und Mietverhältnissen, Kredite mit
  * Buchungen und Tilgungsplänen, Referenzzinsen) für den sichtbaren Ausschnitt des Mandanten.
- * Für Hausverwaltung und Investoren wird automatisch nach `sichtbarkeit()` gefiltert.
+ * Für Hausverwaltung und Investoren wird automatisch nach `sichtbarkeit()` gefiltert;
+ * mit `bereich: true` zusätzlich nach der Portfolio-Auswahl (für Übersichten und Listen).
  */
 export async function ladeRechengrundlage(
   kontext: Kontext,
-  filter: { gesellschaftId?: string; hausId?: string; kreditId?: string } = {},
+  filter: { gesellschaftId?: string; hausId?: string; kreditId?: string; bereich?: boolean } = {},
 ): Promise<{ haeuser: HausDaten[]; kredite: KreditDaten[]; referenzwerte: ReferenzWert[]; sicht: Sichtbarkeit }> {
   const { db } = kontext;
-  const sicht = await sichtbarkeit(kontext);
+  const sicht = filter.bereich ? await bereichsSicht(kontext) : await sichtbarkeit(kontext);
 
   const [haeuser, kredite, referenz] = await Promise.all([
     db.haus.findMany({

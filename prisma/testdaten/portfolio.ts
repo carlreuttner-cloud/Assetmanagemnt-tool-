@@ -25,13 +25,21 @@ export interface TestGesellschaft {
   rechtsform: string;
   registernummer: string;
   steuernummer: string;
+  /** Schlüssel des Test-Portfolios; ohne = "Ohne Portfolio" */
+  portfolio?: string;
 }
 
+/** Test-Portfolios: zwei mit je zwei Gesellschaften, G5 bleibt ohne Portfolio. */
+export const PORTFOLIOS = [
+  { schluessel: "P1", name: "Wohnen Nord (Test)", beschreibung: "Berlin, Hamburg und Dresden (Testdaten)" },
+  { schluessel: "P2", name: "Süd-West (Test)", beschreibung: "Rheinland und Bayern (Testdaten)" },
+] as const;
+
 export const GESELLSCHAFTEN: readonly TestGesellschaft[] = [
-  { schluessel: "G1", name: "Lindenhof Wohnen GmbH & Co. KG", rechtsform: "GmbH & Co. KG", registernummer: "HRA 990011 B (Testwert)", steuernummer: "99/999/00011" },
-  { schluessel: "G2", name: "Rheinblick Immobilien GmbH", rechtsform: "GmbH", registernummer: "HRB 990022 (Testwert)", steuernummer: "999/9999/0022" },
-  { schluessel: "G3", name: "Elbufer Grundbesitz GmbH & Co. KG", rechtsform: "GmbH & Co. KG", registernummer: "HRA 990033 (Testwert)", steuernummer: "99/999/00033" },
-  { schluessel: "G4", name: "Isartal Wohnbau GmbH", rechtsform: "GmbH", registernummer: "HRB 990044 (Testwert)", steuernummer: "999/999/90044" },
+  { schluessel: "G1", name: "Lindenhof Wohnen GmbH & Co. KG", rechtsform: "GmbH & Co. KG", registernummer: "HRA 990011 B (Testwert)", steuernummer: "99/999/00011", portfolio: "P1" },
+  { schluessel: "G2", name: "Rheinblick Immobilien GmbH", rechtsform: "GmbH", registernummer: "HRB 990022 (Testwert)", steuernummer: "999/9999/0022", portfolio: "P2" },
+  { schluessel: "G3", name: "Elbufer Grundbesitz GmbH & Co. KG", rechtsform: "GmbH & Co. KG", registernummer: "HRA 990033 (Testwert)", steuernummer: "99/999/00033", portfolio: "P1" },
+  { schluessel: "G4", name: "Isartal Wohnbau GmbH", rechtsform: "GmbH", registernummer: "HRB 990044 (Testwert)", steuernummer: "999/999/90044", portfolio: "P2" },
   { schluessel: "G5", name: "Mainhaus Bestand GmbH", rechtsform: "GmbH", registernummer: "HRB 990055 (Testwert)", steuernummer: "099 999 00055" },
 ];
 

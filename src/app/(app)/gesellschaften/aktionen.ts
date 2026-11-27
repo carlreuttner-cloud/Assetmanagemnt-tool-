@@ -41,7 +41,9 @@ export async function gesellschaftSpeichern(id: string | null, _v: AktionsErgebn
       registernummer: f.text("registernummer"),
       steuernummer: f.text("steuernummer"),
       notiz: f.text("notiz"),
+      portfolioId: f.text("portfolioId"),
     };
+    if (daten.portfolioId && (await db.portfolio.count({ where: { id: daten.portfolioId } })) === 0) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: t.gesellschaften.portfolio }));
     if (id) await db.gesellschaft.update({ where: { id }, data: daten });
     else ziel = (await db.gesellschaft.create({ data: daten as never })).id;
   });
