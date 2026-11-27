@@ -74,6 +74,7 @@ model Mandant {
   waterfallvertraege      Waterfallvertrag[]
   dokumentnachweise       Dokumentnachweis[]
   kiAnalysen              KiAnalyse[]
+  kiVorschlaege           KiVorschlag[]
   portfolios              Portfolio[]
   lesezeichen             Lesezeichen[]
   dokumentSeiten          DokumentSeite[]
@@ -96,6 +97,7 @@ model Benutzer {
   importvorgaenge     Importvorgang[]
   szenarien           Szenario[]
   kiAnalysen          KiAnalyse[]
+  kiVorschlaege       KiVorschlag[]
   lesezeichen         Lesezeichen[]
   dokumente           Dokument[]
 }
@@ -226,6 +228,7 @@ model Haus {
   investitionen     Investition[]
   massnahmen        Massnahme[]
   exitrechnungen    Exitrechnung[]
+  kiVorschlaege     KiVorschlag[]
   dokumente         Dokument[]
   zuweisungen       HausZuweisung[]
   importe           Importvorgang[]
@@ -1158,6 +1161,32 @@ model KiAnalyse {
 
   @@index([mandantId])
   @@index([gesellschaftId])
+}
+
+/// KI-Vorschlag für Szenario- und Exit-Annahmen eines Hauses (nur auf Knopfdruck). Gespeichert werden
+/// das gesendete Datenpaket und die geprüfte Antwort; gerechnet wird nie durch die KI, sondern in
+/// der Exit-Kalkulation und im Szenario.
+model KiVorschlag {
+  id            String          @id @default(cuid())
+  mandantId     String
+  hausId        String
+  benutzerId    String?
+  stichtag      DateTime        @db.Date
+  modell        String
+  status        KiAnalyseStatus
+  datenpaket    Json
+  ergebnis      Json?
+  fehler        String?
+  tokensEingabe Int?
+  tokensAusgabe Int?
+  erstelltAm    DateTime        @default(now())
+
+  mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus     Haus      @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  benutzer Benutzer? @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId])
+  @@index([hausId])
 }
 
 /// Favoriten und „zuletzt angesehen“ je Benutzer und Mandant: ein Eintrag je aufgerufener Detailseite.

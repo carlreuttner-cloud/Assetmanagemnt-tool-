@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { fuelle, type Texte } from "@/i18n";
 import { ERGEBNIS_SCHEMA, datenpaketAlsText, pruefeErgebnis, type Datenpaket, type GeprueftesErgebnis } from "./ki-analyse";
+import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
 
 /** Modell für die Analyse; über KI_MODELL änderbar. */
 export const KI_MODELL = process.env.KI_MODELL || "claude-opus-5-5";
@@ -41,15 +42,10 @@ export interface AnalyseAntwort {
 /** Fehler mit einer Meldung für die Oberfläche. */
 export class KiFehler extends Error {}
 
-export async function fuehreKiAnalyseDurch(paket: Datenpaket, schwerpunkt: string | null, t: Texte): Promise<AnalyseAntwort> {
+/** Eine Anfrage mit strukturierter Ausgabe; liefert das geparste JSON und den Verbrauch. */
+async function frageClaude(anweisung: string, nachricht: string, schema: object, t: Texte): Promise<{ json: unknown; modell: string; tokensEingabe: number; tokensAusgabe: number }> {
   const tk = t.ki;
   const client = new Anthropic();
-  const nachricht = [
-    datenpaketAlsText(paket, t),
-    "",
-    schwerpunkt ? fuelle(tk.paket.schwerpunkt, { schwerpunkt }) : tk.paket.ohneSchwerpunkt,
-  ].join("\n");
-
   let antwort: Anthropic.Beta.Messages.BetaMessage;
   try {
     const stream = client.beta.messages.stream({
@@ -58,8 +54,8 @@ export async function fuehreKiAnalyseDurch(paket: Datenpaket, schwerpunkt: strin
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       thinking: { type: "adaptive" },
-      output_config: { effort: "high", format: { type: "json_schema", schema: ERGEBNIS_SCHEMA as unknown as Record<string, unknown> } },
-      system: [{ type: "text", text: ANWEISUNG, cache_control: { type: "ephemeral" } }],
+      output_config: { effort: "high", format: { type: "json_schema", schema: schema as Record<string, unknown> } },
+      system: [{ type: "text", text: anweisung, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: nachricht }],
     });
     antwort = await stream.finalMessage();
@@ -71,11 +67,72 @@ export async function fuehreKiAnalyseDurch(paket: Datenpaket, schwerpunkt: strin
   if (antwort.stop_reason === "refusal") throw new KiFehler(tk.fehlerAbgelehnt);
   if (antwort.stop_reason === "max_tokens") throw new KiFehler(tk.fehlerAbgeschnitten);
   const text = antwort.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-  let ergebnis: GeprueftesErgebnis;
+  let json: unknown;
   try {
-    ergebnis = pruefeErgebnis(JSON.parse(text), paket);
+    json = JSON.parse(text);
   } catch {
     throw new KiFehler(tk.fehlerFormat);
   }
-  return { ergebnis, modell: antwort.model, tokensEingabe: antwort.usage.input_tokens + (antwort.usage.cache_read_input_tokens ?? 0) + (antwort.usage.cache_creation_input_tokens ?? 0), tokensAusgabe: antwort.usage.output_tokens };
+  const u = antwort.usage;
+  return { json, modell: antwort.model, tokensEingabe: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), tokensAusgabe: u.output_tokens };
+}
+
+/** Prüft die Antwort; Formatfehler werden zur Meldung für die Oberfläche. */
+function geprueft<T>(pruefe: () => T, t: Texte): T {
+  try {
+    return pruefe();
+  } catch {
+    throw new KiFehler(t.ki.fehlerFormat);
+  }
+}
+
+export async function fuehreKiAnalyseDurch(paket: Datenpaket, schwerpunkt: string | null, t: Texte): Promise<AnalyseAntwort> {
+  const tk = t.ki;
+  const nachricht = [
+    datenpaketAlsText(paket, t),
+    "",
+    schwerpunkt ? fuelle(tk.paket.schwerpunkt, { schwerpunkt }) : tk.paket.ohneSchwerpunkt,
+  ].join("\n");
+  const { json, ...rest } = await frageClaude(ANWEISUNG, nachricht, ERGEBNIS_SCHEMA, t);
+  return { ergebnis: geprueft(() => pruefeErgebnis(json, paket), t), ...rest };
+}
+
+/**
+ * Anweisungen für Vorschläge zu Szenario- und Exit-Annahmen eines Hauses. Unveränderlich
+ * (zwischenspeicherbar); Datum, Haus und Daten stehen in der Nachricht.
+ */
+const ANWEISUNG_VORSCHLAG = `Du bist Analyst für ein deutsches Immobilien-Asset-Management. Du schlägst Annahmen für eine Exit-Kalkulation (Verkauf eines Hauses) und ein Mehrjahres-Szenario vor, ausschließlich abgeleitet aus der Historie im Datenpaket der Nachricht. Du rechnest keine Ergebnisse aus; die Software rechnet mit deinen Annahmen. Schreibe auf Deutsch, sachlich und knapp.
+
+Parameter (genau einmal je Parameter antworten; "wert" als Text im angegebenen Format, ohne Einheit):
+- verkaufsdatum: Verkaufszeitpunkt, JJJJ-MM-TT, nach dem Stichtag und höchstens zehn Jahre danach. Ein Zeitpunkt nach dem Ende einer Zinsbindung vermeidet eine Vorfälligkeitsentschädigung.
+- preisBasis: Grundlage des Verkaufspreises: "gutachten" (Verkehrswert des jüngsten Gutachtens), "marktwert" (jüngster Wert ohne Gutachten) oder "miete" (Soll-Jahresnettokaltmiete × faktor). Nur eine Basis wählen, für die das Datenpaket einen Wert enthält.
+- faktor: Kaufpreisfaktor (Vielfaches der Jahresnettokaltmiete), Dezimalzahl mit Punkt, 1 bis 60. Nur sinnvoll bei preisBasis "miete"; leer lassen bedeutet: Rohertragsfaktor des jüngsten Gutachtens.
+- maklerProzent, sonstigeProzent: Verkaufskosten in Prozent des Preises, 0 bis 10.
+- vfeProzent: Vorfälligkeitsentschädigung in Prozent der abgelösten Restschuld, 0 bis 20.
+- mietsteigerung: Mietsteigerung in Prozent pro Jahr, -10 bis 15.
+- mietausfall: zusätzlicher Mietausfall in Prozent der Soll-Miete, 0 bis 100. Die heutige Ist-Quote (Ist ÷ Soll) wird bereits angewandt; nur einen darüber hinausgehenden Ausfall angeben.
+- leerVermietenMonate: Monate, nach denen leere Einheiten zur erwarteten Miete vermietet werden, ganze Zahl 0 bis 120.
+- wertentwicklung: Wertentwicklung des Verkehrswerts in Prozent pro Jahr, -15 bis 15.
+- zinsVariabelPP: Änderung der variablen Referenzzinsen in Prozentpunkten, -5 bis 10.
+- anschlusszins: Zinssatz für Festzinskredite nach Ende der Zinsbindung in Prozent p. a., 0 bis 15.
+
+Regeln:
+1. Verwende nur das Datenpaket. Kein Allgemeinwissen über Marktmieten, Zinsprognosen, Kaufpreisfaktoren, Maklergebühren oder Notarkosten.
+2. Jeder Wert braucht in "quellen" mindestens einen Fakt (F…), aus dem er folgt; erfinde keine Nummern. Ein Wert ohne Fakt wird verworfen.
+3. Gibt das Datenpaket für einen Parameter nichts her, setze "wert" auf "" (leerer Text), nenne in "begruendung" die fehlende Angabe und in "quellen" die passende Lücke (L…). Schätze nicht.
+4. Fehlende Werte sind unbekannt, nicht 0. Werte mit unterschiedlichen Stichtagen nicht stillschweigend vermischen; nenne Zeitraum oder Stichtag in der Begründung.
+5. Die Begründung (ein bis drei Sätze) erklärt nachvollziehbar, wie der Wert aus den genannten Fakten folgt, z. B. „Die Neuvermietungsmiete stieg 2019–2025 um 2,1 % pro Jahr (F12); vorsichtig angesetzt.“ Rechne nur einfache Schritte und nenne die Fakten.
+6. Abkürzungen beim ersten Vorkommen erklären.
+7. "zusammenfassung": zwei bis vier Sätze zur Gesamtlogik der Annahmen. "datenluecken": die Lücken (L…), die die Annahmen am stärksten einschränken, mit Grund.`;
+
+export interface VorschlagAntwort {
+  ergebnis: GepruefterVorschlag;
+  modell: string;
+  tokensEingabe: number;
+  tokensAusgabe: number;
+}
+
+export async function fuehreKiVorschlagDurch(paket: VorschlagPaket, t: Texte): Promise<VorschlagAntwort> {
+  const { json, ...rest } = await frageClaude(ANWEISUNG_VORSCHLAG, vorschlagPaketAlsText(paket, t), VORSCHLAG_SCHEMA, t);
+  return { ergebnis: geprueft(() => pruefeVorschlag(json, paket), t), ...rest };
 }

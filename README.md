@@ -96,6 +96,7 @@ src/
     bewertung.ts         Bewertung je Haus und Portfolio: letztes Gutachten, Vorgutachten, Boden-/Gebäudewert, Jahresverlauf
     kapitalkonto.ts      Kapitalkonten der Gesellschafter: Einlagen, Rückzahlungen, Ausschüttungen, Saldo, Jahresverlauf
     exit.ts              Exit-Kalkulation je Haus: Preisvorschläge, Kreditablöse zum Verkaufsdatum, Kosten, Erlös
+    ki-vorschlag.ts      KI-Vorschläge für Szenario und Exit: Datenpaket aus der Haus-Historie, Prüfung der Antwort
     liquiditaet.ts       Liquiditätsplanung je Gesellschaft: 12 Monate aus Mieten, Kapitaldienst, Investitionen und Planpositionen, Engpass-Warnung
     massnahme.ts         Investitionsmaßnahmen: Budget, Ist-Kosten, Abweichung, Rendite und Amortisation aus Mehrmiete
     kennzahlen.ts        Kennzahlen je Haus, Gesellschaft und Portfolio (LTV, DSCR, Leerstand, Rendite)
