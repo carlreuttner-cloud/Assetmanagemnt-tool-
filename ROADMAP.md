@@ -41,7 +41,7 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 - [x] **Phase 19: Bewertung.** Reiter „Bewertung“: Gutachten und Marktwerte je Haus und Portfolio im Zeitverlauf, Bodenwert und Gebäudewert getrennt, Veränderung zum Vorgutachten.
 - [x] **Phase 20: Kapitalkonten der Gesellschafter.** Einzahlungen, Anteile, Ausschüttungen und Saldo je Gesellschafter.
 - [x] **Phase 21: Investitionen mit Budget und Rendite.** Budget, Ist-Kosten, Abweichung und Rendite aus Mehrmiete je Maßnahme.
-- [ ] **Phase 22: Liquiditätsplanung.** 12 Monate je Gesellschaft aus Mieten, Kapitaldienst, Investitionen und Ausschüttungen, mit Warnung bei Engpass.
+- [x] **Phase 22: Liquiditätsplanung.** 12 Monate je Gesellschaft aus Mieten, Kapitaldienst, Investitionen und Ausschüttungen, mit Warnung bei Engpass.
 - [ ] **Phase 23: Zinssicherungen.** Caps und Swaps zu variablen Krediten, im Zinssatz, Kapitaldienst und in den Szenarien berücksichtigt.
 - [ ] **Phase 24: Exit-Kalkulation je Haus.** Verkaufszeitpunkt wählbar, Preisvorschläge aus Miete, Marktwert und Gutachten (frei änderbar), Ergebnis nach Kreditablöse und Kosten.
 - [ ] **Phase 25: KI-Vorschläge für Szenarien und Exit.** Knopf „Vorschlag generieren“: Haus wählen, die KI leitet Annahmen aus der Historie ab und begründet sie mit Quellen; gerechnet wird immer im Code, nie durch die KI.

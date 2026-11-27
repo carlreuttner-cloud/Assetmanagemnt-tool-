@@ -59,6 +59,8 @@ model Mandant {
   referenzzinssaetze      Referenzzinssatz[]
   investitionen           Investition[]
   massnahmen              Massnahme[]
+  bankkontostaende        Bankkontostand[]
+  planpositionen          Planposition[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
@@ -164,17 +166,19 @@ model Portfolio {
 }
 
 model Gesellschaft {
-  id             String   @id @default(cuid())
-  mandantId      String
-  name           String
-  rechtsform     String?
-  registernummer String?
-  steuernummer   String?
-  notiz          String?
+  id                 String   @id @default(cuid())
+  mandantId          String
+  name               String
+  rechtsform         String?
+  registernummer     String?
+  steuernummer       String?
+  notiz              String?
   /// Portfolio, zu dem die Gesellschaft gehört; leer = "Ohne Portfolio"
-  portfolioId    String?
-  erstelltAm     DateTime @default(now())
-  geaendertAm    DateTime @updatedAt
+  portfolioId        String?
+  /// Mindestbestand an liquiden Mitteln für die Liquiditätsplanung; null = nicht festgelegt
+  mindestliquiditaet Decimal? @db.Decimal(14, 2)
+  erstelltAm         DateTime @default(now())
+  geaendertAm        DateTime @updatedAt
 
   mandant           Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   portfolio         Portfolio?              @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
@@ -188,6 +192,8 @@ model Gesellschaft {
   gesellschafter    Gesellschafter[]
   waterfallvertrag  Waterfallvertrag?
   kiAnalysen        KiAnalyse[]
+  kontostaende      Bankkontostand[]
+  planpositionen    Planposition[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -1136,4 +1142,56 @@ model Lesezeichen {
 
   @@unique([mandantId, benutzerId, pfad])
   @@index([mandantId, benutzerId, angesehenAm])
+}
+
+// ---------------------------------------------------------------------------
+// Liquiditätsplanung
+// ---------------------------------------------------------------------------
+
+/// Belegter Stand eines Bankkontos der Gesellschaft (Anfangsbestand der Liquiditätsplanung).
+model Bankkontostand {
+  id             String   @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  /// Bezeichnung des Kontos, z. B. "Geschäftskonto Sparkasse"
+  konto          String
+  stichtag       DateTime @db.Date
+  /// Kontostand; negativ = Überziehung
+  betrag         Decimal  @db.Decimal(14, 2)
+  quelle         String?
+  erstelltAm     DateTime @default(now())
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
+}
+
+enum PlanpositionArt {
+  AUSSCHUETTUNG
+  EINNAHME
+  AUSGABE
+}
+
+/// Geplante Zahlung einer Gesellschaft in einem Monat (Ausschüttung, sonstige Einnahme oder Ausgabe).
+model Planposition {
+  id             String          @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  art            PlanpositionArt
+  /// Erster Tag des Monats, in dem die Zahlung geplant ist
+  monat          DateTime        @db.Date
+  /// Betrag immer positiv; die Richtung ergibt sich aus der Art
+  betrag         Decimal         @db.Decimal(14, 2)
+  bezeichnung    String
+  quelle         String?
+  erstelltAm     DateTime        @default(now())
+  geaendertAm    DateTime        @updatedAt
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([gesellschaftId])
 }
