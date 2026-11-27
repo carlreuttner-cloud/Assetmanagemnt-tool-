@@ -28,9 +28,27 @@ Fachliche Regeln für alle Phasen stehen in `CLAUDE.md` (Quelle, Stichtag und Be
 - [x] **Phase 11: Dokumenten-Checkliste.** Pflichtdokumente je Gesellschaft und Haus (z. B. Grundbuchauszug, Gutachten, Darlehensvertrag, Jahresabschluss) mit Status vorhanden/fehlt/veraltet. Ablage der Dateien selbst erst mit dem Dateispeicher der Produktionsreife.
 - [x] **Phase 12: Verkaufsszenarien mit Waterfall.** Verteilung eines Verkaufserlöses (Kosten, Kreditablösung, Vorfälligkeit, Rückzahlung Einlagen, Vorzugsrendite, Gewinnverteilung); unbekannte Einzahlungen und Vertragsregeln als Lücke statt Schätzung.
 - [x] **Phase 13: KI-Analyse.** Manuell gestartete Analyse nur aus gespeicherten Daten, mit Quellenbezug je Aussage und klarer Kennzeichnung von Annahmen und Datenlücken.
-- [ ] Berichte (danach)
+
+## Erweiterungen (ab 27.11.)
+
+Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seiten darin landen; dann Werkzeuge für alle Ansichten; dann Dokumente; dann die Fachfunktionen, wobei Exit und KI-Vorschläge zuletzt kommen, weil sie auf Bewertung, Investitionen und Zinssicherungen aufbauen. Die bisherigen „Berichte“ gehen im Export (Phase 17) auf.
+
+- [ ] **Phase 14: Navigation und Portfolios.** Links oben Auswahl „Generalübersicht“ oder ein Portfolio; darunter Gruppen (z. B. Hausverwaltung: Mieter, Einheiten, Investitionen; Finanzierung: Kredite, Tilgungspläne, Szenarien), oben eine Reiterzeile innerhalb der Gruppe. Übersicht aller Gesellschaften mit ihren Häusern. Reiter „Portfolios“: anlegen, umbenennen, Gesellschaften zuordnen, Kennzahlen je Portfolio, Gruppe „Ohne Portfolio“. Filter wie bisher. Testdaten: zwei Portfolios mit je zwei Gesellschaften, eine ohne Portfolio.
+- [ ] **Phase 15: Globale Suche und Quellen-Schalter.** Suche links unten über Mieter, Kredite, IBANs, Gesellschaften und Häuser mit Sprung zum Treffer. Schalter ganz oben: Stichtage und Quellen aller Zahlen ein- oder ausblenden.
+- [ ] **Phase 16: Fristen-Kalender, Favoriten, zuletzt angesehen.** Kalender mit Zinsbindungsenden, möglichen Mieterhöhungen und Vertragsenden; Favoriten und zuletzt angesehene Objekte je Benutzer.
+- [ ] **Phase 17: Export.** Excel und PDF aus jeder Ansicht (ersetzt „Berichte“), mit Stichtag und Quellen.
+- [ ] **Phase 18: Dateien und Importe.** Reiter „Dateien und Importe“: einheitliche Benennung beim Import (z. B. „Jahresabschluss 2025 – Gesellschaft XY“, Originalname bleibt), Name und Zuordnung vor dem Speichern bestätigen; OCR für eingescannte PDFs; Volltextsuche nur hier, öffnet das Dokument an der Fundstelle und hebt sie hervor.
+- [ ] **Phase 19: Bewertung.** Reiter „Bewertung“: Gutachten und Marktwerte je Haus und Portfolio im Zeitverlauf, Bodenwert und Gebäudewert getrennt, Veränderung zum Vorgutachten.
+- [ ] **Phase 20: Kapitalkonten der Gesellschafter.** Einzahlungen, Anteile, Ausschüttungen und Saldo je Gesellschafter.
+- [ ] **Phase 21: Investitionen mit Budget und Rendite.** Budget, Ist-Kosten, Abweichung und Rendite aus Mehrmiete je Maßnahme.
+- [ ] **Phase 22: Liquiditätsplanung.** 12 Monate je Gesellschaft aus Mieten, Kapitaldienst, Investitionen und Ausschüttungen, mit Warnung bei Engpass.
+- [ ] **Phase 23: Zinssicherungen.** Caps und Swaps zu variablen Krediten, im Zinssatz, Kapitaldienst und in den Szenarien berücksichtigt.
+- [ ] **Phase 24: Exit-Kalkulation je Haus.** Verkaufszeitpunkt wählbar, Preisvorschläge aus Miete, Marktwert und Gutachten (frei änderbar), Ergebnis nach Kreditablöse und Kosten.
+- [ ] **Phase 25: KI-Vorschläge für Szenarien und Exit.** Knopf „Vorschlag generieren“: Haus wählen, die KI leitet Annahmen aus der Historie ab und begründet sie mit Quellen; gerechnet wird immer im Code, nie durch die KI.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
+
+Kommt nach Phase 25, oder früher, sobald echte Daten eingegeben werden sollen.
 
 Bis diese Phase abgeschlossen ist, werden **keine echten Mieter-, Kredit- oder Gesellschaftsdaten** in die App eingegeben oder importiert.
 
