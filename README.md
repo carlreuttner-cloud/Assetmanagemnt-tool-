@@ -2,7 +2,7 @@
 
 Web-App zur Verwaltung und Analyse eines Immobilienportfolios: Gesellschaften, Häuser, Einheiten, Mieter, Kredite. Mandantenfähig, damit sie später an andere Firmen verkauft werden kann.
 
-**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht), Phase 6 (Szenarien), Phase 7 (Nachvollziehbarkeit und belegte Salden) und Phase 8 (Covenant-Headroom und Ausschüttungssperren) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
+**Stand:** Phase 0 (Grundgerüst), Phase 1 (Gesellschaften und Kredite), Phase 2 (Häuser), Phase 3 (Mieter), Phase 4 (Import), Phase 5 (Übersicht), Phase 6 (Szenarien), Phase 7 (Nachvollziehbarkeit und belegte Salden), Phase 8 (Covenant-Headroom und Ausschüttungssperren) und Phase 9 (Gutachtenhistorie) sind fertig; die weiteren Fachseiten folgen laut [Roadmap](ROADMAP.md).
 
 ## Technik
 
@@ -125,6 +125,7 @@ testdaten/               Beispiel-CSVs (Kreditbuchungen in 3 Bankformaten) und �
 - Häuser tragen Kredite anteilig (`KreditHaus.anteilProzent`); Gesellschaft und Portfolio zählen ihre Kredite zu 100 %.
 - Covenants eines Kredits werden über alle Häuser geprüft, die er belastet, mit allen Krediten dieser Häuser.
 - Covenant-Einträge haben eine Art (`Covenant.folge`): Covenant oder Ausschüttungssperre (Lock-up). Der Puffer bis zur Grenze und der Spielraum von Verkehrswert, Miete, Kapitaldienst und Zinsen stehen in `src/lib/covenant.ts`. Nicht automatisch prüfbare Sperren (z. B. Vorlage des Jahresabschlusses) erscheinen als „manuell prüfen“.
+- Gutachten (`Gutachten`) gehören zu einem Haus und legen beim Speichern einen verknüpften Verkehrswert (Quelle „Gutachten“) an bzw. ändern ihn; Löschen entfernt beide. Die rechnerische Kontrolle (Barwertfaktor, Ertragswert, Rohertragsfaktor) in `src/lib/gutachten.ts` rechnet nur mit erfassten Angaben, fehlende bleiben „im Gutachten nicht angegeben“.
 
 **Fotos.** Werden im Verzeichnis `UPLOAD_DIR` (Docker-Volume `uploads`) je Mandant abgelegt und nur über `/api/fotos/<id>` mit Mandanten- und Rechteprüfung ausgeliefert. Erlaubt sind JPEG, PNG und WebP bis 10 MB; der Typ wird am Dateiinhalt geprüft. Backups und S3-Speicher folgen in der Phase „Produktionsreife“.
 

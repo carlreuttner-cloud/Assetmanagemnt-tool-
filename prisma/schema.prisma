@@ -44,6 +44,7 @@ model Mandant {
   gesellschaften          Gesellschaft[]
   haeuser                 Haus[]
   verkehrswerte           Verkehrswert[]
+  gutachten               Gutachten[]
   fotos                   Foto[]
   einheiten               Einheit[]
   mieter                  Mieter[]
@@ -170,6 +171,7 @@ model Haus {
   mandant       Mandant         @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft  Gesellschaft    @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
   verkehrswerte Verkehrswert[]
+  gutachten     Gutachten[]
   fotos         Foto[]
   einheiten     Einheit[]
   kredite       KreditHaus[]
@@ -194,8 +196,79 @@ model Verkehrswert {
   notiz      String?
   erstelltAm DateTime @default(now())
 
-  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  mandant   Mandant    @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus      Haus       @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  gutachten Gutachten?
+
+  @@index([mandantId])
+  @@index([hausId, stichtag])
+}
+
+enum Bewertungsverfahren {
+  ERTRAGSWERT
+  SACHWERT
+  VERGLEICHSWERT
+  SONSTIGES
+}
+
+/// Verkehrswertgutachten eines Hauses mit Bewertungsfaktoren, Objektdetails und SWOT des
+/// Gutachters. Alle Faktoren sind optional: fehlt eine Angabe im Gutachten, bleibt sie leer
+/// (wird nie geschätzt). Jedes Gutachten legt einen verknüpften Verkehrswert an.
+model Gutachten {
+  id             String               @id @default(cuid())
+  mandantId      String
+  hausId         String
+  /// Wertermittlungsstichtag
+  stichtag       DateTime             @db.Date
+  /// Datum des Gutachtens
+  erstelltAm     DateTime?            @db.Date
+  gutachter      String?
+  /// z. B. "Finanzierung", "Kauf", "Jahresabschluss"
+  anlass         String?
+  verfahren      Bewertungsverfahren?
+  verkehrswert   Decimal              @db.Decimal(14, 2)
+  verkehrswertId String?              @unique
+
+  // Bewertungsfaktoren
+  rohertragJahr          Decimal? @db.Decimal(14, 2)
+  bewirtschaftungskosten Decimal? @db.Decimal(14, 2)
+  reinertragJahr         Decimal? @db.Decimal(14, 2)
+  /// Prozent
+  liegenschaftszins      Decimal? @db.Decimal(9, 6)
+  restnutzungsdauer      Int?
+  gesamtnutzungsdauer    Int?
+  /// Barwertfaktor (Vervielfältiger) laut Gutachten
+  barwertfaktor          Decimal? @db.Decimal(9, 6)
+  bodenwert              Decimal? @db.Decimal(14, 2)
+  ertragswert            Decimal? @db.Decimal(14, 2)
+  sachwert               Decimal? @db.Decimal(14, 2)
+  vergleichswert         Decimal? @db.Decimal(14, 2)
+  /// Zu- und Abschläge (Marktanpassung, besondere objektspezifische Grundstücksmerkmale), negativ = Abschlag
+  zuAbschlaege           Decimal? @db.Decimal(14, 2)
+
+  // Objektdetails laut Gutachten
+  baujahr             Int?
+  wohnflaeche         Decimal? @db.Decimal(10, 2)
+  gewerbeflaeche      Decimal? @db.Decimal(10, 2)
+  grundstuecksflaeche Decimal? @db.Decimal(10, 2)
+  einheiten           Int?
+  zustand             String?
+  energieklasse       String?
+  lage                String?
+
+  // SWOT des Gutachters, je Zeile ein Punkt
+  staerken   String?
+  schwaechen String?
+  chancen    String?
+  risiken    String?
+
+  notiz       String?
+  angelegtAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mandant             Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus                Haus          @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  verkehrswertEintrag Verkehrswert? @relation(fields: [verkehrswertId], references: [id], onDelete: SetNull)
 
   @@index([mandantId])
   @@index([hausId, stichtag])

@@ -89,9 +89,26 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
       kaufpreis: geld(h.kaufpreis), kaufdatum: tag(h.kaufdatum),
     })),
   });
+  const verkehrswertIds = new Map<string, string>();
   await db.verkehrswert.createMany({
-    data: p.haeuser.flatMap((h) => h.verkehrswerte.map((v) => ({
-      mandantId, hausId: haus.get(h.schluessel)!, wert: geld(v.wert), stichtag: tag(v.stichtag), quelle: v.quelle,
+    data: p.haeuser.flatMap((h) => h.verkehrswerte.map((v) => {
+      const id = randomUUID();
+      if (v.quelle === "Gutachten") verkehrswertIds.set(`${h.schluessel}|${v.stichtag}`, id);
+      return { id, mandantId, hausId: haus.get(h.schluessel)!, wert: geld(v.wert), stichtag: tag(v.stichtag), quelle: v.quelle };
+    })),
+  });
+  const optGeld = (w: { toFixed(stellen: number): string } | null) => (w === null ? null : geld(w));
+  await db.gutachten.createMany({
+    data: p.haeuser.flatMap((h) => h.gutachten.map((g) => ({
+      mandantId, hausId: haus.get(h.schluessel)!, verkehrswertId: verkehrswertIds.get(`${h.schluessel}|${g.stichtag}`) ?? null,
+      stichtag: tag(g.stichtag), erstelltAm: tag(g.erstelltAm), gutachter: g.gutachter, anlass: g.anlass, verfahren: g.verfahren,
+      verkehrswert: geld(g.verkehrswert), rohertragJahr: optGeld(g.rohertragJahr), bewirtschaftungskosten: optGeld(g.bewirtschaftungskosten),
+      reinertragJahr: optGeld(g.reinertragJahr), liegenschaftszins: g.liegenschaftszins?.toFixed(6) ?? null,
+      restnutzungsdauer: g.restnutzungsdauer, gesamtnutzungsdauer: g.gesamtnutzungsdauer, barwertfaktor: g.barwertfaktor?.toFixed(6) ?? null,
+      bodenwert: optGeld(g.bodenwert), ertragswert: optGeld(g.ertragswert), zuAbschlaege: optGeld(g.zuAbschlaege),
+      baujahr: g.baujahr, wohnflaeche: g.wohnflaeche?.toFixed(2) ?? null, gewerbeflaeche: g.gewerbeflaeche?.toFixed(2) ?? null,
+      grundstuecksflaeche: g.grundstuecksflaeche?.toFixed(2) ?? null, einheiten: g.einheiten, zustand: g.zustand, energieklasse: g.energieklasse,
+      lage: g.lage, staerken: g.staerken, schwaechen: g.schwaechen, chancen: g.chancen, risiken: g.risiken,
     }))),
   });
 

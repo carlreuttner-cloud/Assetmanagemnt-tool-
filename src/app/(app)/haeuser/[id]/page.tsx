@@ -14,6 +14,7 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { hausKennzahlen, istAktiv } from "@/lib/kennzahlen";
+import { GutachtenKarte } from "./gutachten/gutachten-karte";
 import { restschuldNachweis, zinsbindung } from "@/lib/kredit";
 import {
   fotoHochladen,
@@ -42,7 +43,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
         orderBy: [{ art: "desc" }, { bezeichnung: "asc" }],
         include: { mietverhaeltnisse: { include: { mieter: { select: { name: true } } }, orderBy: { beginn: "desc" } } },
       },
-      verkehrswerte: { orderBy: { stichtag: "desc" } },
+      verkehrswerte: { orderBy: { stichtag: "desc" }, include: { gutachten: { select: { id: true } } } },
+      gutachten: { orderBy: { stichtag: "desc" } },
       investitionen: { orderBy: { datum: "desc" }, include: { einheit: { select: { bezeichnung: true } } } },
       fotos: { orderBy: { reihenfolge: "asc" } },
       kredite: { include: { kredit: { select: { id: true, bezeichnung: true, bank: true, kreditnummer: true, gesellschaftId: true } } } },
@@ -300,10 +302,24 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                 <tr key={v.id}>
                   <td>{f.datum(v.stichtag)}</td>
                   <td className={rechts}>{f.betrag(v.wert)}</td>
-                  <td className="text-slate-500">{v.quelle}</td>
+                  <td className="text-slate-500">
+                    {v.gutachten ? (
+                      <Link href={`/haeuser/${id}/gutachten#g-${v.gutachten.id}`} className="hover:underline">
+                        {v.quelle}
+                      </Link>
+                    ) : (
+                      v.quelle
+                    )}
+                  </td>
                   {schreiben && (
                     <td className="text-right">
-                      <Formular aktion={verkehrswertLoeschen.bind(null, v.id)} absenden={t.allgemein.loeschen} bestaetigen={t.allgemein.loeschenBestaetigen} inline />
+                      {v.gutachten ? (
+                        <Link href={`/haeuser/${id}/gutachten/${v.gutachten.id}`} className="text-xs text-slate-600 hover:underline">
+                          {t.allgemein.bearbeiten}
+                        </Link>
+                      ) : (
+                        <Formular aktion={verkehrswertLoeschen.bind(null, v.id)} absenden={t.allgemein.loeschen} bestaetigen={t.allgemein.loeschenBestaetigen} inline />
+                      )}
                     </td>
                   )}
                 </tr>
@@ -326,6 +342,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
             </details>
           )}
         </Karte>
+
+        <GutachtenKarte hausId={id} liste={haus.gutachten} schreiben={schreiben} t={t} f={f} />
 
         <Karte titel={th.kredite}>
           {haus.kredite.length === 0 ? (
