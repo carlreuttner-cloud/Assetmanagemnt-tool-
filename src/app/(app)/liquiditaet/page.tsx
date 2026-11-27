@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { Liniendiagramm } from "@/components/diagramme";
 import { Formular } from "@/components/formular";
 import { Begriff, Glossar, MitHerleitung, Unbekannt } from "@/components/herleitung";
-import { Auswahl, Feld, Felder, Kachel, Kacheln, Karte, Leer, Marke, MieteZelle, Reiter, Seitenkopf, Tabelle, rechts, type Ton } from "@/components/ui";
+import { Auswahl, Feld, Felder, Kachel, Kacheln, Karte, Leer, Marke, MieteZelle, Seitenkopf, Tabelle, rechts, type Ton } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -12,6 +13,7 @@ import { ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
 import { dezimal, type Decimal } from "@/lib/geld";
 import type { LiquiditaetMonat, MonatStatus } from "@/lib/liquiditaet";
+import { LiquiditaetUebersicht } from "./uebersicht";
 import { kontostandHinzufuegen, kontostandLoeschen, mindestliquiditaetSpeichern, planpositionHinzufuegen, planpositionLoeschen } from "./aktionen";
 
 const STATUS_TON: Record<MonatStatus, Ton> = { engpass: "schlecht", unterMindest: "warnung", ok: "gut" };
@@ -39,7 +41,32 @@ export default async function LiquiditaetSeite({ searchParams }: PageProps<"/liq
       </div>
     );
   }
-  const g = alle.find((x) => x.id === sp.g) ?? alle[0];
+  // Ohne Auswahl (oder bei nur einer Gesellschaft deren Plan): Übersicht aller Gesellschaften.
+  const g = alle.length === 1 ? alle[0] : alle.find((x) => x.id === sp.g);
+  const marke = (x: (typeof alle)[number]) => (x.plan.ersterEngpass ? ` ⚠ ${tl.uebersicht.markeEngpass}` : x.plan.ersteUnterschreitung ? ` ! ${tl.uebersicht.markeMindest}` : "");
+  const auswahl =
+    alle.length > 1 ? (
+      <FilterZeile>
+        <AuswahlFilter
+          name="g"
+          label={t.listen.gesellschaft}
+          optionen={[
+            { href: "/liquiditaet", text: tl.uebersicht.alle, aktiv: !g },
+            ...alle.map((x) => ({ href: `/liquiditaet?g=${x.id}`, text: `${x.name}${marke(x)}`, aktiv: x.id === g?.id })),
+          ]}
+        />
+      </FilterZeile>
+    ) : null;
+  if (!g) {
+    return (
+      <div className="max-w-6xl space-y-6">
+        <Seitenkopf titel={tl.titel} beschreibung={tl.beschreibung} />
+        {auswahl}
+        <LiquiditaetUebersicht alle={alle} t={t} f={f} />
+        <Glossar begriffe={["Liquiditaet", "Engpass"]} t={t} />
+      </div>
+    );
+  }
   const plan = g.plan;
   const kreditName = new Map(basis.kredite.map((k) => [k.id, k.bezeichnung]));
   const massnahmeName = (id: string) => g.massnahmen.get(id)?.bezeichnung ?? id;
@@ -137,18 +164,7 @@ export default async function LiquiditaetSeite({ searchParams }: PageProps<"/liq
   return (
     <div className="max-w-6xl space-y-6">
       <Seitenkopf titel={tl.titel} beschreibung={tl.beschreibung} />
-      <Reiter
-        eintraege={alle.map((x) => ({
-          href: `/liquiditaet?g=${x.id}`,
-          aktiv: x.id === g.id,
-          text: (
-            <>
-              {x.name}
-              {x.plan.ersterEngpass ? " ⚠" : x.plan.ersteUnterschreitung ? " !" : ""}
-            </>
-          ),
-        }))}
-      />
+      {auswahl}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">

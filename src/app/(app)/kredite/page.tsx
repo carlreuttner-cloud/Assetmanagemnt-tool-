@@ -8,10 +8,11 @@ import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { heute } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
-import { einParam, filterHref } from "@/lib/filter";
+import { auswahlOptionen, einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { restschuldNachweis, zinsbindung } from "@/lib/kredit";
 import { ibanLesbar } from "@/lib/suche";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 
 const ZINSARTEN = ["FEST", "VARIABEL"] as const;
 
@@ -62,12 +63,9 @@ export default async function KrediteSeite({ searchParams }: PageProps<"/kredite
         }
       />
       {gesellschaften.length > 1 && (
-        <Reiter
-          eintraege={[
-            { href: filterHref("/kredite", filter, "g", undefined), text: tl.alleGesellschaften, aktiv: !filter.g },
-            ...gesellschaften.map((g) => ({ href: filterHref("/kredite", filter, "g", g.id), text: g.name, aktiv: filter.g === g.id })),
-          ]}
-        />
+        <FilterZeile>
+          <AuswahlFilter name="g" label={tl.gesellschaft} optionen={auswahlOptionen("/kredite", filter, "g", tl.alleGesellschaften, gesellschaften)} />
+        </FilterZeile>
       )}
       <Reiter
         eintraege={[

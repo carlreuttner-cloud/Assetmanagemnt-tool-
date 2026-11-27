@@ -49,7 +49,7 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 ## Erweiterungen (ab 27.11. abends, nach Carls Test)
 
 - [x] **Phase 26: Nutzungsarten.** Wohnen, Gewerbe und Stellplätze überall getrennt erfassen, anzeigen und filtern; eigene Reiter „Gewerbe“ und „Stellplätze“; Flächen je Nutzungsart in den Tabellen der Hausverwaltung; Leerstand zusätzlich als kleines Kreisdiagramm nach Nutzungsart; jede Nutzungsart mit fester, gedeckter Farbe (zentral in `src/lib/farben.ts`). Testdaten: ein Drittel der Häuser mit Gewerbe, die meisten mit Stellplätzen.
-- [ ] **Phase 27: Auswahl per Dropdown, Liquidität je Gesellschaft.** In der Finanzierung Gesellschaften und Tilgungspläne per Auswahlliste statt Klickleiste (40+ Gesellschaften); Liquiditätsplanung je Gesellschaft wählbar, nicht nur gesamt.
+- [x] **Phase 27: Auswahl per Dropdown, Liquidität je Gesellschaft.** In der Finanzierung Gesellschaften und Tilgungspläne per Auswahlliste statt Klickleiste (40+ Gesellschaften); Liquiditätsplanung je Gesellschaft wählbar, nicht nur gesamt.
 - [ ] **Phase 28: Excel-Export mit Auswahl.** Vor dem Export Tabellen und Spalten auswählen; die KI kann die Auswahl prüfen und Hinweise geben. Layout der Excel-Vorlagen folgt später separat.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden

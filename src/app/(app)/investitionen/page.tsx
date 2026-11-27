@@ -6,11 +6,12 @@ import { bereichsSicht } from "@/lib/auth/auswahl";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { erlaubt } from "@/lib/daten/portfolio";
-import { einParam, filterHref } from "@/lib/filter";
+import { auswahlOptionen, einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { dezimal } from "@/lib/geld";
 import { summiereMassnahmen, werteMassnahmeAus } from "@/lib/massnahme";
 import { AbweichungWert, BudgetWert, IstWert, MehrmieteWert, RenditeWert } from "./massnahme-werte";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 
 const STATUS_TON = { GEPLANT: "neutral", LAUFEND: "warnung", ABGESCHLOSSEN: "gut" } as const;
 
@@ -74,22 +75,18 @@ export default async function InvestitionenSeite({ searchParams }: PageProps<"/i
         beschreibung={t.seiten.investitionen}
         aktionen={schreiben && <KnopfLink href={`/investitionen/neu${filter.h ? `?h=${filter.h}` : ""}`} art="primaer">{tm.neu}</KnopfLink>}
       />
-      {gesellschaften.length > 1 && (
-        <Reiter
-          eintraege={[
-            { href: filterHref("/investitionen", { ...filter, h: undefined }, "g", undefined), text: tl.alleGesellschaften, aktiv: !filter.g },
-            ...gesellschaften.map((g) => ({ href: filterHref("/investitionen", { ...filter, h: undefined }, "g", g.id), text: g.name, aktiv: filter.g === g.id })),
-          ]}
-        />
-      )}
-      {haeuser.length > 1 && (
-        <Reiter
-          eintraege={[
-            { href: filterHref("/investitionen", filter, "h", undefined), text: tl.alleHaeuser, aktiv: !filter.h },
-            ...haeuser.map((h) => ({ href: filterHref("/investitionen", filter, "h", h.id), text: h.bezeichnung, aktiv: filter.h === h.id })),
-          ]}
-        />
-      )}
+      <FilterZeile>
+        {gesellschaften.length > 1 && (
+          <AuswahlFilter name="g" label={tl.gesellschaft} optionen={auswahlOptionen("/investitionen", filter, "g", tl.alleGesellschaften, gesellschaften, ["h"])} />
+        )}
+        {haeuser.length > 1 && (
+          <AuswahlFilter
+            name="h"
+            label={tl.haus}
+            optionen={auswahlOptionen("/investitionen", filter, "h", tl.alleHaeuser, haeuser.map((h) => ({ id: h.id, name: h.bezeichnung })))}
+          />
+        )}
+      </FilterZeile>
       {kategorien.length > 1 && (
         <Reiter
           eintraege={[

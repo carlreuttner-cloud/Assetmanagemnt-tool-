@@ -4,9 +4,10 @@ import { fuelle, texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { alsDbDatum, heute, plusMonate } from "@/lib/datum";
 import { ladeFristEingabe } from "@/lib/daten/fristen";
-import { einParam, filterHref } from "@/lib/filter";
+import { auswahlOptionen, einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { FRIST_ARTEN, nachMonat, sammleFristen, type Frist, type FristArt } from "@/lib/fristen";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 
 const ZEITRAEUME = ["12", "24", "36", "alle"] as const;
 const TON: Record<FristArt, Ton> = { zinsbindung: "schlecht", kreditende: "warnung", sicherungsende: "warnung", mietende: "warnung", mieterhoehung: "gut" };
@@ -50,12 +51,9 @@ export default async function FristenSeite({ searchParams }: PageProps<"/fristen
           ]}
         />
         {eingabe.gesellschaften.length > 1 && (
-          <Reiter
-            eintraege={[
-              { href: filterHref("/fristen", filter, "g", undefined), text: tf.alleGesellschaften, aktiv: !filter.g },
-              ...eingabe.gesellschaften.map((g) => ({ href: filterHref("/fristen", filter, "g", g.id), text: g.name, aktiv: filter.g === g.id })),
-            ]}
-          />
+          <FilterZeile>
+            <AuswahlFilter name="g" label={t.listen.gesellschaft} optionen={auswahlOptionen("/fristen", filter, "g", tf.alleGesellschaften, eingabe.gesellschaften)} />
+          </FilterZeile>
         )}
       </div>
 

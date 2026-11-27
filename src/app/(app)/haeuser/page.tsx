@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { Begriff, Kennzahl } from "@/components/herleitung";
 import { LeerstandZelle, NutzungsartPunkt } from "@/components/nutzungsart";
 import { KnopfLink, Leer, MieteZelle, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
@@ -60,12 +61,16 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
       />
 
       {gesellschaften.length > 1 && (
-        <div className="mb-4 flex flex-wrap gap-2 text-sm">
-          <FilterLink href={href({ art })} aktiv={!filter} text={t.haeuser.alleGesellschaften} />
-          {gesellschaften.map((g) => (
-            <FilterLink key={g.id} href={href({ gesellschaft: g.id, art })} aktiv={filter === g.id} text={g.name} />
-          ))}
-        </div>
+        <FilterZeile>
+          <AuswahlFilter
+            name="gesellschaft"
+            label={t.listen.gesellschaft}
+            optionen={[
+              { href: href({ art }), text: t.haeuser.alleGesellschaften, aktiv: !filter },
+              ...gesellschaften.map((g) => ({ href: href({ gesellschaft: g.id, art }), text: g.name, aktiv: filter === g.id })),
+            ]}
+          />
+        </FilterZeile>
       )}
       <Reiter
         eintraege={[
@@ -177,17 +182,6 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
         )}
       </div>
     </div>
-  );
-}
-
-function FilterLink({ href, aktiv, text }: { href: string; aktiv: boolean; text: string }) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-full px-3 py-1 ring-1 ring-inset ${aktiv ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
-    >
-      {text}
-    </Link>
   );
 }
 
