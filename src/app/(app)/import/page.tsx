@@ -1,4 +1,4 @@
-import { Karte, Leer, Marke, Reiter, Seitenkopf, Tabelle } from "@/components/ui";
+import { Karte, Leer, Marke, Seitenkopf, Tabelle } from "@/components/ui";
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -6,6 +6,7 @@ import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { heute } from "@/lib/datum";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
+import { ImportReiter } from "./import-reiter";
 import { KreditImport } from "./kredit-import";
 import { MieterImport } from "./mieter-import";
 
@@ -48,14 +49,7 @@ export default async function ImportSeite({ searchParams }: PageProps<"/import">
     <div className="max-w-6xl space-y-6">
       <Seitenkopf titel={ti.titel} beschreibung={kreditImport ? ti.beschreibung : ti.beschreibungMieter} />
 
-      {schreiben && kreditImport && (
-        <Reiter
-          eintraege={[
-            { href: "/import", text: ti.mieterliste, aktiv: reiter === "mieter" },
-            { href: "/import?art=kredite", text: ti.kreditbuchungen, aktiv: reiter === "kredite" },
-          ]}
-        />
-      )}
+      <ImportReiter kontext={kontext} t={t} aktiv={reiter} />
 
       {!schreiben ? (
         <Leer>{t.allgemein.nurLesen}</Leer>

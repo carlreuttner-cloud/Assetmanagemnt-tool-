@@ -40,6 +40,21 @@ export async function speichere(mandantId: string, ordner: string, endung: strin
   return relativ;
 }
 
+/** Absoluter Pfad einer gespeicherten Datei, z. B. für Texterkennung mit externen Programmen. */
+export function pfadAufDisk(relativ: string): string {
+  return vollerPfad(relativ);
+}
+
+/** Dokumenttypen für den Upload (PDF und Bilder für die Texterkennung). */
+export const DOKUMENT_TYPEN: Record<string, string> = { "application/pdf": "pdf", ...BILD_TYPEN };
+export const MAX_DOKUMENT_MB = 30;
+
+/** Prüft die ersten Bytes: PDF oder eines der Bildformate. */
+export function dokumentTypAusInhalt(daten: Uint8Array): string | null {
+  if (new TextDecoder("latin1").decode(daten.slice(0, 5)) === "%PDF-") return "application/pdf";
+  return bildTypAusInhalt(daten);
+}
+
 export async function lese(relativ: string): Promise<Buffer> {
   return readFile(vollerPfad(relativ));
 }

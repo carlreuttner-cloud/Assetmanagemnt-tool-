@@ -12,6 +12,7 @@ import { baueFinanzen } from "./testdaten/finanzen";
 import { baueWaterfall } from "./testdaten/waterfall";
 import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
+import { legeTestdokumenteAn } from "./testdaten/dateien";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Der Seed löscht alle Daten und darf nicht in Produktion laufen.");
@@ -60,6 +61,8 @@ async function main() {
   await db.gesellschaftZuweisung.create({
     data: { mandantId, mitgliedschaftId: mInvestor.id, gesellschaftId: ids.gesellschaft.get("G1")! },
   });
+
+  await legeTestdokumenteAn(db, mandantId, admin.id);
 
   // --- Mandant 2: zeigt Mandantentrennung und Mandantenwechsel ----------------------
   const m2 = await db.mandant.create({ data: { name: "Zweite Kunde AG", slug: "zweite-kunde" } });
