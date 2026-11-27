@@ -42,6 +42,7 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "gesellschaften", pfad: "/gesellschaften/referenzzinsen", textSchluessel: "referenzzinsen" },
       { bereich: "szenarien", pfad: "/szenarien", textSchluessel: "szenarien" },
       { bereich: "szenarien", pfad: "/exit", textSchluessel: "exit" },
+      { bereich: "szenarien", pfad: "/ki-vorschlag", textSchluessel: "kiVorschlag" },
     ],
   },
   {

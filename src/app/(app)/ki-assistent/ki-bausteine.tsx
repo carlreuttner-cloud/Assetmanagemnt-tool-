@@ -10,7 +10,7 @@ export function zeitpunkt(datum: Date, sprache: string) {
 }
 
 /** Vollständiges Datenpaket: Fakten als Tabelle mit Sprungmarken, darunter die Lücken. */
-export function DatenpaketAnsicht({ paket, t }: { paket: Datenpaket; t: Texte }) {
+export function DatenpaketAnsicht({ paket, t }: { paket: Pick<Datenpaket, "fakten" | "luecken">; t: Texte }) {
   const ts = t.ki.spalten;
   return (
     <div className="space-y-4">
@@ -64,7 +64,7 @@ export function LueckenListe({ luecken, t }: { luecken: Luecke[]; t: Texte }) {
 }
 
 /** Belege einer Aussage: die zitierten Fakten und Lücken mit Wert, Stichtag und Quelle. */
-export function Belege({ ids, unbekannt, paket, t }: { ids: string[]; unbekannt: string[]; paket: Datenpaket; t: Texte }) {
+export function Belege({ ids, unbekannt, paket, t }: { ids: string[]; unbekannt: string[]; paket: Pick<Datenpaket, "fakten" | "luecken">; t: Texte }) {
   const fakten = new Map<string, Fakt>(paket.fakten.map((x) => [x.id, x]));
   const luecken = new Map<string, Luecke>(paket.luecken.map((x) => [x.id, x]));
   if (ids.length === 0 && unbekannt.length === 0) return null;

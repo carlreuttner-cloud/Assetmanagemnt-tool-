@@ -25,9 +25,12 @@ export default async function SzenarienSeite() {
         titel={ts.titel}
         beschreibung={t.seiten.szenarien}
         aktionen={
-          <KnopfLink href="/szenarien/neu" art="primaer">
-            {ts.neu}
-          </KnopfLink>
+          <div className="flex gap-2">
+            <KnopfLink href="/ki-vorschlag">{t.kiVorschlag.aufruf}</KnopfLink>
+            <KnopfLink href="/szenarien/neu" art="primaer">
+              {ts.neu}
+            </KnopfLink>
+          </div>
         }
       />
       <div className="rounded-xl border border-slate-200 bg-white">

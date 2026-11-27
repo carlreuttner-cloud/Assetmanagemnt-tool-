@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Wasserfall } from "@/components/diagramme";
 import { Formular } from "@/components/formular";
 import { Begriff, Glossar, MitHerleitung, Unbekannt } from "@/components/herleitung";
-import { Feld, Kachel, Kacheln, Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
+import { Feld, Kachel, Kacheln, Karte, KnopfLink, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -154,7 +154,7 @@ export default async function ExitSeite({ searchParams }: PageProps<"/exit">) {
 
   return (
     <div className="max-w-6xl space-y-6">
-      <Seitenkopf titel={te.titel} beschreibung={te.beschreibung} />
+      <Seitenkopf titel={te.titel} beschreibung={te.beschreibung} aktionen={<KnopfLink href={`/ki-vorschlag?h=${hausId}`}>{t.kiVorschlag.aufruf}</KnopfLink>} />
 
       <form method="get" action="/exit" className="flex flex-wrap items-end gap-3">
         <label className="block text-sm">
