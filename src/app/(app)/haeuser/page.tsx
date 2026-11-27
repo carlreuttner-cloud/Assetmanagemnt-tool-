@@ -17,7 +17,7 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
   const stichtag = heute();
   const filter = typeof gesellschaft === "string" && gesellschaft ? gesellschaft : undefined;
 
-  const grundlage = await ladeRechengrundlage(kontext);
+  const grundlage = await ladeRechengrundlage(kontext, { bereich: true });
   const [haeuser, gesellschaften] = await Promise.all([
     kontext.db.haus.findMany({
       where: { id: erlaubt(grundlage.sicht.hausIds), gesellschaftId: filter },

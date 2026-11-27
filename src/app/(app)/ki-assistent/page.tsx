@@ -4,7 +4,7 @@ import { Auswahl, Feld, Felder, Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKl
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
-import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
+import { bereichsSicht } from "@/lib/auth/auswahl";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
 import type { GeprueftesErgebnis } from "@/lib/ki-analyse";
@@ -17,7 +17,7 @@ export default async function KiAnalyseSeite() {
   const t = texte(kontext.mandant.sprache);
   const f = formatierer(kontext.mandant);
   const tk = t.ki;
-  const sicht = await sichtbarkeit(kontext);
+  const sicht = await bereichsSicht(kontext);
   const schreiben = darf(kontext.rolle, "kiAssistent", "schreiben");
   const modus = kiModus();
 

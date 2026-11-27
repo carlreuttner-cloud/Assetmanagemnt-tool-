@@ -24,7 +24,7 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
   const f = formatierer(kontext.mandant);
   const stichtag = heute();
   const sp = await searchParams;
-  const { haeuser, kredite, referenzwerte, sicht } = await ladeRechengrundlage(kontext);
+  const { haeuser, kredite, referenzwerte, sicht } = await ladeRechengrundlage(kontext, { bereich: true });
 
   const [gesellschaften, hausNamen, covenants] = await Promise.all([
     kontext.db.gesellschaft.findMany({ where: { id: idFilter(sicht.gesellschaftIds) }, select: { id: true, name: true }, orderBy: { name: "asc" } }),

@@ -3,7 +3,7 @@ import { Kachel, Kacheln, KnopfLink, Leer, Marke, MieteZelle, Reiter, Seitenkopf
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
-import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
+import { bereichsSicht } from "@/lib/auth/auswahl";
 import { heute, isoDatum } from "@/lib/datum";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
@@ -25,7 +25,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const f = formatierer(kontext.mandant);
   const tm = t.mieter;
   const stichtag = heute();
-  const sicht = await sichtbarkeit(kontext);
+  const sicht = await bereichsSicht(kontext);
   const hausIds = erlaubt(sicht.hausIds, hausFilter);
 
   const [haeuser, einheiten] = await Promise.all([

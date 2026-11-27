@@ -1,138 +1,61 @@
 import Link from "next/link";
-import { Begriff, Kennzahl } from "@/components/herleitung";
-import { KnopfLink, Leer, MieteZelle, Seitenkopf, Tabelle, rechts } from "@/components/ui";
-import { texte } from "@/i18n";
+import { GesellschaftenTabelle } from "@/components/gesellschaften-tabelle";
+import { Karte, KnopfLink, Seitenkopf } from "@/components/ui";
+import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
-import { idFilter } from "@/lib/auth/sichtbarkeit";
-import { heute } from "@/lib/datum";
-import { ladeRechengrundlage } from "@/lib/daten/portfolio";
+import { ladePortfolioGruppen } from "@/lib/daten/gesellschaften";
 import { formatierer } from "@/lib/format";
-import { gruppenKennzahlen } from "@/lib/kennzahlen";
 
 export default async function GesellschaftenSeite() {
   const kontext = await pruefeZugriff("gesellschaften");
   const t = texte(kontext.mandant.sprache);
   const f = formatierer(kontext.mandant);
-  const stichtag = heute();
-  const { haeuser, kredite, referenzwerte, sicht } = await ladeRechengrundlage(kontext);
-  const gesellschaften = await kontext.db.gesellschaft.findMany({
-    where: { id: idFilter(sicht.gesellschaftIds) },
-    orderBy: { name: "asc" },
-  });
-  const zeilen = gesellschaften.map((g) => ({
-    g,
-    k: gruppenKennzahlen(
-      haeuser.filter((h) => h.gesellschaftId === g.id),
-      kredite.filter((x) => x.gesellschaftId === g.id),
-      referenzwerte,
-      stichtag,
-    ),
-    kredite: kredite.filter((x) => x.gesellschaftId === g.id).length,
-  }));
-  const gesamt = gruppenKennzahlen(haeuser, kredite, referenzwerte, stichtag);
+  const { stichtag, gruppen, gesamt, gesamtZeilen } = await ladePortfolioGruppen(kontext, { bereich: true });
   const schreiben = darf(kontext.rolle, "gesellschaften", "schreiben");
+  // Leere Gruppen nur zeigen, wenn es sonst nichts gibt; "Ohne Portfolio" nur, wenn belegt.
+  const belegt = gruppen.filter((g) => g.zeilen.length > 0);
+  const mitPortfolios = belegt.some((g) => g.portfolio !== null);
 
   return (
-    <div>
+    <div className="space-y-6">
       <Seitenkopf
         titel={t.gesellschaften.titel}
         beschreibung={t.seiten.gesellschaften}
         aktionen={
-          <>
-            <KnopfLink href="/gesellschaften/referenzzinsen">{t.gesellschaften.referenzzinsen}</KnopfLink>
-            {schreiben && (
-              <KnopfLink href="/gesellschaften/neu" art="primaer">
-                {t.gesellschaften.neu}
-              </KnopfLink>
-            )}
-          </>
+          schreiben && (
+            <KnopfLink href="/gesellschaften/neu" art="primaer">
+              {t.gesellschaften.neu}
+            </KnopfLink>
+          )
         }
       />
-      <div className="rounded-xl border border-slate-200 bg-white">
-        {zeilen.length === 0 ? (
-          <div className="px-5">
-            <Leer>{t.allgemein.keineDaten}</Leer>
-          </div>
-        ) : (
-          <Tabelle>
-            <thead>
-              <tr>
-                <th>{t.gesellschaften.name}</th>
-                <th className={rechts}>{t.kennzahlen.haeuser}</th>
-                <th className={rechts}>{t.kennzahlen.kredite}</th>
-                <th className={rechts}>{t.kennzahlen.verkehrswert}</th>
-                <th className={rechts}>{t.kennzahlen.restschuld}</th>
-                <th className={rechts}>
-                  <Begriff k="LTV" t={t} />
-                </th>
-                <th className={rechts}>
-                  {t.kennzahlen.sollMiete} ({t.allgemein.monat} / {t.allgemein.jahr})
-                </th>
-                <th className={rechts}>{t.kennzahlen.leerstand}</th>
-                <th className={rechts}>
-                  <Begriff k="DSCR" t={t} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {zeilen.map(({ g, k, kredite: anzahlKredite }) => (
-                <tr key={g.id} className="hover:bg-slate-50">
-                  <td>
-                    <Link href={`/gesellschaften/${g.id}`} className="font-medium text-slate-900 hover:underline">
-                      {g.name}
-                    </Link>
-                    {g.rechtsform && <div className="text-xs text-slate-500">{g.rechtsform}</div>}
-                  </td>
-                  <td className={rechts}>{k.haeuser}</td>
-                  <td className={rechts}>{anzahlKredite}</td>
-                  <td className={rechts}>
-                    <Kennzahl art="verkehrswert" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <Kennzahl art="restschuld" k={k} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <Kennzahl art="ltv" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
-                  </td>
-                  <td className={rechts}>{f.prozent(k.leerstandQuote, 1)}</td>
-                  <td className={rechts}>
-                    <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {zeilen.length > 1 && (
-              <tfoot>
-                <tr>
-                  <td>{t.gesellschaften.summePortfolio}</td>
-                  <td className={rechts}>{gesamt.haeuser}</td>
-                  <td className={rechts}>{kredite.length}</td>
-                  <td className={rechts}>
-                    <Kennzahl art="verkehrswert" k={gesamt} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <Kennzahl art="restschuld" k={gesamt} t={t} f={f} stichtag={stichtag} ganz ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <Kennzahl art="ltv" k={gesamt} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
-                  </td>
-                  <td className={rechts}>
-                    <MieteZelle monat={f.betrag(gesamt.sollMonat)} jahr={f.betrag(gesamt.sollJahr)} />
-                  </td>
-                  <td className={rechts}>{f.prozent(gesamt.leerstandQuote, 1)}</td>
-                  <td className={rechts}>
-                    <Kennzahl art="dscr" k={gesamt} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </Tabelle>
-        )}
-      </div>
+      {!mitPortfolios ? (
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <GesellschaftenTabelle zeilen={gesamtZeilen} summe={gesamt} summeText={t.gesellschaften.summePortfolio} t={t} f={f} stichtag={stichtag} />
+        </div>
+      ) : (
+        belegt.map((g) => {
+          const name = g.portfolio?.name ?? t.portfolios.ohne;
+          return (
+            <Karte
+              key={g.portfolio?.id ?? "ohne"}
+              titel={
+                g.portfolio ? (
+                  <Link href={`/portfolios/${g.portfolio.id}`} className="hover:underline">
+                    {name}
+                  </Link>
+                ) : (
+                  name
+                )
+              }
+            >
+              {g.portfolio?.beschreibung && <p className="-mt-2 mb-3 text-sm text-slate-500">{g.portfolio.beschreibung}</p>}
+              <GesellschaftenTabelle zeilen={g.zeilen} summe={g.summe} summeText={fuelle(t.gesellschaften.summeGruppe, { name })} t={t} f={f} stichtag={stichtag} />
+            </Karte>
+          );
+        })
+      )}
     </div>
   );
 }

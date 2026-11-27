@@ -69,6 +69,7 @@ model Mandant {
   waterfallvertraege      Waterfallvertrag[]
   dokumentnachweise       Dokumentnachweis[]
   kiAnalysen              KiAnalyse[]
+  portfolios              Portfolio[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -140,6 +141,23 @@ model GesellschaftZuweisung {
 // Gesellschaften, Häuser, Einheiten
 // ---------------------------------------------------------------------------
 
+/// Gruppe von Gesellschaften, z. B. je Investorenkreis oder Region. Eine Gesellschaft gehört
+/// zu höchstens einem Portfolio.
+model Portfolio {
+  id           String   @id @default(cuid())
+  mandantId    String
+  name         String
+  beschreibung String?
+  erstelltAm   DateTime @default(now())
+  geaendertAm  DateTime @updatedAt
+
+  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaften Gesellschaft[]
+
+  @@unique([mandantId, name])
+  @@index([mandantId])
+}
+
 model Gesellschaft {
   id             String   @id @default(cuid())
   mandantId      String
@@ -148,10 +166,13 @@ model Gesellschaft {
   registernummer String?
   steuernummer   String?
   notiz          String?
+  /// Portfolio, zu dem die Gesellschaft gehört; leer = "Ohne Portfolio"
+  portfolioId    String?
   erstelltAm     DateTime @default(now())
   geaendertAm    DateTime @updatedAt
 
   mandant           Mandant                 @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  portfolio         Portfolio?              @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
   haeuser           Haus[]
   kredite           Kredit[]
   dokumente         Dokument[]
@@ -164,6 +185,7 @@ model Gesellschaft {
   kiAnalysen        KiAnalyse[]
 
   @@index([mandantId])
+  @@index([portfolioId])
 }
 
 model Haus {

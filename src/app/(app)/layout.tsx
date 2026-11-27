@@ -1,17 +1,35 @@
-import { abmelden, mandantWechseln } from "@/app/aktionen";
-import { SeitenleistenNavigation } from "@/components/seitenleiste";
-import { texte } from "@/i18n";
+import { Suspense } from "react";
+import { abmelden, mandantWechseln, portfolioWaehlen } from "@/app/aktionen";
+import { PortfolioAuswahl } from "@/components/portfolio-auswahl";
+import { Reiterzeile, SeitenleistenNavigation, type NavGruppeMitText } from "@/components/seitenleiste";
+import { fuelle, texte } from "@/i18n";
+import { AUSWAHL_OHNE, ladeAuswahl } from "@/lib/auth/auswahl";
 import { getKontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
-import { NAVIGATION } from "@/lib/navigation";
+import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
+import { erlaubteNavigation } from "@/lib/navigation";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const kontext = await getKontext();
   const t = texte(kontext.mandant.sprache);
-  const links = NAVIGATION.filter((e) => darf(kontext.rolle, e.bereich)).map((e) => ({
-    pfad: e.pfad,
-    text: t.navigation[e.textSchluessel],
+  const gruppen: NavGruppeMitText[] = erlaubteNavigation((b) => darf(kontext.rolle, b)).map((g) => ({
+    ...g,
+    text: t.navigationGruppen[g.schluessel],
+    reiterTexte: Object.fromEntries(g.reiter.map((r) => [r.pfad, t.navigation[r.textSchluessel]])),
   }));
+
+  // Portfolio-Auswahl nur für Rollen, die Gesellschaften sehen; nur Portfolios mit sichtbaren Gesellschaften.
+  const mitAuswahl = darf(kontext.rolle, "gesellschaften");
+  const [auswahl, sicht] = mitAuswahl ? await Promise.all([ladeAuswahl(kontext), sichtbarkeit(kontext)]) : [null, null];
+  const portfolios = mitAuswahl
+    ? await kontext.db.portfolio.findMany({
+        where: sicht && sicht.gesellschaftIds !== "alle" ? { gesellschaften: { some: { id: { in: sicht.gesellschaftIds } } } } : undefined,
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : [];
+  const auswahlWert = auswahl?.art === "portfolio" ? auswahl.id : auswahl?.art === "ohne" ? AUSWAHL_OHNE : "";
+  const auswahlName = auswahl?.art === "portfolio" ? auswahl.name : auswahl?.art === "ohne" ? t.auswahl.ohne : null;
 
   return (
     <div className="flex min-h-screen">
@@ -21,7 +39,25 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <div className="mt-1 text-xs text-slate-400">{kontext.mandant.name}</div>
         </div>
 
-        <SeitenleistenNavigation links={links} />
+        {mitAuswahl && (
+          <div className="mb-5 px-3">
+            <Suspense>
+              <PortfolioAuswahl
+                key={auswahlWert}
+                aktion={portfolioWaehlen}
+                wert={auswahlWert}
+                label={t.auswahl.titel}
+                optionen={[
+                  { wert: "", text: t.auswahl.alle },
+                  ...portfolios.map((p) => ({ wert: p.id, text: p.name })),
+                  { wert: AUSWAHL_OHNE, text: t.auswahl.ohne },
+                ]}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        <SeitenleistenNavigation gruppen={gruppen} />
 
         <div className="mt-auto space-y-3 border-t border-slate-800 px-3 pt-4 text-xs text-slate-400">
           {kontext.mandanten.length > 1 && (
@@ -52,7 +88,20 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-8">
+        <Reiterzeile gruppen={gruppen} />
+        {auswahlName && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-sky-50 px-4 py-2 text-sm text-sky-900">
+            <span>{fuelle(t.auswahl.hinweis, { name: auswahlName })}</span>
+            <form action={portfolioWaehlen}>
+              <input type="hidden" name="portfolio" value="" />
+              <input type="hidden" name="zurueck" value="/" />
+              <button className="font-medium underline">{t.auswahl.zuruecksetzen}</button>
+            </form>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }
