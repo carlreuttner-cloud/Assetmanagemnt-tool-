@@ -38,6 +38,7 @@ export const NAVIGATION: NavGruppe[] = [
     reiter: [
       { bereich: "gesellschaften", pfad: "/kredite", textSchluessel: "kredite", auch: ["/gesellschaften/kredite"] },
       { bereich: "gesellschaften", pfad: "/tilgungsplaene", textSchluessel: "tilgungsplaene" },
+      { bereich: "gesellschaften", pfad: "/liquiditaet", textSchluessel: "liquiditaet" },
       { bereich: "gesellschaften", pfad: "/gesellschaften/referenzzinsen", textSchluessel: "referenzzinsen" },
       { bereich: "szenarien", pfad: "/szenarien", textSchluessel: "szenarien" },
     ],

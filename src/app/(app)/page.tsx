@@ -7,13 +7,14 @@ import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { idFilter } from "@/lib/auth/sichtbarkeit";
 import { formatMonat, heute, monatsende, monatsNummer } from "@/lib/datum";
+import { ladeLiquiditaet } from "@/lib/daten/liquiditaet";
 import { ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { gruppenKennzahlen, zeitreihe, zinsbindungsProfil } from "@/lib/kennzahlen";
 import { ermittleWarnungen, type Warnung } from "@/lib/warnungen";
 
-const ARTEN = ["zinsbindung", "covenant", "sperre", "rueckstand", "leerstand"] as const;
+const ARTEN = ["zinsbindung", "covenant", "sperre", "rueckstand", "leerstand", "liquiditaet"] as const;
 const MAX_WARNUNGEN = 12;
 
 export default async function UebersichtSeite({ searchParams }: PageProps<"/">) {
@@ -45,12 +46,16 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
   }
 
   const gesamt = gruppenKennzahlen(haeuser, kredite, referenzwerte, stichtag);
+  const liquiditaet = darf(kontext.rolle, "gesellschaften")
+    ? await ladeLiquiditaet(kontext, { haeuser, kredite, referenzwerte }, gesellschaften.map((g) => g.id), stichtag)
+    : [];
   const warnungen = ermittleWarnungen(
     haeuser,
     kredite,
     covenants.map((c) => ({ ...c, schwellenwert: c.schwellenwert ? dezimal(c.schwellenwert) : null })),
     referenzwerte,
     stichtag,
+    liquiditaet.map((l) => ({ gesellschaftId: l.id, plan: l.plan })),
   );
 
   // Verlauf: 24 Monate zurück (nur belegte Werte; Planwerte je Kredit auf der Kreditseite)
@@ -81,7 +86,9 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
   const gefiltert = filter ? warnungen.filter((w) => w.art === filter) : warnungen;
   const alle = sp.alle === "1";
   const sichtbar = alle ? gefiltert : gefiltert.slice(0, MAX_WARNUNGEN);
+  const gesellschaftName = new Map(gesellschaften.map((g) => [g.id, g.name]));
   const link = (w: Warnung): { href: string | null; name: string } => {
+    if (w.art === "liquiditaet") return { href: `/liquiditaet?g=${w.gesellschaftId}`, name: gesellschaftName.get(w.gesellschaftId) ?? "" };
     if (w.art === "zinsbindung" || w.art === "covenant" || w.art === "sperre") {
       return { href: darfGesellschaften ? `/gesellschaften/kredite/${w.kreditId}` : null, name: kreditName.get(w.kreditId) ?? "" };
     }
@@ -115,6 +122,10 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
           fuelle(tu.rueckstandText, { anzahl: w.anzahl, summe: f.betrag(w.summe) }) +
           (w.anzahlHoch > 0 ? fuelle(tu.rueckstandHoch, { anzahl: w.anzahlHoch }) : "")
         );
+      case "liquiditaet":
+        return w.stufe === "hoch"
+          ? fuelle(tu.liquiditaetEngpass, { monat: formatMonat(w.monat), bestand: f.betragGanz(w.bestand) })
+          : fuelle(tu.liquiditaetMindest, { monat: formatMonat(w.monat), bestand: f.betragGanz(w.bestand), mindest: f.betragGanz(w.mindest) });
       case "leerstand":
         return fuelle(tu.leerstandText, {
           quote: f.prozent(w.quote, 1),

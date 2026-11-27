@@ -9,12 +9,15 @@
  * - Rückstand: je Haus; hoch, sobald ein Mieter mit mindestens zwei Monatsmieten (Soll) im
  *   Rückstand ist (Grenze für eine fristlose Kündigung nach § 543 BGB), sonst mittel.
  * - Leerstand: je Haus nach Fläche; ab 10 % hoch, darunter mittel.
+ * - Liquidität: je Gesellschaft aus der 12-Monats-Planung; Bestand unter 0 (Engpass) = hoch,
+ *   unter der Mindestliquidität = mittel. Ohne Anfangsbestand keine Warnung (unbekannt).
  */
 import { dezimal, type Decimal } from "./geld";
 import type { IsoDatum } from "./datum";
 import { covenantKennzahlen, hausKennzahlen, istAktiv, type HausDaten } from "./kennzahlen";
 import { covenantPuffer, type Folge } from "./covenant";
 import { restschuld, zinsbindung, type KreditDaten, type ReferenzWert } from "./kredit";
+import type { Liquiditaetsplan } from "./liquiditaet";
 
 export type WarnStufe = "hoch" | "mittel";
 
@@ -23,7 +26,8 @@ export type Warnung =
   | ({ art: "covenant" } & CovenantWarnung)
   | ({ art: "sperre" } & CovenantWarnung)
   | { art: "rueckstand"; stufe: WarnStufe; hausId: string; anzahl: number; anzahlHoch: number; summe: Decimal }
-  | { art: "leerstand"; stufe: WarnStufe; hausId: string; quote: Decimal; leereEinheiten: number; einheiten: number; erwartetMonat: Decimal };
+  | { art: "leerstand"; stufe: WarnStufe; hausId: string; quote: Decimal; leereEinheiten: number; einheiten: number; erwartetMonat: Decimal }
+  | { art: "liquiditaet"; stufe: WarnStufe; gesellschaftId: string; monat: IsoDatum; bestand: Decimal; mindest: Decimal | null };
 
 export interface CovenantWarnung {
   stufe: WarnStufe;
@@ -57,8 +61,17 @@ export function ermittleWarnungen(
   covenants: CovenantDaten[],
   referenzwerte: ReferenzWert[],
   stichtag: IsoDatum,
+  liquiditaet: Array<{ gesellschaftId: string; plan: Liquiditaetsplan }> = [],
 ): Warnung[] {
   const warnungen: Warnung[] = [];
+
+  for (const { gesellschaftId, plan } of liquiditaet) {
+    const monat = plan.ersterEngpass ?? plan.ersteUnterschreitung;
+    if (!monat) continue;
+    // tiefster Bestand ab dem ersten Problemmonat
+    const tiefster = plan.monate.filter((m) => m.monat >= monat && m.bestand !== null).reduce((t, m) => (m.bestand!.lessThan(t) ? m.bestand! : t), plan.monate.find((m) => m.monat === monat)!.bestand!);
+    warnungen.push({ art: "liquiditaet", stufe: plan.ersterEngpass ? "hoch" : "mittel", gesellschaftId, monat, bestand: tiefster, mindest: plan.mindestliquiditaet });
+  }
 
   for (const k of kredite) {
     const zb = zinsbindung(k, stichtag);

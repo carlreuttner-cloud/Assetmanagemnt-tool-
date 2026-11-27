@@ -14,6 +14,7 @@ import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 import { legeTestdokumenteAn } from "./testdaten/dateien";
 import { baueMassnahmen } from "./testdaten/massnahmen";
+import { baueLiquiditaet } from "./testdaten/liquiditaet";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Der Seed löscht alle Daten und darf nicht in Produktion laufen.");
@@ -253,6 +254,16 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     });
     await db.kapitalbewegung.createMany({
       data: gs.bewegungen.map((b) => ({ mandantId, gesellschafterId, art: b.art, datum: b.datum ? tag(b.datum) : null, betrag: geld(b.betrag), quelle: b.quelle })),
+    });
+  }
+  for (const l of baueLiquiditaet(p)) {
+    const gesellschaftId = gesellschaft.get(l.gesellschaft)!;
+    if (l.mindestliquiditaet) await db.gesellschaft.update({ where: { id: gesellschaftId }, data: { mindestliquiditaet: geld(l.mindestliquiditaet) } });
+    await db.bankkontostand.createMany({
+      data: l.kontostaende.map((k) => ({ mandantId, gesellschaftId, konto: k.konto, stichtag: tag(k.stichtag), betrag: geld(k.betrag), quelle: k.quelle })),
+    });
+    await db.planposition.createMany({
+      data: l.positionen.map((x) => ({ mandantId, gesellschaftId, art: x.art, monat: tag(x.monat), betrag: geld(x.betrag), bezeichnung: x.bezeichnung, quelle: x.quelle })),
     });
   }
   await db.waterfallvertrag.createMany({
