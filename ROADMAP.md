@@ -39,7 +39,7 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 - [x] **Phase 17: Export.** Excel und PDF aus jeder Ansicht (ersetzt „Berichte“), mit Stichtag und Quellen.
 - [x] **Phase 18: Dateien und Importe.** Reiter „Dateien und Importe“: einheitliche Benennung beim Import (z. B. „Jahresabschluss 2025 – Gesellschaft XY“, Originalname bleibt), Name und Zuordnung vor dem Speichern bestätigen; OCR für eingescannte PDFs; Volltextsuche nur hier, öffnet das Dokument an der Fundstelle und hebt sie hervor.
 - [x] **Phase 19: Bewertung.** Reiter „Bewertung“: Gutachten und Marktwerte je Haus und Portfolio im Zeitverlauf, Bodenwert und Gebäudewert getrennt, Veränderung zum Vorgutachten.
-- [ ] **Phase 20: Kapitalkonten der Gesellschafter.** Einzahlungen, Anteile, Ausschüttungen und Saldo je Gesellschafter.
+- [x] **Phase 20: Kapitalkonten der Gesellschafter.** Einzahlungen, Anteile, Ausschüttungen und Saldo je Gesellschafter.
 - [ ] **Phase 21: Investitionen mit Budget und Rendite.** Budget, Ist-Kosten, Abweichung und Rendite aus Mehrmiete je Maßnahme.
 - [ ] **Phase 22: Liquiditätsplanung.** 12 Monate je Gesellschaft aus Mieten, Kapitaldienst, Investitionen und Ausschüttungen, mit Warnung bei Engpass.
 - [ ] **Phase 23: Zinssicherungen.** Caps und Swaps zu variablen Krediten, im Zinssatz, Kapitaldienst und in den Szenarien berücksichtigt.

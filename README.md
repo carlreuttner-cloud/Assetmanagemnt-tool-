@@ -94,6 +94,7 @@ src/
     datum.ts             Kalenderdaten als "JJJJ-MM-TT", Monatsrechnung, Formatierung
     kredit.ts            Restschuld, Zinssatz, Kapitaldienst, Zinsbindung, Tilgungspläne, Covenants
     bewertung.ts         Bewertung je Haus und Portfolio: letztes Gutachten, Vorgutachten, Boden-/Gebäudewert, Jahresverlauf
+    kapitalkonto.ts      Kapitalkonten der Gesellschafter: Einlagen, Rückzahlungen, Ausschüttungen, Saldo, Jahresverlauf
     kennzahlen.ts        Kennzahlen je Haus, Gesellschaft und Portfolio (LTV, DSCR, Leerstand, Rendite)
     daten/portfolio.ts   lädt die Rechengrundlage für den sichtbaren Ausschnitt des Mandanten
     format.ts            Anzeigeformate (Beträge, Prozent, Fläche, Datum) je Mandant
