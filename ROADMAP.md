@@ -43,7 +43,7 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 - [x] **Phase 21: Investitionen mit Budget und Rendite.** Budget, Ist-Kosten, Abweichung und Rendite aus Mehrmiete je Maßnahme.
 - [x] **Phase 22: Liquiditätsplanung.** 12 Monate je Gesellschaft aus Mieten, Kapitaldienst, Investitionen und Ausschüttungen, mit Warnung bei Engpass.
 - [x] **Phase 23: Zinssicherungen.** Caps und Swaps zu variablen Krediten, im Zinssatz, Kapitaldienst und in den Szenarien berücksichtigt.
-- [ ] **Phase 24: Exit-Kalkulation je Haus.** Verkaufszeitpunkt wählbar, Preisvorschläge aus Miete, Marktwert und Gutachten (frei änderbar), Ergebnis nach Kreditablöse und Kosten.
+- [x] **Phase 24: Exit-Kalkulation je Haus.** Verkaufszeitpunkt wählbar, Preisvorschläge aus Miete, Marktwert und Gutachten (frei änderbar), Ergebnis nach Kreditablöse und Kosten.
 - [ ] **Phase 25: KI-Vorschläge für Szenarien und Exit.** Knopf „Vorschlag generieren“: Haus wählen, die KI leitet Annahmen aus der Historie ab und begründet sie mit Quellen; gerechnet wird immer im Code, nie durch die KI.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
