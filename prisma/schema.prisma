@@ -62,6 +62,7 @@ model Mandant {
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
+  geschaeftsjahre         Geschaeftsjahr[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -149,6 +150,7 @@ model Gesellschaft {
   dokumente   Dokument[]
   zuweisungen GesellschaftZuweisung[]
   szenarien   Szenario[]
+  abschluesse Geschaeftsjahr[]
 
   @@index([mandantId])
 }
@@ -749,5 +751,69 @@ model Szenario {
   gesellschaft Gesellschaft? @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
   benutzer     Benutzer?     @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
 
+  @@index([mandantId])
+}
+
+enum AbschlussQuelle {
+  JAHRESABSCHLUSS
+  BWA
+  SONSTIGE
+}
+
+enum AbschlussStatus {
+  ENDGUELTIG
+  ENTWURF
+}
+
+/// Finanzzahlen einer Gesellschaft für ein Geschäftsjahr (GuV, Bilanz, Cashflow). Fehlende Posten bleiben null.
+model Geschaeftsjahr {
+  id             String          @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  /// Bezeichnung des Geschäftsjahrs, z. B. 2024
+  jahr           Int
+  beginn         DateTime        @db.Date
+  /// Bilanzstichtag
+  ende           DateTime        @db.Date
+  quelle         AbschlussQuelle
+  quelleText     String?
+  status         AbschlussStatus
+
+  // GuV
+  umsatzerloese        Decimal? @db.Decimal(14, 2)
+  sonstigeErtraege     Decimal? @db.Decimal(14, 2)
+  /// Aufwand für bezogene Leistungen (Bewirtschaftung, Instandhaltung, nicht umgelegte Betriebskosten)
+  materialaufwand      Decimal? @db.Decimal(14, 2)
+  personalaufwand      Decimal? @db.Decimal(14, 2)
+  sonstigeAufwendungen Decimal? @db.Decimal(14, 2)
+  abschreibungen       Decimal? @db.Decimal(14, 2)
+  zinsertraege         Decimal? @db.Decimal(14, 2)
+  zinsaufwendungen     Decimal? @db.Decimal(14, 2)
+  steuern              Decimal? @db.Decimal(14, 2)
+  jahresergebnis       Decimal? @db.Decimal(14, 2)
+
+  // Bilanz
+  anlagevermoegen           Decimal? @db.Decimal(14, 2)
+  /// Umlaufvermögen ohne liquide Mittel
+  umlaufvermoegen           Decimal? @db.Decimal(14, 2)
+  liquideMittel             Decimal? @db.Decimal(14, 2)
+  eigenkapital              Decimal? @db.Decimal(14, 2)
+  rueckstellungen           Decimal? @db.Decimal(14, 2)
+  verbindlichkeitenBanken   Decimal? @db.Decimal(14, 2)
+  sonstigeVerbindlichkeiten Decimal? @db.Decimal(14, 2)
+
+  // Kapitalflussrechnung
+  cashflowLaufend      Decimal? @db.Decimal(14, 2)
+  cashflowInvestition  Decimal? @db.Decimal(14, 2)
+  cashflowFinanzierung Decimal? @db.Decimal(14, 2)
+
+  notiz       String?
+  angelegtAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@unique([gesellschaftId, jahr])
   @@index([mandantId])
 }

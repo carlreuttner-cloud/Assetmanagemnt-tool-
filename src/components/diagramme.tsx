@@ -182,11 +182,15 @@ export function Jahressaeulen({
   if (jahre.length === 0) return null;
   const werte = jahre.flatMap((j) => [j.wert, j.plan ?? null]).filter((w): w is Decimal => w !== null);
   if (werte.length === 0) return null;
-  const max = werte.reduce((m, w) => (w.greaterThan(m) ? w : m), werte[0]);
+  // Skala immer ab 0; negative Werte (z. B. Verluste) zeigen nach unten.
+  const null0 = werte[0].times(0);
+  const max = werte.reduce((m, w) => (w.greaterThan(m) ? w : m), null0);
+  const min = werte.reduce((m, w) => (w.lessThan(m) ? w : m), null0);
+  const spanne = max.minus(min);
   const hoehe = H - RAND.o - RAND.u;
-  const y = (w: Decimal) => RAND.o + hoehe - (max.isZero() ? 0 : w.dividedBy(max).toNumber()) * hoehe;
+  const y = (w: Decimal) => RAND.o + hoehe - (spanne.isZero() ? 0 : w.minus(min).dividedBy(spanne).toNumber()) * hoehe;
   const breite = (B - RAND.l - RAND.r) / jahre.length;
-  const linien = [0, 1, 2, 3, 4].map((i) => max.times(i).dividedBy(4));
+  const linien = [0, 1, 2, 3, 4].map((i) => min.plus(spanne.times(i).dividedBy(4)));
   const farbe = FARBEN[0];
   const mitPlan = jahre.some((j) => j.plan);
   const mitEntwurf = jahre.some((j) => j.entwurf);
@@ -207,17 +211,25 @@ export function Jahressaeulen({
             </text>
           </g>
         ))}
+        {min.lessThan(0) && <line x1={RAND.l} x2={B - RAND.r} y1={y(null0)} y2={y(null0)} stroke="#94a3b8" />}
         {jahre.map((j, i) => {
           const x0 = RAND.l + i * breite + breite * 0.2;
           const b = breite * 0.6;
           return (
             <g key={j.jahr}>
               {j.wert !== null ? (
-                <rect x={x0} y={y(j.wert)} width={b} height={RAND.o + hoehe - y(j.wert)} fill={j.entwurf ? "url(#schraffur)" : farbe} stroke={farbe}>
+                <rect
+                  x={x0}
+                  y={Math.min(y(j.wert), y(null0))}
+                  width={b}
+                  height={Math.abs(y(null0) - y(j.wert))}
+                  fill={j.entwurf ? "url(#schraffur)" : j.wert.isNegative() ? "#be123c" : farbe}
+                  stroke={j.wert.isNegative() ? "#be123c" : farbe}
+                >
                   <title>{`${j.jahr}: ${format(j.wert)}${j.titel ? ` · ${j.titel}` : ""}`}</title>
                 </rect>
               ) : (
-                <text x={x0 + b / 2} y={RAND.o + hoehe - 4} textAnchor="middle" fontSize="12" fill="#94a3b8">
+                <text x={x0 + b / 2} y={y(null0) - 4} textAnchor="middle" fontSize="12" fill="#94a3b8">
                   –
                 </text>
               )}

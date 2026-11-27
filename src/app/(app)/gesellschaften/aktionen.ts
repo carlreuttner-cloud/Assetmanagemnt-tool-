@@ -4,9 +4,11 @@ import { refresh } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
+import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { alsDbDatum, plusTage } from "@/lib/datum";
-import { ladeRechengrundlage } from "@/lib/daten/portfolio";
+import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, zuText } from "@/lib/geld";
+import { ALLE_POSTEN } from "@/lib/finanzen";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
 import { berechneTilgungsplan, restschuld, type TilgungsartArt, type ZahlweiseArt } from "@/lib/kredit";
 
@@ -15,6 +17,8 @@ const ZAHLWEISEN = ["MONATLICH", "QUARTALSWEISE", "HALBJAEHRLICH", "JAEHRLICH"] 
 const TILGUNGSARTEN = ["ANNUITAET", "RATENTILGUNG", "ENDFAELLIG"] as const satisfies readonly TilgungsartArt[];
 const VERGLEICHE = ["HOECHSTENS", "MINDESTENS"] as const;
 const FOLGEN = ["COVENANT", "AUSSCHUETTUNGSSPERRE"] as const;
+const ABSCHLUSS_QUELLEN = ["JAHRESABSCHLUSS", "BWA", "SONSTIGE"] as const;
+const ABSCHLUSS_STATUS = ["ENDGUELTIG", "ENTWURF"] as const;
 const BUCHUNGSARTEN = ["ZINS", "TILGUNG", "SONDERTILGUNG", "GEBUEHR", "AUSZAHLUNG", "SONSTIGES"] as const;
 
 async function schreibKontext() {
@@ -331,4 +335,62 @@ export async function referenzzinsLoeschen(id: string): Promise<AktionsErgebnis>
     await db.referenzzinssatz.delete({ where: { id } });
     refresh();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Finanzen je Geschäftsjahr
+// ---------------------------------------------------------------------------
+
+async function pruefeGesellschaft(kontext: Awaited<ReturnType<typeof schreibKontext>>["kontext"], gesellschaftId: string) {
+  const sicht = await sichtbarkeit(kontext);
+  const g = await kontext.db.gesellschaft.findFirst({ where: { id: erlaubt(sicht.gesellschaftIds, gesellschaftId) }, select: { id: true } });
+  if (!g) notFound();
+}
+
+export async function geschaeftsjahrSpeichern(ort: { id: string | null; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  const ergebnis = await fuehreAus(async () => {
+    const { kontext, db, t, sprache } = await schreibKontext();
+    await pruefeGesellschaft(kontext, ort.gesellschaftId);
+    const f = formularLeser(fd, sprache);
+    const tf = t.finanzen;
+    const jahrText = f.pflicht("jahr", tf.jahr);
+    if (!/^\d{4}$/.test(jahrText)) throw new EingabeFehler(fuelle(t.fehler.zahl, { feld: tf.jahr }));
+    const jahr = Number(jahrText);
+    const beginn = f.datum("beginn", tf.beginn);
+    const ende = f.datum("ende", tf.ende);
+    if (ende <= beginn) throw new EingabeFehler(fuelle(t.fehler.datum, { feld: tf.ende }));
+    const daten: Record<string, unknown> = {
+      jahr,
+      beginn: alsDbDatum(beginn),
+      ende: alsDbDatum(ende),
+      quelle: f.auswahl("quelle", tf.quelle, ABSCHLUSS_QUELLEN),
+      quelleText: f.text("quelleText"),
+      status: f.auswahl("status", tf.status, ABSCHLUSS_STATUS),
+      notiz: f.text("notiz"),
+    };
+    for (const p of ALLE_POSTEN) daten[p] = zuText(f.betragOptional(p, tf.posten[p]));
+    const doppelt = await db.geschaeftsjahr.findFirst({ where: { gesellschaftId: ort.gesellschaftId, jahr, NOT: ort.id ? { id: ort.id } : undefined }, select: { id: true } });
+    if (doppelt) throw new EingabeFehler(tf.jahrVorhanden);
+    if (ort.id) {
+      const bisher = await db.geschaeftsjahr.findFirst({ where: { id: ort.id, gesellschaftId: ort.gesellschaftId }, select: { id: true } });
+      if (!bisher) notFound();
+      await db.geschaeftsjahr.update({ where: { id: ort.id }, data: daten as never });
+    } else {
+      await db.geschaeftsjahr.create({ data: { ...daten, gesellschaftId: ort.gesellschaftId } as never });
+    }
+  });
+  if (ergebnis.fehler) return ergebnis;
+  redirect(`/gesellschaften/${ort.gesellschaftId}/finanzen`);
+}
+
+export async function geschaeftsjahrLoeschen(id: string, gesellschaftId: string): Promise<AktionsErgebnis> {
+  const ergebnis = await fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    await pruefeGesellschaft(kontext, gesellschaftId);
+    const j = await db.geschaeftsjahr.findFirst({ where: { id, gesellschaftId }, select: { id: true } });
+    if (!j) notFound();
+    await db.geschaeftsjahr.delete({ where: { id } });
+  });
+  if (ergebnis.fehler) return ergebnis;
+  redirect(`/gesellschaften/${gesellschaftId}/finanzen`);
 }

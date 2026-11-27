@@ -13,6 +13,8 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, type Decimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { covenantKennzahlen, gruppenKennzahlen, hausKennzahlen } from "@/lib/kennzahlen";
+import { ladeGeschaeftsjahre } from "@/lib/daten/finanzen";
+import { FinanzKarte } from "./finanzen/finanz-karte";
 import { kapitaldienstJahr, pruefeCovenant, restschuldNachweis, zinsbindung } from "@/lib/kredit";
 
 export default async function GesellschaftSeite({ params }: PageProps<"/gesellschaften/[id]">) {
@@ -51,6 +53,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
       }));
   });
   const tk = t.kennzahlen;
+  const geschaeftsjahre = await ladeGeschaeftsjahre(kontext, id);
 
   return (
     <div className="space-y-6">
@@ -184,6 +187,8 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         )}
       </Karte>
 
+      <FinanzKarte gesellschaftId={id} jahre={geschaeftsjahre} schreiben={schreiben} t={t} f={f} />
+
       <Karte titel={t.gesellschaften.haeuser}>
         {g.haeuser.length === 0 ? (
           <Leer>{t.gesellschaften.keineHaeuser}</Leer>
@@ -235,7 +240,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         )}
       </Karte>
 
-      <Glossar begriffe={["LTV", "DSCR", "JNKM", "Kapitaldienst", "Restschuld", "Covenant", "Ausschuettungssperre", "Headroom", "Zinsbindung", "BAR", "Kaufpreisfaktor", "Leerstand"]} t={t} />
+      <Glossar begriffe={["LTV", "DSCR", "JNKM", "Kapitaldienst", "Restschuld", "Covenant", "Ausschuettungssperre", "Headroom", "Zinsbindung", "BAR", "Kaufpreisfaktor", "Leerstand", "EBITDA", "Eigenkapitalquote"]} t={t} />
 
       <Karte titel={t.gesellschaften.stammdaten}>
         <Angaben
