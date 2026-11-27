@@ -61,6 +61,7 @@ model Mandant {
   massnahmen              Massnahme[]
   bankkontostaende        Bankkontostand[]
   zinssicherungen         Zinssicherung[]
+  exitrechnungen          Exitrechnung[]
   planpositionen          Planposition[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
@@ -224,6 +225,7 @@ model Haus {
   kredite           KreditHaus[]
   investitionen     Investition[]
   massnahmen        Massnahme[]
+  exitrechnungen    Exitrechnung[]
   dokumente         Dokument[]
   zuweisungen       HausZuweisung[]
   importe           Importvorgang[]
@@ -1230,4 +1232,33 @@ model Planposition {
 
   @@index([mandantId])
   @@index([gesellschaftId])
+}
+
+/// Gespeicherte Exit-Kalkulation eines Hauses (Annahmen; gerechnet wird immer neu im Code).
+model Exitrechnung {
+  id              String   @id @default(cuid())
+  mandantId       String
+  hausId          String
+  name            String
+  verkaufsdatum   DateTime @db.Date
+  /// "miete", "marktwert", "gutachten" oder "frei"
+  preisBasis      String
+  /// nur bei Basis "frei"
+  preis           Decimal? @db.Decimal(14, 2)
+  /// Kaufpreisfaktor für die Basis "miete"; null = aus dem Gutachten
+  faktor          Decimal? @db.Decimal(9, 4)
+  maklerProzent   Decimal  @db.Decimal(9, 4)
+  sonstigeProzent Decimal  @db.Decimal(9, 4)
+  /// Vorfälligkeitsentschädigung in Prozent der Ablöse; null = unbekannt
+  vfeProzent      Decimal? @db.Decimal(9, 4)
+  /// Begründung bzw. Quellen der Annahmen
+  notiz           String?
+  erstelltAm      DateTime @default(now())
+  geaendertAm     DateTime @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([hausId])
 }
