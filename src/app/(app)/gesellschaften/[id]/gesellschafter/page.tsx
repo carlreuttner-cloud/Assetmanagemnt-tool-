@@ -2,7 +2,12 @@ import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
 import { Begriff } from "@/components/herleitung";
 import { Ankreuzfeld, Auswahl, Feld, Felder, Karte, KnopfLink, Leer, Seitenkopf, Tabelle, rechts } from "@/components/ui";
-import { texte } from "@/i18n";
+import { Liniendiagramm, type Reihe } from "@/components/diagramme";
+import { KapitalkontoTabelle } from "@/components/kapitalkonto-tabelle";
+import { fuelle, texte } from "@/i18n";
+import { heute, isoDatum } from "@/lib/datum";
+import { dezimal } from "@/lib/geld";
+import { kontoverlauf } from "@/lib/kapitalkonto";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
@@ -37,9 +42,22 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
   if (!g) notFound();
   const schreiben = darf(kontext.rolle, "gesellschaften", "schreiben");
   const v = g.waterfallvertrag;
+  const tk = t.kapitalkonten;
+  const stichtag = heute();
+  const konten = g.gesellschafter.map((gs) => ({
+    id: gs.id,
+    name: gs.name,
+    beteiligungProzent: gs.beteiligungProzent === null ? null : dezimal(gs.beteiligungProzent),
+    bewegungen: gs.bewegungen.map((b) => ({ art: b.art, datum: isoDatum(b.datum), betrag: dezimal(b.betrag) })),
+  }));
+  const verlaeufe = konten.map((k) => kontoverlauf(k.bewegungen, Number(stichtag.slice(0, 4))));
+  const reihen: Reihe[] = konten.map((k, i) => ({
+    name: k.name,
+    punkte: verlaeufe[i].jahre.map((j) => ({ x: j.jahr === Number(stichtag.slice(0, 4)) ? stichtag : `${j.jahr}-12-31`, y: j.saldoEnde })),
+  }));
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <Seitenkopf
         titel={tw.gesellschafter}
         beschreibung={`${g.name} · ${tw.gesellschafterBeschreibung}`}
@@ -84,15 +102,27 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
         )}
       </Karte>
 
+      {konten.length > 0 && (
+        <Karte titel={tk.titel}>
+          <KapitalkontoTabelle gesellschafter={konten} stichtag={stichtag} link={(gid) => `#gs-${gid}`} t={t} f={f} />
+          {reihen.some((r) => r.punkte.length > 1) && (
+            <div className="mt-4 max-w-3xl">
+              <h3 className="mb-1 text-sm font-medium">{tk.diagramm}</h3>
+              <Liniendiagramm reihen={reihen} formatY={(w) => f.betragKurz(w)} formatX={(d) => d.slice(0, 4)} ab0 />
+            </div>
+          )}
+        </Karte>
+      )}
+
       {g.gesellschafter.length === 0 && (
         <Karte>
           <Leer>{tw.keineGesellschafter}</Leer>
         </Karte>
       )}
 
-      {g.gesellschafter.map((gs) => (
+      {g.gesellschafter.map((gs, nr) => (
+        <div key={gs.id} id={`gs-${gs.id}`} className="scroll-mt-4">
         <Karte
-          key={gs.id}
           titel={gs.name}
           aktionen={
             <span className="text-sm text-slate-600">
@@ -100,6 +130,39 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
             </span>
           }
         >
+          {verlaeufe[nr].jahre.length > 0 && (
+            <details className="mb-4">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">{tk.verlauf}</summary>
+              <p className="mt-2 text-xs text-slate-500">{tk.verlaufHinweis}</p>
+              <Tabelle>
+                <thead>
+                  <tr>
+                    <th>{tk.jahr}</th>
+                    <th className={rechts}>{tk.einlagen}</th>
+                    <th className={rechts}>{tk.rueckzahlungen}</th>
+                    <th className={rechts}>{tk.ausschuettungen}</th>
+                    <th className={rechts}>{tk.saldoEnde}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verlaeufe[nr].jahre.map((j) => (
+                    <tr key={j.jahr}>
+                      <td>{j.jahr}</td>
+                      <td className={rechts}>{j.einlagen.isZero() ? "–" : f.betragGanz(j.einlagen)}</td>
+                      <td className={rechts}>{j.rueckzahlungen.isZero() ? "–" : f.betragGanz(j.rueckzahlungen)}</td>
+                      <td className={rechts}>{j.ausschuettungen.isZero() ? "–" : f.betragGanz(j.ausschuettungen)}</td>
+                      <td className={`${rechts} font-medium`}>{f.betragGanz(j.saldoEnde)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Tabelle>
+              {verlaeufe[nr].ohneDatum && (
+                <p className="mt-2 text-xs text-amber-700">
+                  {fuelle(tk.ohneDatum, { anzahl: verlaeufe[nr].ohneDatum!.anzahl })}: {tk.einlagen} {f.betragGanz(verlaeufe[nr].ohneDatum!.einlagen)}. {tk.ohneDatumHinweis}
+                </p>
+              )}
+            </details>
+          )}
           <h3 className="mb-2 text-sm font-medium text-slate-700">{tw.bewegungen}</h3>
           {gs.bewegungen.length === 0 ? (
             <p className="text-sm text-amber-700">{tw.keineBewegungen}</p>
@@ -158,6 +221,7 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
             </div>
           )}
         </Karte>
+        </div>
       ))}
 
       {schreiben && (
