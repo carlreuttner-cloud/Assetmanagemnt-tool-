@@ -12,6 +12,8 @@ import { heute } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, type Decimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
+import { DokumenteKarte } from "@/components/dokumente";
+import { ladeCheckliste } from "@/lib/daten/dokumente";
 import { covenantKennzahlen, gruppenKennzahlen, hausKennzahlen } from "@/lib/kennzahlen";
 import { ladeGeschaeftsjahre } from "@/lib/daten/finanzen";
 import { FinanzKarte } from "./finanzen/finanz-karte";
@@ -54,6 +56,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
   });
   const tk = t.kennzahlen;
   const geschaeftsjahre = await ladeGeschaeftsjahre(kontext, id);
+  const dokumente = darf(kontext.rolle, "dokumente") ? await ladeCheckliste(kontext, { bezug: "GESELLSCHAFT", id }) : null;
 
   return (
     <div className="space-y-6">
@@ -188,6 +191,8 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
       </Karte>
 
       <FinanzKarte gesellschaftId={id} jahre={geschaeftsjahre} schreiben={schreiben} t={t} f={f} />
+
+      {dokumente && <DokumenteKarte checkliste={dokumente} bezug="GESELLSCHAFT" id={id} t={t} />}
 
       <Karte titel={t.gesellschaften.haeuser}>
         {g.haeuser.length === 0 ? (

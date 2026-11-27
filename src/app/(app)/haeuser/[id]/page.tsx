@@ -13,6 +13,8 @@ import { formatMonat, heute, isoDatum } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
+import { DokumenteKarte } from "@/components/dokumente";
+import { ladeCheckliste } from "@/lib/daten/dokumente";
 import { hausKennzahlen, istAktiv } from "@/lib/kennzahlen";
 import { GutachtenKarte } from "./gutachten/gutachten-karte";
 import { restschuldNachweis, zinsbindung } from "@/lib/kredit";
@@ -58,6 +60,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
   const darfGesellschaften = darf(kontext.rolle, "gesellschaften");
   const darfMieter = darf(kontext.rolle, "mieter");
+  const dokumente = darf(kontext.rolle, "dokumente") ? await ladeCheckliste(kontext, { bezug: "HAUS", id }) : null;
   const summeInvestitionen = haus.investitionen.reduce((s, i) => s.plus(dezimal(i.betrag)), dezimal(0));
   const vollvermietung = k.sollMonat.plus(k.erwartetLeerMonat);
   // Wertentwicklung ab Kauf: Kaufpreis als Startpunkt, danach die Verkehrswerte
@@ -344,6 +347,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
         </Karte>
 
         <GutachtenKarte hausId={id} liste={haus.gutachten} schreiben={schreiben} t={t} f={f} />
+
+        {dokumente && <DokumenteKarte checkliste={dokumente} bezug="HAUS" id={id} t={t} />}
 
         <Karte titel={th.kredite}>
           {haus.kredite.length === 0 ? (
