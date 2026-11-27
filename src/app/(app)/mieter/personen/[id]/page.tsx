@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Merken } from "@/components/merken";
 import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
 import { Angaben, Ankreuzfeld, Feld, Felder, Karte, KnopfLink, Leer, Marke, MieteZelle, Seitenkopf, Tabelle, Textfeld, rechts } from "@/components/ui";
@@ -41,7 +42,12 @@ export default async function MieterPersonSeite({ params }: PageProps<"/mieter/p
         titel={mieter.name}
         beschreibung={mieter.istFirma ? tm.istFirma : undefined}
         zurueck={{ href: "/mieter", text: tm.titel }}
-        aktionen={schreiben && <KnopfLink href="/mieter/neu" art="primaer">{tm.neuesMietverhaeltnis}</KnopfLink>}
+        aktionen={
+          <>
+            <Merken kontext={kontext} t={t} art="mieter" pfad={`/mieter/personen/${id}`} titel={mieter.name} />
+            {schreiben && <KnopfLink href="/mieter/neu" art="primaer">{tm.neuesMietverhaeltnis}</KnopfLink>}
+          </>
+        }
       />
 
       <Karte titel={tm.mietverhaeltnisse}>

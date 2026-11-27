@@ -4,10 +4,12 @@ import { AuthError } from "next-auth";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/auth";
-import { getKontext, MANDANT_COOKIE } from "@/lib/auth/kontext";
+import { getKontext, MANDANT_COOKIE, pruefeZugriff } from "@/lib/auth/kontext";
 import { startseite } from "@/lib/auth/rechte";
 import { AUSWAHL_OHNE, PORTFOLIO_COOKIE } from "@/lib/auth/auswahl";
 import { texte } from "@/i18n";
+import { setzeFavorit } from "@/lib/daten/lesezeichen";
+import { BEREICH_JE_ART, pfadPasst } from "@/lib/lesezeichen";
 
 export type AnmeldeStatus = { fehler?: string };
 
@@ -64,4 +66,11 @@ export async function portfolioWaehlen(formular: FormData) {
   }
   // Nur Pfade innerhalb der App, keine fremden Ziele.
   redirect(zurueck.startsWith("/") && !zurueck.startsWith("//") ? zurueck : "/");
+}
+
+/** Favorit einer Detailseite setzen oder entfernen. Prüft das Leserecht für die Art der Seite. */
+export async function favoritSetzen(art: string, pfad: string, titel: string, favorit: boolean): Promise<void> {
+  if (!pfadPasst(art, pfad)) return;
+  const kontext = await pruefeZugriff(BEREICH_JE_ART[art]);
+  await setzeFavorit(kontext, { art, pfad, titel: titel.slice(0, 200) }, favorit);
 }

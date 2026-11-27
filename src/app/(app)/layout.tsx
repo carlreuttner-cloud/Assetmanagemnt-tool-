@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { abmelden, mandantWechseln, portfolioWaehlen } from "@/app/aktionen";
 import { GlobaleSuche } from "@/components/globale-suche";
+import { Merkliste } from "@/components/lesezeichen";
 import { PortfolioAuswahl } from "@/components/portfolio-auswahl";
 import { QuellenSchalter } from "@/components/quellen-schalter";
 import { Sprungziel } from "@/components/sprungziel";
@@ -64,6 +65,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         )}
 
         <SeitenleistenNavigation gruppen={gruppen} />
+        {darf(kontext.rolle, "suche") && (
+          <Merkliste texte={{ favoriten: t.lesezeichen.favoriten, zuletzt: t.lesezeichen.zuletzt, keineFavoriten: t.lesezeichen.keineFavoriten }} />
+        )}
 
         <div className="mt-auto space-y-3 border-t border-slate-800 px-3 pt-4 text-xs text-slate-400">
           {darf(kontext.rolle, "suche") && (

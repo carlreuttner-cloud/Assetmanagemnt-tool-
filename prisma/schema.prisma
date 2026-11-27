@@ -70,6 +70,7 @@ model Mandant {
   dokumentnachweise       Dokumentnachweis[]
   kiAnalysen              KiAnalyse[]
   portfolios              Portfolio[]
+  lesezeichen             Lesezeichen[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -89,6 +90,7 @@ model Benutzer {
   importvorgaenge     Importvorgang[]
   szenarien           Szenario[]
   kiAnalysen          KiAnalyse[]
+  lesezeichen         Lesezeichen[]
 }
 
 model Mitgliedschaft {
@@ -1018,4 +1020,26 @@ model KiAnalyse {
 
   @@index([mandantId])
   @@index([gesellschaftId])
+}
+
+/// Favoriten und „zuletzt angesehen“ je Benutzer und Mandant: ein Eintrag je aufgerufener Detailseite.
+/// Titel ist der Name beim letzten Aufruf (zur Anzeige); geöffnet wird immer der Pfad mit Rechteprüfung.
+model Lesezeichen {
+  id          String    @id @default(cuid())
+  mandantId   String
+  benutzerId  String
+  /// z. B. "/haeuser/<id>"
+  pfad        String
+  titel       String
+  /// gesellschaft, haus, kredit, mieter, portfolio
+  objektArt   String
+  favorit     Boolean   @default(false)
+  favoritSeit DateTime?
+  angesehenAm DateTime?
+
+  mandant  Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  benutzer Benutzer @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
+
+  @@unique([mandantId, benutzerId, pfad])
+  @@index([mandantId, benutzerId, angesehenAm])
 }

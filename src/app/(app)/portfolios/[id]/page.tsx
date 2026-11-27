@@ -1,3 +1,4 @@
+import { Merken } from "@/components/merken";
 import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
 import { GesellschaftenTabelle } from "@/components/gesellschaften-tabelle";
@@ -34,7 +35,12 @@ export default async function PortfolioSeite({ params }: PageProps<"/portfolios/
 
   return (
     <div className="space-y-6">
-      <Seitenkopf titel={portfolio.name} beschreibung={portfolio.beschreibung} zurueck={{ href: "/portfolios", text: tp.titel }} />
+      <Seitenkopf
+        titel={portfolio.name}
+        beschreibung={portfolio.beschreibung}
+        zurueck={{ href: "/portfolios", text: tp.titel }}
+        aktionen={<Merken kontext={kontext} t={t} art="portfolio" pfad={`/portfolios/${id}`} titel={portfolio.name} />}
+      />
 
       <KennzahlKacheln k={gruppe.summe} t={t} f={f} stichtag={stichtag} />
 

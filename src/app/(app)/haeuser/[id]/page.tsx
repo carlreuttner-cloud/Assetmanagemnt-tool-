@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Merken } from "@/components/merken";
 import { notFound } from "next/navigation";
 import { Liniendiagramm } from "@/components/diagramme";
 import { Formular } from "@/components/formular";
@@ -88,15 +89,18 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
         }
         zurueck={{ href: "/haeuser", text: th.titel }}
         aktionen={
-          schreiben && (
-            <>
-              <KnopfLink href={`/haeuser/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
-              {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href={`/import?haus=${id}`}>{t.importe.mieterlisteImportieren}</KnopfLink>}
-              <KnopfLink href={`/haeuser/${id}/einheiten/neu`} art="primaer">
-                {t.einheiten.neu}
-              </KnopfLink>
-            </>
-          )
+          <>
+            <Merken kontext={kontext} t={t} art="haus" pfad={`/haeuser/${id}`} titel={haus.bezeichnung} />
+            {schreiben && (
+              <>
+                <KnopfLink href={`/haeuser/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+                {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href={`/import?haus=${id}`}>{t.importe.mieterlisteImportieren}</KnopfLink>}
+                <KnopfLink href={`/haeuser/${id}/einheiten/neu`} art="primaer">
+                  {t.einheiten.neu}
+                </KnopfLink>
+              </>
+            )}
+          </>
         }
       />
 

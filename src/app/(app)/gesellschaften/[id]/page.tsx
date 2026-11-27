@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Merken } from "@/components/merken";
 import { notFound } from "next/navigation";
 import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/components/kredit-marken";
 import { covenantPuffer, sperrenStatus } from "@/lib/covenant";
@@ -80,6 +81,7 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
         zurueck={{ href: "/gesellschaften", text: t.gesellschaften.titel }}
         aktionen={
           <>
+            <Merken kontext={kontext} t={t} art="gesellschaft" pfad={`/gesellschaften/${id}`} titel={g.name} />
             <KnopfLink href={`/gesellschaften/${id}/waterfall`}>{t.waterfall.titel}</KnopfLink>
             <KnopfLink href={`/gesellschaften/${id}/gesellschafter`}>{t.waterfall.gesellschafterVerwalten}</KnopfLink>
             {schreiben && (
