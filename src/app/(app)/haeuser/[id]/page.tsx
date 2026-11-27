@@ -27,6 +27,8 @@ import {
   verkehrswertHinzufuegen,
   verkehrswertLoeschen,
 } from "../aktionen";
+import { FlaechenJeArt, LeerstandKreis, NutzungsartMarke } from "@/components/nutzungsart";
+import { inFlaeche } from "@/lib/nutzungsart";
 
 export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) {
   const { id } = await params;
@@ -43,7 +45,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
     include: {
       gesellschaft: { select: { id: true, name: true } },
       einheiten: {
-        orderBy: [{ art: "desc" }, { bezeichnung: "asc" }],
+        orderBy: [{ art: "asc" }, { bezeichnung: "asc" }],
         include: { mietverhaeltnisse: { include: { mieter: { select: { name: true } } }, orderBy: { beginn: "desc" } } },
       },
       verkehrswerte: { orderBy: { stichtag: "desc" }, include: { gutachten: { select: { id: true } } } },
@@ -145,6 +147,9 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
             <>
               {`${k.leereEinheiten} / ${k.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: `}
               <Kennzahl art="erwartetLeerMonat" {...p} /> / {f.betrag(k.erwartetLeerJahr)}
+              <div className="mt-2">
+                <LeerstandKreis nachArt={k.nachArt} t={t} f={f} groesse={40} legende />
+              </div>
             </>
           }
           ton={k.leereEinheiten > 0 ? "warnung" : undefined}
@@ -168,7 +173,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
             </>
           }
         />
-        <Kachel titel={tk.rueckstand} wert={f.betrag(k.rueckstand)} ton={k.rueckstand.greaterThan(0) ? "schlecht" : undefined} unter={`${tk.flaeche}: ${f.flaeche(k.flaeche)}`} />
+        <Kachel titel={tk.rueckstand} wert={f.betrag(k.rueckstand)} ton={k.rueckstand.greaterThan(0) ? "schlecht" : undefined} unter={<FlaechenJeArt nachArt={k.nachArt} t={t} f={f} waagerecht />} />
       </Kacheln>
 
       <Karte titel={th.fotos}>
@@ -233,10 +238,12 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
                     <tr key={e.id} id={`einheit-${e.id}`} className={leer ? "bg-amber-50/40" : undefined}>
                       <td className="font-medium">
                         {e.bezeichnung}
-                        <div className="text-xs font-normal text-slate-500">{t.einheitArten[e.art]}</div>
+                        <div className="mt-0.5 font-normal">
+                          <NutzungsartMarke art={e.art} t={t} />
+                        </div>
                       </td>
                       <td>{e.lage}</td>
-                      <td className={rechts}>{f.zahl(e.flaeche, 1)}</td>
+                      <td className={rechts}>{inFlaeche(e.art) ? f.zahl(e.flaeche, 1) : <span className="text-xs text-slate-500">1 {t.nutzung.stueck}</span>}</td>
                       <td>{leer ? <Marke ton="warnung">{th.leer}</Marke> : <Marke ton="gut">{th.vermietet}</Marke>}</td>
                       <td>
                         {leer ? (

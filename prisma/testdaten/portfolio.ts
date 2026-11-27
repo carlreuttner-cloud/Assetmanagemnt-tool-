@@ -132,7 +132,7 @@ export interface TestMietverhaeltnis {
 
 export interface TestEinheit {
   bezeichnung: string;
-  art: "WOHNUNG" | "GEWERBE";
+  art: "WOHNUNG" | "GEWERBE" | "STELLPLATZ";
   flaeche: Decimal;
   lage: string;
   /** Erwartete Nettokaltmiete pro Monat bei Neuvermietung; nur bei Leerstand gesetzt. */
@@ -229,6 +229,8 @@ function baueHaus(v: HausVorgabe): TestHaus {
       leerFlaeche = leerFlaeche.plus(e.flaeche);
     }
   }
+  // Gewerbe-Leerstand: in Häusern mit Leerstand und mindestens zwei Gewerbeeinheiten steht die letzte leer.
+  if (v.leerstand > 0 && v.gewerbe >= 2) leer.add(einheiten[v.gewerbe - 1]);
   for (const e of gemischt.slice(0, anzahlAlt)) {
     e.altmieter = true;
     e.gewicht = z.faktor(5800, 7200);
@@ -299,6 +301,8 @@ function baueHaus(v: HausVorgabe): TestHaus {
     });
   }
 
+  const stellplaetze = baueStellplaetze(v);
+
   // Verkehrswerte: Gutachten der letzten drei Jahre, aktueller Wert zum 31.12.2025.
   const verkehrswerte: TestHaus["verkehrswerte"] = [];
   for (const [jahr, min, max, quelle] of [
@@ -338,11 +342,59 @@ function baueHaus(v: HausVorgabe): TestHaus {
     kaufdatum: v.kaufdatum,
     verkehrswerte,
     gutachten,
-    einheiten: einheiten.map((e) => ({
-      bezeichnung: e.bezeichnung, art: e.art, flaeche: e.flaeche, lage: e.lage, erwarteteMiete: e.erwarteteMiete, notiz: e.notiz, mietverhaeltnisse: e.mietverhaeltnisse,
-    })),
+    einheiten: [
+      ...einheiten.map((e) => ({
+        bezeichnung: e.bezeichnung, art: e.art, flaeche: e.flaeche, lage: e.lage, erwarteteMiete: e.erwarteteMiete, notiz: e.notiz, mietverhaeltnisse: e.mietverhaeltnisse,
+      })),
+      ...stellplaetze,
+    ],
     investitionen,
   };
+}
+
+/** Häuser ohne Stellplätze (Altbau ohne Hof oder Tiefgarage). */
+const OHNE_STELLPLAETZE = new Set(["H03", "H09", "H14"]);
+
+/**
+ * Stellplätze eines Hauses: in den meisten Häusern 6 bis 24 Plätze (Tiefgarage oder Hof),
+ * Miete je Stück nach örtlichem Mietniveau (rund das 6-Fache der m²-Miete), einzelne leer.
+ * Eigener Zufallsstrom, damit die übrigen Testdaten unverändert bleiben.
+ */
+function baueStellplaetze(v: HausVorgabe): TestEinheit[] {
+  if (OHNE_STELLPLAETZE.has(v.schluessel)) return [];
+  const z = zufall(`stellplatz-${v.schluessel}`);
+  const anzahl = z.ganz(6, 24);
+  const tiefgarage = z.chance(60);
+  const basis = dezimal(v.mietniveau).times(6).dividedBy(100);
+  const anzahlLeer = v.leerstand > 0 ? z.ganz(1, 3) : z.chance(40) ? 1 : 0;
+  const leer = new Set(z.mische(Array.from({ length: anzahl }, (_, i) => i)).slice(0, anzahlLeer));
+  return Array.from({ length: anzahl }, (_, i): TestEinheit => {
+    const miete = basis.times(z.faktor(9000, 11500)).toDecimalPlaces(0);
+    const bezeichnung = `SP ${String(i + 1).padStart(2, "0")}`;
+    const lage = tiefgarage ? `Tiefgarage Platz ${i + 1}` : `Hof Platz ${i + 1}`;
+    const flaeche = dezimal(tiefgarage ? "12.50" : "15.00");
+    if (leer.has(i)) {
+      const leerSeit = zufallsMonat(z, 2025, 2026, 9);
+      return {
+        bezeichnung, art: "STELLPLATZ", flaeche, lage, erwarteteMiete: miete, notiz: `Leerstand seit ${leerSeit.slice(5, 7)}/${leerSeit.slice(0, 4)}`,
+        mietverhaeltnisse: z.chance(50)
+          ? [{
+              mieter: { name: personenName(z, false), istFirma: false }, beginn: zufallsMonat(z, 2016, 2023), ende: tagDavor(leerSeit),
+              istMiete: miete, sollMiete: miete, letzteMieterhoehung: null, rueckstand: dezimal(0), rueckstandStichtag: null, notiz: "Stellplatz gekündigt",
+            }]
+          : [],
+      };
+    }
+    const firma = v.gewerbe > 0 && z.chance(25);
+    return {
+      bezeichnung, art: "STELLPLATZ", flaeche, lage, erwarteteMiete: null, notiz: null,
+      mietverhaeltnisse: [{
+        mieter: firma ? { name: z.waehle(FIRMEN), istFirma: true } : { name: personenName(z, false), istFirma: false },
+        beginn: zufallsMonat(z, 2010, 2026, 9), ende: null, istMiete: miete, sollMiete: miete,
+        letzteMieterhoehung: z.chance(30) ? zufallsMonat(z, 2020, 2025) : null, rueckstand: dezimal(0), rueckstandStichtag: null, notiz: null,
+      }],
+    };
+  });
 }
 
 function personenName(z: Zufall, aelter: boolean): string {
@@ -373,8 +425,11 @@ export interface HausKennzahlen {
   haus: string;
   verkehrswert: Decimal;
   kaufpreis: Decimal;
+  /** Wohn- und Gewerbeeinheiten (ohne Stellplätze) */
   einheiten: number;
   gewerbe: number;
+  stellplaetze: number;
+  /** Wohn- und Gewerbefläche (Stellplätze zählen in Stück) */
   flaeche: Decimal;
   leerFlaeche: Decimal;
   leerstandProzent: Decimal;
@@ -397,7 +452,19 @@ export function aktiveMietverhaeltnisse(e: TestEinheit): TestMietverhaeltnis[] {
 export function kennzahlen(p: TestPortfolio): HausKennzahlen[] {
   return p.haeuser.map((h) => {
     let flaeche = dezimal(0), leerFlaeche = dezimal(0), erwartetLeerMonat = dezimal(0), sollMonat = dezimal(0), istMonat = dezimal(0), vermietetFlaeche = dezimal(0);
+    let stellplatzSoll = dezimal(0);
     for (const e of h.einheiten) {
+      const aktivSp = aktiveMietverhaeltnisse(e);
+      if (e.art === "STELLPLATZ") {
+        // Stellplätze: Miete zählt zur Soll-/Ist-Miete, aber nicht zur Fläche und nicht zur m²-Miete.
+        if (aktivSp.length === 0) erwartetLeerMonat = erwartetLeerMonat.plus(e.erwarteteMiete ?? 0);
+        for (const m of aktivSp) {
+          sollMonat = sollMonat.plus(m.sollMiete);
+          istMonat = istMonat.plus(m.istMiete);
+          stellplatzSoll = stellplatzSoll.plus(m.sollMiete);
+        }
+        continue;
+      }
       flaeche = flaeche.plus(e.flaeche);
       const aktiv = aktiveMietverhaeltnisse(e);
       if (aktiv.length === 0) {
@@ -421,8 +488,9 @@ export function kennzahlen(p: TestPortfolio): HausKennzahlen[] {
       haus: h.schluessel,
       verkehrswert,
       kaufpreis: h.kaufpreis,
-      einheiten: h.einheiten.length,
+      einheiten: h.einheiten.filter((e) => e.art !== "STELLPLATZ").length,
       gewerbe: h.einheiten.filter((e) => e.art === "GEWERBE").length,
+      stellplaetze: h.einheiten.filter((e) => e.art === "STELLPLATZ").length,
       flaeche,
       leerFlaeche,
       leerstandProzent: leerFlaeche.times(100).dividedBy(flaeche),
@@ -431,7 +499,7 @@ export function kennzahlen(p: TestPortfolio): HausKennzahlen[] {
       erwartetLeerMonat,
       faktor: h.kaufpreis.dividedBy(sollJahr),
       bruttoanfangsrendite: sollJahr.times(100).dividedBy(h.kaufpreis),
-      mieteProM2: sollMonat.dividedBy(vermietetFlaeche),
+      mieteProM2: sollMonat.minus(stellplatzSoll).dividedBy(vermietetFlaeche),
       restschuld,
       ltv: restschuld.times(100).dividedBy(verkehrswert),
       kredite: kredite.length,

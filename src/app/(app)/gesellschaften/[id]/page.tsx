@@ -19,6 +19,7 @@ import { covenantKennzahlen, gruppenKennzahlen, hausKennzahlen } from "@/lib/ken
 import { ladeGeschaeftsjahre } from "@/lib/daten/finanzen";
 import { FinanzKarte } from "./finanzen/finanz-karte";
 import { kapitaldienstJahr, pruefeCovenant, restschuldNachweis, zinsbindung } from "@/lib/kredit";
+import { LeerstandZelle } from "@/components/nutzungsart";
 
 export default async function GesellschaftSeite({ params }: PageProps<"/gesellschaften/[id]">) {
   const { id } = await params;
@@ -256,7 +257,9 @@ export default async function GesellschaftSeite({ params }: PageProps<"/gesellsc
                     <td className={rechts}>
                       <MieteZelle monat={f.betrag(hk.sollMonat)} jahr={f.betrag(hk.sollJahr)} />
                     </td>
-                    <td className={rechts}>{f.prozent(hk.leerstandQuote, 1)}</td>
+                    <td className={rechts}>
+                      <LeerstandZelle quote={f.prozent(hk.leerstandQuote, 1)} nachArt={hk.nachArt} t={t} f={f} />
+                    </td>
                   </tr>
                 );
               })}

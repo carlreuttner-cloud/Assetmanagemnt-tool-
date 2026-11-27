@@ -350,9 +350,12 @@ model Foto {
   @@index([hausId])
 }
 
+/// Nutzungsart einer Einheit. Farben und Texte zentral in src/lib/nutzungsart.ts bzw. src/i18n.
 enum EinheitArt {
   WOHNUNG
   GEWERBE
+  /// Stellplatz, Garage oder Tiefgaragenplatz; wird in Stück gezählt, nicht in der Wohn-/Gewerbefläche
+  STELLPLATZ
 }
 
 model Einheit {

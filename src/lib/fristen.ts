@@ -8,6 +8,7 @@
  * Gewerbemieten folgen dem Vertrag; diese Regeln sind nicht erfasst und werden als Lücke gezeigt.
  */
 import { plusMonate, type IsoDatum } from "./datum";
+import type { Nutzungsart } from "./nutzungsart";
 
 export const FRIST_ARTEN = ["zinsbindung", "kreditende", "sicherungsende", "mietende", "mieterhoehung"] as const;
 export type FristArt = (typeof FRIST_ARTEN)[number];
@@ -28,11 +29,11 @@ export type FristLuecke = { art: FristArt; titel: string; unter: string; href: s
 
 export type MieterhoehungErgebnis =
   | { art: "moeglich"; verlangenAb: IsoDatum; wirksamAb: IsoDatum; basis: "letzteErhoehung" | "mietbeginn"; basisDatum: IsoDatum }
-  | { art: "unbekannt"; grund: "gewerbe" };
+  | { art: "unbekannt"; grund: "gewerbe" | "stellplatz" };
 
 /** Frühestes Erhöhungsverlangen und Wirksamwerden nach § 558 BGB (nur Wohnraum). */
-export function naechsteMieterhoehung(mv: { einheitArt: "WOHNUNG" | "GEWERBE"; beginn: IsoDatum; letzteMieterhoehung: IsoDatum | null }): MieterhoehungErgebnis {
-  if (mv.einheitArt !== "WOHNUNG") return { art: "unbekannt", grund: "gewerbe" };
+export function naechsteMieterhoehung(mv: { einheitArt: Nutzungsart; beginn: IsoDatum; letzteMieterhoehung: IsoDatum | null }): MieterhoehungErgebnis {
+  if (mv.einheitArt !== "WOHNUNG") return { art: "unbekannt", grund: mv.einheitArt === "STELLPLATZ" ? "stellplatz" : "gewerbe" };
   const basis = mv.letzteMieterhoehung && mv.letzteMieterhoehung > mv.beginn ? "letzteErhoehung" : "mietbeginn";
   const basisDatum = basis === "letzteErhoehung" ? mv.letzteMieterhoehung! : mv.beginn;
   return { art: "moeglich", verlangenAb: plusMonate(basisDatum, 12), wirksamAb: plusMonate(basisDatum, 15), basis, basisDatum };
@@ -48,6 +49,8 @@ export type FristTexte = {
   basisLetzte: string;
   basisBeginn: string;
   gewerbe: string;
+  /** Stellplätze: Erhöhung nach Vertrag; fehlt der Text, gilt der Gewerbetext */
+  stellplatz?: string;
 };
 
 export type FristEingabe = {
@@ -56,7 +59,7 @@ export type FristEingabe = {
     id: string;
     mieter: string;
     einheit: string;
-    einheitArt: "WOHNUNG" | "GEWERBE";
+    einheitArt: Nutzungsart;
     haus: string;
     gesellschaftId: string;
     beginn: IsoDatum;
@@ -100,7 +103,7 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
     }
     const erh = naechsteMieterhoehung(m);
     if (erh.art === "unbekannt") {
-      luecken.push({ art: "mieterhoehung", titel, unter: m.mieter, href, grund: t.gewerbe });
+      luecken.push({ art: "mieterhoehung", titel, unter: m.mieter, href, grund: erh.grund === "stellplatz" ? (t.stellplatz ?? t.gewerbe) : t.gewerbe });
     } else if (imRahmen(erh.verlangenAb) && (!m.ende || erh.wirksamAb <= m.ende)) {
       fristen.push({
         art: "mieterhoehung",

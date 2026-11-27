@@ -21,6 +21,7 @@ import type { Fakt, Luecke, Thema } from "./ki-analyse";
 import { hausSummen, istAktiv, type HausDaten } from "./kennzahlen";
 import { referenzzinsAm, restschuldNachweis, zinsbindung, zinssatz, type KreditDaten, type ReferenzWert } from "./kredit";
 import { jahresNettokaltmiete } from "./miete";
+import { inFlaeche, type Nutzungsart } from "./nutzungsart";
 
 export const VORSCHLAG_VERSION = 1;
 
@@ -70,7 +71,7 @@ export interface VorschlagEingabe {
   einheiten: Array<{
     id: string;
     bezeichnung: string;
-    art: "WOHNUNG" | "GEWERBE";
+    art: Nutzungsart;
     flaeche: Decimal;
     erwarteteMiete: Decimal | null;
     vertraege: Array<{ beginn: IsoDatum; ende: IsoDatum | null; sollMiete: Decimal; istMiete: Decimal; letzteMieterhoehung: IsoDatum | null }>;
@@ -119,6 +120,9 @@ export function baueVorschlagPaket(e: VorschlagEingabe, t: Texte, f: Formatierer
   const prozent = (d: Decimal, stellen = 2) => f.prozent(d, stellen);
   const proQm = (miete: Decimal, flaeche: Decimal) => (flaeche.isZero() ? null : miete.dividedBy(flaeche));
   const qmText = (w: Decimal | null) => (w === null ? t.allgemein.unbekannt : `${f.faktor(w, 2)} €/m²`);
+  // Stellplätze werden je Stück vermietet: keine Miete je m², keine Fläche in der Beschreibung.
+  const qmFuer = (u: { art: Nutzungsart; flaeche: Decimal }, miete: Decimal) => (inFlaeche(u.art) ? qmText(proQm(miete, u.flaeche)) : "–");
+  const flaecheFuer = (u: { art: Nutzungsart; flaeche: Decimal }) => (inFlaeche(u.art) ? f.flaeche(u.flaeche) : t.einheiten.jeStueck);
 
   // --- Stammdaten ------------------------------------------------------------------
   if (e.haus.kaufpreis) fakt("BEWERTUNG", tf.kaufpreis, f.betrag(e.haus.kaufpreis), e.haus.kaufdatum ? f.datum(e.haus.kaufdatum) : null, tf.quelleStammdaten);
@@ -126,14 +130,16 @@ export function baueVorschlagPaket(e: VorschlagEingabe, t: Texte, f: Formatierer
 
   // --- Vermietung heute ------------------------------------------------------------
   const summen = hausSummen(e.daten, s);
-  const flaeche = e.einheiten.reduce((x, y) => x.plus(y.flaeche), dezimal(0));
+  // Flächen nur Wohnen und Gewerbe; Stellplätze zählen in Stück (src/lib/nutzungsart.ts).
+  const flaeche = summen.flaeche;
   const leer = e.einheiten.filter((u) => !u.vertraege.some((m) => istAktiv(m, s)));
   fakt("VERMIETUNG", tf.bestand, fuelle(tf.bestandWert, { einheiten: e.einheiten.length, flaeche: f.flaeche(flaeche), leer: leer.length }), stichtagText, tf.quelleStammdaten);
   const sollMonat = summen.sollMonat;
   fakt("VERMIETUNG", tf.sollMiete, fuelle(tf.mieteWert, { monat: f.betrag(sollMonat), jahr: f.betrag(jahresNettokaltmiete(sollMonat)) }), stichtagText, tf.quelleMietvertraege);
   const vermietet = e.einheiten.filter((u) => u.vertraege.some((m) => istAktiv(m, s)));
-  const vermieteteFlaeche = vermietet.reduce((x, y) => x.plus(y.flaeche), dezimal(0));
-  fakt("VERMIETUNG", tf.sollProQm, qmText(proQm(sollMonat, vermieteteFlaeche)), stichtagText, tf.quelleMietvertraege);
+  const vermieteteFlaeche = vermietet.filter((u) => inFlaeche(u.art)).reduce((x, y) => x.plus(y.flaeche), dezimal(0));
+  const sollFlaeche = summen.nachArt.WOHNUNG.sollMonat.plus(summen.nachArt.GEWERBE.sollMonat);
+  fakt("VERMIETUNG", tf.sollProQm, qmText(proQm(sollFlaeche, vermieteteFlaeche)), stichtagText, tf.quelleMietvertraege);
   if (!sollMonat.isZero()) {
     const quote = summen.istMonat.dividedBy(sollMonat).times(100);
     fakt("VERMIETUNG", tf.istQuote, fuelle(tf.istQuoteWert, { quote: prozent(quote, 1), ist: f.betrag(summen.istMonat), soll: f.betrag(sollMonat) }), stichtagText, tf.quelleMietvertraege);
@@ -142,8 +148,8 @@ export function baueVorschlagPaket(e: VorschlagEingabe, t: Texte, f: Formatierer
   for (const u of leer) {
     const letzte = [...u.vertraege].filter((m) => m.ende && m.ende < s).sort((a, b) => (a.ende! < b.ende! ? 1 : -1))[0];
     const seit = letzte?.ende ? fuelle(tf.leerSeit, { datum: f.datum(letzte.ende), monate: monateZwischen(letzte.ende, s) }) : tf.leerOhneVertrag;
-    const erwartet = u.erwarteteMiete ? fuelle(tf.erwartet, { monat: f.betrag(u.erwarteteMiete), qm: qmText(proQm(u.erwarteteMiete, u.flaeche)) }) : tf.erwartetFehlt;
-    fakt("VERMIETUNG", fuelle(tf.leereEinheit, { einheit: u.bezeichnung }), `${t.einheitArten[u.art]}, ${f.flaeche(u.flaeche)}; ${seit}; ${erwartet}`, stichtagText, tf.quelleMietvertraege);
+    const erwartet = u.erwarteteMiete ? fuelle(tf.erwartet, { monat: f.betrag(u.erwarteteMiete), qm: qmFuer(u, u.erwarteteMiete) }) : tf.erwartetFehlt;
+    fakt("VERMIETUNG", fuelle(tf.leereEinheit, { einheit: u.bezeichnung }), `${t.einheitArten[u.art]}, ${flaecheFuer(u)}; ${seit}; ${erwartet}`, stichtagText, tf.quelleMietvertraege);
     if (!u.erwarteteMiete) luecke("VERMIETUNG", fuelle(tf.erwarteteMieteFehlt, { einheit: u.bezeichnung }));
   }
 
@@ -156,7 +162,7 @@ export function baueVorschlagPaket(e: VorschlagEingabe, t: Texte, f: Formatierer
     fakt(
       "VERMIETUNG",
       fuelle(tf.vertrag, { einheit: u.bezeichnung }),
-      fuelle(tf.vertragWert, { art: t.einheitArten[u.art], flaeche: f.flaeche(u.flaeche), soll: f.betrag(m.sollMiete), qm: qmText(proQm(m.sollMiete, u.flaeche)), erhoehung }),
+      fuelle(tf.vertragWert, { art: t.einheitArten[u.art], flaeche: flaecheFuer(u), soll: f.betrag(m.sollMiete), qm: qmFuer(u, m.sollMiete), erhoehung }),
       zeitraum,
       tf.quelleMietvertrag,
     );
@@ -169,7 +175,7 @@ export function baueVorschlagPaket(e: VorschlagEingabe, t: Texte, f: Formatierer
   const proJahr = new Map<number, { miete: Decimal; flaeche: Decimal; anzahl: number }>();
   for (const { u, m } of alle) {
     const j = jahr(m.beginn);
-    if (j < abJahr || m.beginn > s || u.flaeche.isZero()) continue;
+    if (j < abJahr || m.beginn > s || !inFlaeche(u.art) || u.flaeche.isZero()) continue;
     const x = proJahr.get(j) ?? { miete: dezimal(0), flaeche: dezimal(0), anzahl: 0 };
     proJahr.set(j, { miete: x.miete.plus(m.sollMiete), flaeche: x.flaeche.plus(u.flaeche), anzahl: x.anzahl + 1 });
   }

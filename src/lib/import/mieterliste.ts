@@ -19,8 +19,9 @@ import { Decimal } from "../geld";
 import { plusTage, type IsoDatum } from "../datum";
 import { ueberschneiden } from "../mietverhaeltnis";
 import { dekodiere, findeTabelle, leseCsv, leseDatum, leseZahl, normalisiere } from "./csv";
+import type { Nutzungsart } from "../nutzungsart";
 
-export type EinheitArtText = "WOHNUNG" | "GEWERBE";
+export type EinheitArtText = Nutzungsart;
 
 export const MIETERLISTE_SPALTEN = {
   einheit: ["einheit", "einheitnr", "mieteinheit", "wohnung", "wohnungsnr", "whg", "whgnr", "nr", "nummer", "bezeichnung"],
@@ -68,6 +69,7 @@ const LEER_MIETER = /^(leer|leerstand|frei|unvermietet|-+|–)$/i;
 function leseArt(text: string): EinheitArtText | null {
   const s = normalisiere(text);
   if (!s) return null;
+  if (/stellplatz|stellpl|garage|parkplatz|tiefgarage|carport|^tg|^sp$|parking/.test(s)) return "STELLPLATZ";
   if (/gewerb|laden|buero|praxis|gastro|commercial|retail|office/.test(s)) return "GEWERBE";
   if (/wohn|whg|apartment|residential/.test(s)) return "WOHNUNG";
   return null;
@@ -384,7 +386,7 @@ export function schreibeMieterliste(einheiten: BestandEinheit[], stand: IsoDatum
     const m = e.mietverhaeltnisse.find((x) => x.beginn <= stand && (x.ende === null || x.ende >= stand));
     zeilen.push([
       e.bezeichnung,
-      e.art === "GEWERBE" ? "Gewerbe" : "Wohnung",
+      e.art === "GEWERBE" ? "Gewerbe" : e.art === "STELLPLATZ" ? "Stellplatz" : "Wohnung",
       deZahl(e.flaeche),
       m?.mieterName ?? "",
       deDatum(m?.beginn ?? null),

@@ -5,7 +5,9 @@
 import type { Decimal } from "@/lib/geld";
 import { alsDbDatum, type IsoDatum } from "@/lib/datum";
 
-export const FARBEN = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed", "#be123c", "#4d7c0f", "#0369a1", "#a16207"];
+/** Allgemeine Diagrammfarben, zentral in src/lib/farben.ts. */
+import { DIAGRAMM_FARBEN } from "@/lib/farben";
+export const FARBEN = DIAGRAMM_FARBEN;
 
 /** Punkte mit y = null sind unbekannt: die Linie wird dort unterbrochen statt auf 0 gezogen. */
 export type Reihe = { name: string; farbe?: string; punkte: { x: IsoDatum; y: Decimal | null }[]; gestrichelt?: boolean };

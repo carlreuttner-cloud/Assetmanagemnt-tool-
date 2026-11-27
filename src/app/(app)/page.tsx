@@ -13,6 +13,7 @@ import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { gruppenKennzahlen, zeitreihe, zinsbindungsProfil } from "@/lib/kennzahlen";
 import { ermittleWarnungen, type Warnung } from "@/lib/warnungen";
+import { LeerstandKreis, LeerstandZelle } from "@/components/nutzungsart";
 
 const ARTEN = ["zinsbindung", "covenant", "sperre", "rueckstand", "leerstand", "liquiditaet"] as const;
 const MAX_WARNUNGEN = 12;
@@ -192,6 +193,9 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
             <>
               {`${gesamt.leereEinheiten} / ${gesamt.einheiten} ${tk.einheiten} · ${tk.erwartetLeer}: `}
               <Kennzahl art="erwartetLeerMonat" {...p} /> ({t.allgemein.jahr} {f.jahresmiete(gesamt.erwartetLeerMonat)})
+              <div className="mt-2">
+                <LeerstandKreis nachArt={gesamt.nachArt} t={t} f={f} groesse={40} legende />
+              </div>
             </>
           }
           ton={gesamt.leerstandQuote && gesamt.leerstandQuote.greaterThanOrEqualTo(10) ? "warnung" : undefined}
@@ -341,7 +345,9 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
                     <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
                   </td>
                   <td className={rechts}>{gesamtMiete.isZero() ? "–" : f.prozent(k.sollJahr.dividedBy(gesamtMiete).times(100), 1)}</td>
-                  <td className={rechts}>{f.prozent(k.leerstandQuote, 1)}</td>
+                  <td className={rechts}>
+                    <LeerstandZelle quote={f.prozent(k.leerstandQuote, 1)} nachArt={k.nachArt} t={t} f={f} />
+                  </td>
                   <td className={rechts}>
                     <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
                   </td>
