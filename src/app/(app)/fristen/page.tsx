@@ -1,0 +1,181 @@
+import Link from "next/link";
+import { Kachel, Kacheln, Karte, Leer, Marke, Reiter, Seitenkopf, Tabelle, type Ton } from "@/components/ui";
+import { fuelle, texte, type Texte } from "@/i18n";
+import { pruefeZugriff } from "@/lib/auth/kontext";
+import { alsDbDatum, heute, plusMonate } from "@/lib/datum";
+import { ladeFristEingabe } from "@/lib/daten/fristen";
+import { einParam, filterHref } from "@/lib/filter";
+import { formatierer } from "@/lib/format";
+import { FRIST_ARTEN, nachMonat, sammleFristen, type Frist, type FristArt } from "@/lib/fristen";
+
+const ZEITRAEUME = ["12", "24", "36", "alle"] as const;
+const TON: Record<FristArt, Ton> = { zinsbindung: "schlecht", kreditende: "warnung", mietende: "warnung", mieterhoehung: "gut" };
+
+export default async function FristenSeite({ searchParams }: PageProps<"/fristen">) {
+  const sp = await searchParams;
+  const kontext = await pruefeZugriff("uebersicht");
+  const t = texte(kontext.mandant.sprache);
+  const f = formatierer(kontext.mandant);
+  const tf = t.fristen;
+  const stichtag = heute();
+  const zeitraum = ZEITRAEUME.find((z) => z === sp.zeitraum) ?? "12";
+  const art = FRIST_ARTEN.find((a) => a === sp.art);
+  const filter = { zeitraum: zeitraum === "12" ? undefined : zeitraum, art, g: einParam(sp.g) };
+  const bis = zeitraum === "alle" ? null : plusMonate(stichtag, Number(zeitraum));
+
+  const eingabe = await ladeFristEingabe(kontext);
+  const { fristen: alle, luecken } = sammleFristen(eingabe, stichtag, bis, tf, (d) => f.datum(d));
+  const nachG = filter.g ? alle.filter((x) => x.gesellschaftId === filter.g) : alle;
+  const fristen = art ? nachG.filter((x) => x.art === art) : nachG;
+  const { faellig, monate } = nachMonat(fristen, stichtag);
+  const monatsName = new Intl.DateTimeFormat(f.sprache, { timeZone: "UTC", month: "long", year: "numeric" });
+  const anzahl = (a: FristArt) => nachG.filter((x) => x.art === a && x.datum >= stichtag).length;
+
+  return (
+    <div className="space-y-6">
+      <Seitenkopf titel={tf.titel} beschreibung={tf.beschreibung} />
+
+      <div>
+        <Reiter
+          eintraege={ZEITRAEUME.map((z) => ({
+            href: filterHref("/fristen", filter, "zeitraum", z === "12" ? undefined : z),
+            text: z === "alle" ? tf.alle : fuelle(tf.monate, { anzahl: z }),
+            aktiv: zeitraum === z,
+          }))}
+        />
+        <Reiter
+          eintraege={[
+            { href: filterHref("/fristen", filter, "art", undefined), text: tf.alleArten, aktiv: !art },
+            ...FRIST_ARTEN.map((a) => ({ href: filterHref("/fristen", filter, "art", a), text: tf.arten[a], aktiv: art === a })),
+          ]}
+        />
+        {eingabe.gesellschaften.length > 1 && (
+          <Reiter
+            eintraege={[
+              { href: filterHref("/fristen", filter, "g", undefined), text: tf.alleGesellschaften, aktiv: !filter.g },
+              ...eingabe.gesellschaften.map((g) => ({ href: filterHref("/fristen", filter, "g", g.id), text: g.name, aktiv: filter.g === g.id })),
+            ]}
+          />
+        )}
+      </div>
+
+      <Kacheln>
+        {FRIST_ARTEN.map((a) => (
+          <Kachel key={a} titel={tf.arten[a]} wert={anzahl(a)} unter={zeitraum === "alle" ? tf.alle : fuelle(tf.monate, { anzahl: zeitraum })} />
+        ))}
+      </Kacheln>
+
+      {faellig.length > 0 && (
+        <Karte titel={`${tf.faellig} (${faellig.length})`}>
+          <p className="-mt-2 mb-3 text-xs text-slate-500">{tf.faelligHinweis}</p>
+          <FaelligListe fristen={faellig} t={t} datum={(d) => f.datum(d)} />
+        </Karte>
+      )}
+
+      {monate.length === 0 && faellig.length === 0 ? (
+        <Karte>
+          <Leer>{tf.keine}</Leer>
+        </Karte>
+      ) : (
+        monate.map(([monat, liste]) => (
+          <Karte key={monat} titel={`${monatsName.format(alsDbDatum(`${monat}-01`))} · ${liste.length === 1 ? tf.eineFrist : fuelle(tf.anzahl, { anzahl: liste.length })}`}>
+            <FristTabelle fristen={liste} t={t} datum={(d) => f.datum(d)} />
+          </Karte>
+        ))
+      )}
+
+      {luecken.length > 0 && (!art || art === "mieterhoehung") && (
+        <Karte titel={`${tf.luecken} (${luecken.length})`}>
+          <p className="mb-3 text-xs text-slate-500">{tf.lueckenHinweis}</p>
+          <details>
+            <summary className="cursor-pointer text-sm text-slate-700">{luecken[0].grund}</summary>
+            <ul className="mt-2 space-y-1 text-sm">
+              {luecken.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="hover:underline">
+                    {l.titel}
+                  </Link>
+                  <span className="text-xs text-slate-500"> · {l.unter}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </Karte>
+      )}
+
+      <p className="text-xs text-slate-500">
+        <span className="font-medium">{tf.regeln}:</span> {tf.regelText}
+      </p>
+    </div>
+  );
+}
+
+function FristTabelle({ fristen, t, datum }: { fristen: Frist[]; t: Texte; datum: (d: string) => string }) {
+  const tf = t.fristen;
+  return (
+    <Tabelle>
+      <thead>
+        <tr>
+          <th>{tf.datum}</th>
+          <th>{t.listen.art}</th>
+          <th>{tf.objekt}</th>
+          <th>{tf.grundlage}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {fristen.map((x) => (
+          <tr key={`${x.art}-${x.href}`} className="align-top hover:bg-slate-50">
+            <td className="whitespace-nowrap">{datum(x.datum)}</td>
+            <td>
+              <Marke ton={TON[x.art]}>{tf.arten[x.art]}</Marke>
+            </td>
+            <td>
+              <Link href={x.href} className="font-medium hover:underline">
+                {x.titel}
+              </Link>
+              <div className="text-xs text-slate-500">{x.unter}</div>
+            </td>
+            <td className="max-w-md text-xs text-slate-600">{x.grundlage}</td>
+          </tr>
+        ))}
+      </tbody>
+    </Tabelle>
+  );
+}
+
+/** Fällige Fristen; schon mögliche Mieterhöhungen je Haus zusammengefasst, weil es viele sein können. */
+function FaelligListe({ fristen, t, datum }: { fristen: Frist[]; t: Texte; datum: (d: string) => string }) {
+  const andere = fristen.filter((x) => x.art !== "mieterhoehung");
+  const erhoehungen = fristen.filter((x) => x.art === "mieterhoehung");
+  const jeHaus = new Map<string, Frist[]>();
+  for (const x of erhoehungen) {
+    const haus = x.titel.split(" · ").slice(1).join(" · ");
+    jeHaus.set(haus, [...(jeHaus.get(haus) ?? []), x]);
+  }
+  return (
+    <div className="space-y-4">
+      {andere.length > 0 && <FristTabelle fristen={andere} t={t} datum={datum} />}
+      {jeHaus.size > 0 && (
+        <div>
+          <div className="mb-2">
+            <Marke ton={TON.mieterhoehung}>{t.fristen.arten.mieterhoehung}</Marke>
+          </div>
+          <div className="space-y-1">
+            {[...jeHaus.entries()]
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([haus, liste]) => (
+                <details key={haus} className="rounded border border-slate-100 px-3 py-1.5">
+                  <summary className="cursor-pointer text-sm">
+                    <span className="font-medium">{haus}</span> <span className="text-slate-500">· {fuelle(t.fristen.proHaus, { anzahl: liste.length })}</span>
+                  </summary>
+                  <div className="mt-2">
+                    <FristTabelle fristen={liste} t={t} datum={datum} />
+                  </div>
+                </details>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

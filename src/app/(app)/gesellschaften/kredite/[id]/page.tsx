@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Merken } from "@/components/merken";
 import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
 import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/components/kredit-marken";
@@ -94,12 +95,15 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
         beschreibung={[kredit.bank, kredit.kreditnummer].filter(Boolean).join(" · ")}
         zurueck={{ href: `/gesellschaften/${kredit.gesellschaft.id}`, text: kredit.gesellschaft.name }}
         aktionen={
-          schreiben && (
-            <>
-              {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href="/import?art=kredite">{t.importe.buchungenImportieren}</KnopfLink>}
-              <KnopfLink href={`/gesellschaften/kredite/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
-            </>
-          )
+          <>
+            <Merken kontext={kontext} t={t} art="kredit" pfad={`/gesellschaften/kredite/${id}`} titel={kredit.bezeichnung} />
+            {schreiben && (
+              <>
+                {darf(kontext.rolle, "import", "schreiben") && <KnopfLink href="/import?art=kredite">{t.importe.buchungenImportieren}</KnopfLink>}
+                <KnopfLink href={`/gesellschaften/kredite/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
+              </>
+            )}
+          </>
         }
       />
 
