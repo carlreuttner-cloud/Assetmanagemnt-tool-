@@ -71,6 +71,7 @@ model Mandant {
   kiAnalysen              KiAnalyse[]
   portfolios              Portfolio[]
   lesezeichen             Lesezeichen[]
+  dokumentSeiten          DokumentSeite[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -91,6 +92,7 @@ model Benutzer {
   szenarien           Szenario[]
   kiAnalysen          KiAnalyse[]
   lesezeichen         Lesezeichen[]
+  dokumente           Dokument[]
 }
 
 model Mitgliedschaft {
@@ -689,29 +691,74 @@ model Investition {
 
 /// Dokument mit optionalem Bezug zu genau einem Objekt (Gesellschaft, Haus, ...).
 model Dokument {
-  id                String   @id @default(cuid())
+  id                String              @id @default(cuid())
   mandantId         String
+  /// Einheitlicher Name, z. B. "Jahresabschluss 2025 – Lindenhof Wohnen GmbH & Co. KG"
   titel             String
   /// z. B. "Kaufvertrag", "Mietvertrag", "Kreditvertrag", "Gutachten"
   kategorie         String?
+  /// Geschäftsjahr bzw. Jahr, auf das sich das Dokument bezieht
+  jahr              Int?
+  /// Datum bzw. Stand des Dokuments
+  dokumentDatum     DateTime?           @db.Date
   speicherPfad      String
+  /// Originaler Dateiname beim Hochladen (bleibt unverändert gespeichert)
   dateiname         String
   mimeType          String
   groesseBytes      Int
+  /// SHA-256 des Inhalts, um doppelte Uploads zu erkennen
+  pruefsumme        String?
+  /// Name und Zuordnung vom Benutzer bestätigt; vorher nur Vorschlag
+  bestaetigt        Boolean             @default(false)
+  /// Woher der durchsuchbare Text stammt
+  textQuelle        DokumentTextQuelle?
+  /// z. B. "Texterkennung nicht installiert" oder "nur die ersten 40 Seiten erkannt"
+  textHinweis       String?
+  seitenAnzahl      Int?
+  hochgeladenVonId  String?
   gesellschaftId    String?
   hausId            String?
   einheitId         String?
   mietverhaeltnisId String?
   kreditId          String?
-  erstelltAm        DateTime @default(now())
+  erstelltAm        DateTime            @default(now())
+  geaendertAm       DateTime            @default(now()) @updatedAt
 
   mandant         Mandant          @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  hochgeladenVon  Benutzer?        @relation(fields: [hochgeladenVonId], references: [id], onDelete: SetNull)
   gesellschaft    Gesellschaft?    @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
   haus            Haus?            @relation(fields: [hausId], references: [id], onDelete: SetNull)
   einheit         Einheit?         @relation(fields: [einheitId], references: [id], onDelete: SetNull)
   mietverhaeltnis Mietverhaeltnis? @relation(fields: [mietverhaeltnisId], references: [id], onDelete: SetNull)
   kredit          Kredit?          @relation(fields: [kreditId], references: [id], onDelete: SetNull)
+  seiten          DokumentSeite[]
 
+  @@index([mandantId])
+  @@index([mandantId, bestaetigt])
+}
+
+enum DokumentTextQuelle {
+  /// Textebene des PDFs
+  PDF_TEXT
+  /// Texterkennung (OCR) eines Scans oder Bildes
+  OCR
+  /// Kein Text gefunden bzw. nicht erkennbar
+  KEINE
+}
+
+/// Durchsuchbarer Text je Seite (aus der Textebene oder per OCR), für die Volltextsuche mit Seitenangabe.
+model DokumentSeite {
+  id         String   @id @default(cuid())
+  mandantId  String
+  dokumentId String
+  /// Seitennummer ab 1
+  nummer     Int
+  text       String
+
+  mandant  Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  dokument Dokument @relation(fields: [dokumentId], references: [id], onDelete: Cascade)
+
+  @@unique([dokumentId, nummer])
   @@index([mandantId])
 }
 

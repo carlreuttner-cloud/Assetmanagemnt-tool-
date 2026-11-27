@@ -18,6 +18,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     UPLOAD_DIR=/app/uploads
+# Texterkennung für Dokumente: pdftotext/pdftoppm (poppler) und tesseract mit deutschen Sprachdaten
+RUN apk add --no-cache poppler-utils tesseract-ocr tesseract-ocr-data-deu
 RUN addgroup -S app && adduser -S app -G app && mkdir -p /app/uploads && chown app:app /app/uploads
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static

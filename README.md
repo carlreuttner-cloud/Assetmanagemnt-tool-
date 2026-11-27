@@ -32,6 +32,10 @@ Stoppen mit `docker compose down`. Die Daten bleiben im Docker-Volume erhalten; 
 ## Entwicklung ohne App-Container
 
 Schneller für die tägliche Arbeit, weil Änderungen sofort sichtbar sind. Voraussetzung: Node.js 22.
+Für die Texterkennung von Dokumenten (Volltextsuche, eingescannte PDFs) zusätzlich poppler und
+tesseract mit deutschen Sprachdaten, z. B. auf dem Mac `brew install poppler tesseract tesseract-lang`,
+unter Debian/Ubuntu `apt install poppler-utils tesseract-ocr tesseract-ocr-deu`. Ohne sie werden
+Dokumente gespeichert, sind aber nicht durchsuchbar (die Ansicht sagt das). Im Docker-Image ist beides enthalten.
 
 ```bash
 cp .env.example .env            # alle Platzhalter ersetzen (AUTH_SECRET z. B. mit: openssl rand -base64 32)
@@ -74,7 +78,7 @@ prisma/
   schema.prisma          Datenmodell (mit Kommentaren)
   migrations/            Datenbank-Migrationen
   seed.ts                Testdaten (Demo-Benutzer und Testportfolio)
-  testdaten/             Generator für das Testportfolio
+  testdaten/             Generator für das Testportfolio, Testdokumente (dateien/*.pdf, als TESTDOKUMENT gekennzeichnet)
 src/
   auth.ts                Anmeldung (Auth.js)
   app/
@@ -96,7 +100,9 @@ src/
     szenario.ts          Was-wäre-wenn-Vorschau über mehrere Jahre (Zinsen, Mieten, Leerstand, Verkauf)
     warnungen.ts         Warnungen der Übersicht (Zinsbindung, Covenants, Rückstände, Leerstand) mit Schwellen
     mietverhaeltnis.ts   Status, Monate seit Mieterhöhung, Überschneidungsprüfung
-    dateispeicher.ts     Fotos im UPLOAD_DIR je Mandant, Typprüfung am Dateiinhalt
+    dateispeicher.ts     Fotos und Dokumente im UPLOAD_DIR je Mandant, Typprüfung am Dateiinhalt
+    dokument-text.ts     Text je Seite aus PDFs (Textebene, sonst Texterkennung mit tesseract)
+    dokument-vorschlag.ts Kategorie, Jahr/Datum, Zuordnung und einheitlicher Name beim Dokument-Upload
     import/              CSV lesen (Zeichensatz, Trennzeichen, Zahlen, Daten), Bank-CSVs, Mieterlisten-Abgleich
     navigation.ts        Einträge der Seitenleiste
   i18n/                  Oberflächentexte (vorerst nur Deutsch)

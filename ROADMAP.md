@@ -37,7 +37,7 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 - [x] **Phase 15: Globale Suche und Quellen-Schalter.** Suche links unten über Mieter, Kredite, IBANs, Gesellschaften und Häuser mit Sprung zum Treffer. Schalter ganz oben: Stichtage und Quellen aller Zahlen ein- oder ausblenden.
 - [x] **Phase 16: Fristen-Kalender, Favoriten, zuletzt angesehen.** Kalender mit Zinsbindungsenden, möglichen Mieterhöhungen und Vertragsenden; Favoriten und zuletzt angesehene Objekte je Benutzer.
 - [x] **Phase 17: Export.** Excel und PDF aus jeder Ansicht (ersetzt „Berichte“), mit Stichtag und Quellen.
-- [ ] **Phase 18: Dateien und Importe.** Reiter „Dateien und Importe“: einheitliche Benennung beim Import (z. B. „Jahresabschluss 2025 – Gesellschaft XY“, Originalname bleibt), Name und Zuordnung vor dem Speichern bestätigen; OCR für eingescannte PDFs; Volltextsuche nur hier, öffnet das Dokument an der Fundstelle und hebt sie hervor.
+- [x] **Phase 18: Dateien und Importe.** Reiter „Dateien und Importe“: einheitliche Benennung beim Import (z. B. „Jahresabschluss 2025 – Gesellschaft XY“, Originalname bleibt), Name und Zuordnung vor dem Speichern bestätigen; OCR für eingescannte PDFs; Volltextsuche nur hier, öffnet das Dokument an der Fundstelle und hebt sie hervor.
 - [ ] **Phase 19: Bewertung.** Reiter „Bewertung“: Gutachten und Marktwerte je Haus und Portfolio im Zeitverlauf, Bodenwert und Gebäudewert getrennt, Veränderung zum Vorgutachten.
 - [ ] **Phase 20: Kapitalkonten der Gesellschafter.** Einzahlungen, Anteile, Ausschüttungen und Saldo je Gesellschafter.
 - [ ] **Phase 21: Investitionen mit Budget und Rendite.** Budget, Ist-Kosten, Abweichung und Rendite aus Mehrmiete je Maßnahme.

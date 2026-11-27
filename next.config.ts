@@ -5,8 +5,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
-    // Foto-Uploads (höchstens 10 MB, siehe src/lib/dateispeicher.ts) plus Formularfelder
-    serverActions: { bodySizeLimit: "11mb" },
+    // Dokument-Uploads (höchstens 30 MB, Fotos 10 MB, siehe src/lib/dateispeicher.ts) plus Formularfelder
+    serverActions: { bodySizeLimit: "31mb" },
   },
   turbopack: {
     rules: {
