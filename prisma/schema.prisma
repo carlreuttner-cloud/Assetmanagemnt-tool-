@@ -60,6 +60,7 @@ model Mandant {
   investitionen           Investition[]
   massnahmen              Massnahme[]
   bankkontostaende        Bankkontostand[]
+  zinssicherungen         Zinssicherung[]
   planpositionen          Planposition[]
   dokumente               Dokument[]
   aenderungsprotokoll     Aenderungsprotokoll[]
@@ -493,9 +494,44 @@ model Kredit {
   dokumente         Dokument[]
   importe           Importvorgang[]
   dokumentnachweise Dokumentnachweis[]
+  zinssicherungen   Zinssicherung[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
+}
+
+enum ZinssicherungArt {
+  /// Zinsobergrenze: der Referenzzins zählt höchstens bis zum Cap-Satz
+  CAP
+  /// Payer-Swap: statt des Referenzzinses wird der feste Swap-Satz gezahlt
+  SWAP
+}
+
+/// Zinssicherung (Cap oder Swap) zu einem variablen Kredit.
+model Zinssicherung {
+  id          String           @id @default(cuid())
+  mandantId   String
+  kreditId    String
+  art         ZinssicherungArt
+  /// Cap: Obergrenze des Referenzzinses; Swap: fester Satz statt des Referenzzinses (Prozent p. a.)
+  satz        Decimal          @db.Decimal(9, 6)
+  /// Gesicherter Betrag; null = die gesamte Restschuld
+  nominal     Decimal?         @db.Decimal(14, 2)
+  beginn      DateTime         @db.Date
+  ende        DateTime         @db.Date
+  bank        String?
+  /// Einmalige Prämie (Cap), nur zur Information
+  praemie     Decimal?         @db.Decimal(14, 2)
+  quelle      String?
+  notiz       String?
+  erstelltAm  DateTime         @default(now())
+  geaendertAm DateTime         @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([kreditId])
 }
 
 /// Stand eines Referenzzinses (z. B. 3M-EURIBOR) zu einem Stichtag. Daraus wird der

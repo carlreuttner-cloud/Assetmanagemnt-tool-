@@ -1,5 +1,5 @@
 /**
- * Fristen-Kalender: Zinsbindungsenden, Kreditlaufzeiten, Mietvertragsenden und mögliche
+ * Fristen-Kalender: Zinsbindungsenden, Kreditlaufzeiten, Enden von Zinssicherungen, Mietvertragsenden und mögliche
  * Mieterhöhungen. Reine Funktionen ohne Datenbank.
  *
  * Mieterhöhung (nur Wohnraum, Vergleichsmiete nach § 558 BGB): Das Erhöhungsverlangen ist
@@ -9,7 +9,7 @@
  */
 import { plusMonate, type IsoDatum } from "./datum";
 
-export const FRIST_ARTEN = ["zinsbindung", "kreditende", "mietende", "mieterhoehung"] as const;
+export const FRIST_ARTEN = ["zinsbindung", "kreditende", "sicherungsende", "mietende", "mieterhoehung"] as const;
 export type FristArt = (typeof FRIST_ARTEN)[number];
 
 export type Frist = {
@@ -41,6 +41,8 @@ export function naechsteMieterhoehung(mv: { einheitArt: "WOHNUNG" | "GEWERBE"; b
 export type FristTexte = {
   grundZinsbindung: string;
   grundKreditende: string;
+  /** mit {art} und {satz} */
+  grundSicherungsende?: string;
   grundMietende: string;
   grundMieterhoehung: string;
   basisLetzte: string;
@@ -49,7 +51,7 @@ export type FristTexte = {
 };
 
 export type FristEingabe = {
-  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null }>;
+  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }> }>;
   mietverhaeltnisse: Array<{
     id: string;
     mieter: string;
@@ -82,6 +84,10 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
     }
     if (k.laufzeitBis && imRahmen(k.laufzeitBis)) {
       fristen.push({ art: "kreditende", datum: k.laufzeitBis, titel: k.bezeichnung, unter: k.gesellschaft, href, gesellschaftId: k.gesellschaftId, grundlage: t.grundKreditende });
+    }
+    for (const s of k.sicherungen ?? []) {
+      if (s.ende < stichtag || !imRahmen(s.ende)) continue; // abgelaufene Sicherungen sind keine Frist mehr
+      fristen.push({ art: "sicherungsende", datum: s.ende, titel: k.bezeichnung, unter: k.gesellschaft, href, gesellschaftId: k.gesellschaftId, grundlage: fuelle(t.grundSicherungsende ?? "", { art: s.art, satz: s.satz }) });
     }
   }
 

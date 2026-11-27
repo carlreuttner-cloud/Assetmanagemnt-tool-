@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RestschuldWert, ZinssatzWert } from "@/components/herleitung";
+import { aktiveSicherungen } from "@/lib/kredit";
 import { ZinsbindungMarke } from "@/components/kredit-marken";
 import { KnopfLink, Leer, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { texte } from "@/i18n";
@@ -116,6 +117,11 @@ export default async function KrediteSeite({ searchParams }: PageProps<"/kredite
                     <td>
                       {t.zinsArten[k.zinsArt]}
                       {k.referenzzins && <div className="text-xs text-slate-500">{k.referenzzins}</div>}
+                      {d && aktiveSicherungen(d, stichtag).map((x) => (
+                        <div key={x.id} className="text-xs text-teal-700">
+                          {t.zinssicherungen.arten[x.art]} {f.prozent(x.satz, 2)}
+                        </div>
+                      ))}
                     </td>
                     <td className={rechts}>{f.betrag(k.ursprungsbetrag)}</td>
                     <td className={rechts}>{d && <ZinssatzWert k={d} referenzwerte={referenzwerte} stichtag={stichtag} t={t} f={f} />}</td>

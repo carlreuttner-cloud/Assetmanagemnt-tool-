@@ -3,6 +3,7 @@ import { bereichsSicht } from "@/lib/auth/auswahl";
 import type { Kontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { isoDatum } from "@/lib/datum";
+import { dezimal, formatProzent } from "@/lib/geld";
 import type { FristEingabe } from "@/lib/fristen";
 import { erlaubt } from "./portfolio";
 
@@ -16,7 +17,15 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
     mitKrediten
       ? kontext.db.kredit.findMany({
           where: { gesellschaftId: erlaubt(sicht.gesellschaftIds) },
-          select: { id: true, bezeichnung: true, zinsArt: true, zinsbindungBis: true, laufzeitBis: true, gesellschaft: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            bezeichnung: true,
+            zinsArt: true,
+            zinsbindungBis: true,
+            laufzeitBis: true,
+            gesellschaft: { select: { id: true, name: true } },
+            zinssicherungen: { select: { art: true, satz: true, ende: true } },
+          },
         })
       : [],
     mitMietern
@@ -43,6 +52,7 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
       zinsArt: k.zinsArt,
       zinsbindungBis: isoDatum(k.zinsbindungBis),
       laufzeitBis: isoDatum(k.laufzeitBis),
+      sicherungen: k.zinssicherungen.map((s) => ({ art: s.art === "CAP" ? "Cap" : "Swap", satz: formatProzent(dezimal(s.satz), { sprache: kontext.mandant.sprache }), ende: isoDatum(s.ende) })),
     })),
     mietverhaeltnisse: mvs.map((m) => ({
       id: m.id,

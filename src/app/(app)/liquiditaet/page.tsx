@@ -82,6 +82,7 @@ export default async function LiquiditaetSeite({ searchParams }: PageProps<"/liq
   const hinweisTexte = [
     ...plan.hinweise.zinsbindungEndet.map((id) => fuelle(tl.hinweisZinsbindung, { kredit: kreditName.get(id) ?? "" })),
     ...plan.hinweise.variabel.map((id) => fuelle(tl.hinweisVariabel, { kredit: kreditName.get(id) ?? "" })),
+    ...plan.hinweise.sicherungEndet.map((id) => fuelle(tl.hinweisSicherung, { kredit: kreditName.get(id) ?? "" })),
     ...plan.hinweise.massnahmeUeberfaellig.map((id) => fuelle(tl.hinweisUeberfaellig, { massnahme: massnahmeName(id) })),
   ];
   const summeHerleitung = (formel: string, wert: Decimal) => (

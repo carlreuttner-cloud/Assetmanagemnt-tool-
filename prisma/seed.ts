@@ -15,6 +15,7 @@ import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 import { legeTestdokumenteAn } from "./testdaten/dateien";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
+import { baueZinssicherungen } from "./testdaten/zinssicherungen";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Der Seed löscht alle Daten und darf nicht in Produktion laufen.");
@@ -191,6 +192,12 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     data: p.kredite.flatMap((k) => k.haeuser.map((x) => ({
       mandantId, kreditId: kredit.get(k.schluessel)!, hausId: haus.get(x.haus)!, anteilProzent: prozent(x.anteilProzent),
     }))),
+  });
+  await db.zinssicherung.createMany({
+    data: baueZinssicherungen(p.kredite).map((z) => ({
+      mandantId, kreditId: kredit.get(z.kredit)!, art: z.art, satz: prozent(z.satz), nominal: z.nominal ? geld(z.nominal) : null,
+      beginn: tag(z.beginn), ende: tag(z.ende), bank: BANKEN[p.kredite.find((k) => k.schluessel === z.kredit)!.bank].name, praemie: z.praemie ? geld(z.praemie) : null, quelle: z.quelle, notiz: z.notiz,
+    })),
   });
   await db.covenant.createMany({
     data: p.kredite.flatMap((k) => k.covenants.map((c) => ({
