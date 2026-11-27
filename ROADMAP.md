@@ -22,7 +22,7 @@ Werden mit Testdaten entwickelt, je Phase ein eigener Branch und Pull Request.
 Fachliche Regeln für alle Phasen stehen in `CLAUDE.md` (Quelle, Stichtag und Berechnung je Zahl; unbekannt statt 0; Restschuld nur aus belegten Salden; Abkürzungen erklären).
 
 - [x] **Phase 7: Nachvollziehbarkeit und belegte Salden.** Herleitung (Quelle, Stichtag, Berechnung) für die wesentlichen Kennzahlen in allen Ansichten nachrüsten; fehlende Werte als „unbekannt“ statt 0; Glossar für Abkürzungen. Belegte Kreditsalden je Kredit und Jahr (Quelle, Stichtag, Status Entwurf/belegt, unklare Stichtage getrennt), Jahrestabelle und Diagramm je Kredit; Guthaben getrennt von Darlehen.
-- [ ] **Phase 8: Covenant-Headroom und Ausschüttungssperren.** Puffer je Covenant bis zur Grenze (absolut und in %, z. B. wie viel Miete fehlen dürfte), Ausschüttungssperren mit Bedingungen und aktuellem Status.
+- [x] **Phase 8: Covenant-Headroom und Ausschüttungssperren.** Puffer je Covenant bis zur Grenze (absolut und in %, z. B. wie viel Miete fehlen dürfte), Ausschüttungssperren mit Bedingungen und aktuellem Status.
 - [ ] **Phase 9: Gutachtenhistorie je Haus.** Gutachten mit Wert, Stichtag, Gutachter, Bewertungsfaktoren (Rohertrag, Vervielfältiger, Liegenschaftszins, Bewirtschaftungskosten …), Objektdetails und SWOT des Gutachters; Vergleich der Gutachten über die Zeit.
 - [ ] **Phase 10: Finanzen der Gesellschaften.** Bilanz, GuV, Cashflow und EBITDA je Geschäftsjahr mit Historie und Quelle (Jahresabschluss, BWA, Entwurf).
 - [ ] **Phase 11: Dokumenten-Checkliste.** Pflichtdokumente je Gesellschaft und Haus (z. B. Grundbuchauszug, Gutachten, Darlehensvertrag, Jahresabschluss) mit Status vorhanden/fehlt/veraltet. Ablage der Dateien selbst erst mit dem Dateispeicher der Produktionsreife.

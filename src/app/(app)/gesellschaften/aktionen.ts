@@ -14,6 +14,7 @@ const ZINSARTEN = ["FEST", "VARIABEL"] as const;
 const ZAHLWEISEN = ["MONATLICH", "QUARTALSWEISE", "HALBJAEHRLICH", "JAEHRLICH"] as const satisfies readonly ZahlweiseArt[];
 const TILGUNGSARTEN = ["ANNUITAET", "RATENTILGUNG", "ENDFAELLIG"] as const satisfies readonly TilgungsartArt[];
 const VERGLEICHE = ["HOECHSTENS", "MINDESTENS"] as const;
+const FOLGEN = ["COVENANT", "AUSSCHUETTUNGSSPERRE"] as const;
 const BUCHUNGSARTEN = ["ZINS", "TILGUNG", "SONDERTILGUNG", "GEBUEHR", "AUSZAHLUNG", "SONSTIGES"] as const;
 
 async function schreibKontext() {
@@ -154,6 +155,7 @@ export async function covenantHinzufuegen(kreditId: string, _v: AktionsErgebnis,
     await db.covenant.create({
       data: {
         kreditId,
+        folge: f.auswahl("folge", t.kredite.folge, FOLGEN),
         kennzahl: f.pflicht("kennzahl", t.kredite.kennzahl).toUpperCase(),
         vergleich: VERGLEICHE.find((v) => v === vergleich) ?? null,
         schwellenwert: zuText(f.zahlOptional("schwellenwert", t.kredite.schwellenwert)),

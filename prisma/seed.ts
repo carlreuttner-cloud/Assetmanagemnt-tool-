@@ -149,7 +149,7 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
   await db.covenant.createMany({
     data: p.kredite.flatMap((k) => k.covenants.map((c) => ({
       mandantId, kreditId: kredit.get(k.schluessel)!, kennzahl: c.kennzahl, vergleich: c.vergleich,
-      schwellenwert: c.schwellenwert, pruefrhythmus: c.pruefrhythmus,
+      schwellenwert: c.schwellenwert, pruefrhythmus: c.pruefrhythmus, folge: c.folge ?? "COVENANT", beschreibung: c.beschreibung ?? null,
     }))),
   });
   await db.kreditbuchung.createMany({

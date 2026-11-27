@@ -397,10 +397,16 @@ enum CovenantVergleich {
   MINDESTENS // Kennzahl darf den Schwellenwert nicht unterschreiten (z. B. DSCR)
 }
 
+enum CovenantFolge {
+  COVENANT // Vertragsauflage; Verletzung kann zur Kündigung oder Nachbesicherung führen
+  AUSSCHUETTUNGSSPERRE // bei Unterschreiten der Bedingung dürfen keine Ausschüttungen erfolgen (Lock-up)
+}
+
 model Covenant {
   id            String             @id @default(cuid())
   mandantId     String
   kreditId      String
+  folge         CovenantFolge      @default(COVENANT)
   /// Kennzahl, z. B. "LTV", "DSCR", "ICR"
   kennzahl      String
   vergleich     CovenantVergleich?

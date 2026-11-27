@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
-import { CovenantMarke, ZinsbindungMarke } from "@/components/kredit-marken";
+import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/components/kredit-marken";
+import { covenantPuffer, sperrenStatus } from "@/lib/covenant";
 import { Jahressaeulen } from "@/components/diagramme";
 import { Begriff, Glossar, Hinweismarke, KapitaldienstWert, MitHerleitung, RestschuldWert, Unbekannt, ZinssatzWert, type GlossarBegriff } from "@/components/herleitung";
 import { Angaben, Auswahl, Feld, Felder, Kachel, Kacheln, Karte, KnopfLink, Leer, Seitenkopf, Tabelle, rechts } from "@/components/ui";
@@ -335,7 +336,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
         </Karte>
       </div>
 
-      <Karte titel={tk.covenants}>
+      <Karte titel={<Begriff k="Covenant" t={t}>{tk.covenantsUndSperren}</Begriff>}>
         <p className="mb-3 text-xs text-slate-500">{tk.covenantHinweis}</p>
         {kredit.covenants.length === 0 ? (
           <Leer>{t.allgemein.keineDaten}</Leer>
@@ -343,10 +344,12 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           <Tabelle>
             <thead>
               <tr>
+                <th>{tk.folge}</th>
                 <th>{tk.kennzahl}</th>
                 <th>{tk.vergleich}</th>
                 <th className={rechts}>{tk.schwellenwert}</th>
                 <th className={rechts}>{tk.aktuellerWert}</th>
+                <th className={rechts}>{tk.puffer}</th>
                 <th>{tk.status}</th>
                 <th>{tk.pruefrhythmus}</th>
                 {schreiben && <th />}
@@ -356,10 +359,13 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
               {kredit.covenants.map((c) => {
                 const schwelle = c.schwellenwert ? dezimal(c.schwellenwert) : null;
                 const p = pruefeCovenant({ kennzahl: c.kennzahl, vergleich: c.vergleich, schwellenwert: schwelle }, { LTV: werte.ltv, DSCR: werte.dscr, ICR: werte.icr });
+                const puffer = covenantPuffer({ kennzahl: c.kennzahl, vergleich: c.vergleich, schwellenwert: schwelle }, werte);
                 const istProzent = c.kennzahl.toUpperCase() === "LTV";
                 const zeige = (w: typeof schwelle) => (istProzent ? f.prozent(w, 1) : f.faktor(w));
+                const sperre = c.folge === "AUSSCHUETTUNGSSPERRE";
                 return (
                   <tr key={c.id}>
+                    <td className="text-xs">{tk.folgen[c.folge]}</td>
                     <td className="font-medium">
                       {glossarBegriff(c.kennzahl) ? <Begriff k={glossarBegriff(c.kennzahl)!} t={t}>{c.kennzahl}</Begriff> : c.kennzahl}
                       {c.beschreibung && <div className="text-xs font-normal text-slate-500">{c.beschreibung}</div>}
@@ -387,9 +393,10 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
                         />
                       )}
                     </td>
-                    <td>
-                      <CovenantMarke eingehalten={p.eingehalten} t={t} />
+                    <td className={rechts}>
+                      {c.vergleich && schwelle !== null ? <PufferWert puffer={puffer} kennzahl={c.kennzahl} kz={werte} stichtag={stichtag} t={t} f={f} /> : "–"}
                     </td>
+                    <td>{sperre ? <SperrenMarke status={sperrenStatus(puffer)} t={t} /> : <CovenantMarke eingehalten={p.eingehalten} t={t} />}</td>
                     <td>{c.pruefrhythmus}</td>
                     {schreiben && (
                       <td className="text-right">
@@ -408,6 +415,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
             <div className="mt-3">
               <Formular aktion={covenantHinzufuegen.bind(null, id)} absenden={t.allgemein.hinzufuegen} zuruecksetzen>
                 <Felder>
+                  <Auswahl name="folge" label={tk.folge} wert="COVENANT" optionen={Object.entries(tk.folgen).map(([wert, text]) => ({ wert, text }))} pflicht />
                   <Feld name="kennzahl" label={tk.kennzahl} platzhalter="LTV, DSCR, ICR" pflicht />
                   <Auswahl name="vergleich" label={tk.vergleich} optionen={Object.entries(t.vergleiche).map(([wert, text]) => ({ wert, text }))} leerText="–" />
                   <Feld name="schwellenwert" label={tk.schwellenwert} inputMode="decimal" />
@@ -478,7 +486,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
         )}
       </Karte>
 
-      <Glossar begriffe={["Restschuld", "Kapitaldienst", "Zinsbindung", "Covenant", "LTV", "DSCR", "ICR", "Entwurf", "Guthaben"]} t={t} />
+      <Glossar begriffe={["Restschuld", "Kapitaldienst", "Zinsbindung", "Covenant", "Ausschuettungssperre", "Headroom", "LTV", "DSCR", "ICR", "Entwurf", "Guthaben"]} t={t} />
 
       <Karte titel={<span id="tilgungsplaene">{tk.tilgungsplaene}</span>}>
         {kredit.tilgungsplaene.length === 0 ? (

@@ -13,7 +13,7 @@ import { formatierer } from "@/lib/format";
 import { gruppenKennzahlen, zeitreihe, zinsbindungsProfil } from "@/lib/kennzahlen";
 import { ermittleWarnungen, type Warnung } from "@/lib/warnungen";
 
-const ARTEN = ["zinsbindung", "covenant", "rueckstand", "leerstand"] as const;
+const ARTEN = ["zinsbindung", "covenant", "sperre", "rueckstand", "leerstand"] as const;
 const MAX_WARNUNGEN = 12;
 
 export default async function UebersichtSeite({ searchParams }: PageProps<"/">) {
@@ -31,7 +31,7 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
     kontext.db.haus.findMany({ where: { id: { in: haeuser.map((h) => h.id) } }, select: { id: true, bezeichnung: true } }),
     kontext.db.covenant.findMany({
       where: { kreditId: { in: kredite.map((k) => k.id) } },
-      select: { kreditId: true, kennzahl: true, vergleich: true, schwellenwert: true },
+      select: { kreditId: true, kennzahl: true, vergleich: true, schwellenwert: true, folge: true },
     }),
   ]);
 
@@ -82,7 +82,7 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
   const alle = sp.alle === "1";
   const sichtbar = alle ? gefiltert : gefiltert.slice(0, MAX_WARNUNGEN);
   const link = (w: Warnung): { href: string | null; name: string } => {
-    if (w.art === "zinsbindung" || w.art === "covenant") {
+    if (w.art === "zinsbindung" || w.art === "covenant" || w.art === "sperre") {
       return { href: darfGesellschaften ? `/gesellschaften/kredite/${w.kreditId}` : null, name: kreditName.get(w.kreditId) ?? "" };
     }
     const href = w.art === "rueckstand" && darfMieter ? `/mieter?status=rueckstand&haus=${w.hausId}` : darfHaeuser ? `/haeuser/${w.hausId}` : null;
@@ -98,7 +98,8 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
               datum: f.datum(w.bis),
               restschuld: w.restschuld ? f.betragGanz(w.restschuld) : t.allgemein.unbekannt,
             });
-      case "covenant": {
+      case "covenant":
+      case "sperre": {
         const prozent = w.kennzahl === "LTV";
         const werte = {
           kennzahl: w.kennzahl,
@@ -106,6 +107,7 @@ export default async function UebersichtSeite({ searchParams }: PageProps<"/">) 
           vergleich: t.vergleiche[w.vergleich],
           schwelle: prozent ? f.prozent(w.schwellenwert, 1) : f.faktor(w.schwellenwert),
         };
+        if (w.art === "sperre") return fuelle(w.stufe === "hoch" ? tu.sperreAktiv : tu.sperreKnapp, werte);
         return fuelle(w.stufe === "hoch" ? tu.covenantVerletzt : tu.covenantKnapp, werte);
       }
       case "rueckstand":

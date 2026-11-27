@@ -5,6 +5,7 @@
  * Schwellen:
  * - Zinsbindung: abgelaufen oder in höchstens 12 Monaten = hoch, in 13 bis 24 Monaten = mittel.
  * - Covenant: verletzt = hoch; knapp (Abstand zum Schwellenwert unter 5 % des Schwellenwerts) = mittel.
+ * - Ausschüttungssperre: aktiv (Bedingung verletzt) = hoch; knapp wie bei Covenants = mittel.
  * - Rückstand: je Haus; hoch, sobald ein Mieter mit mindestens zwei Monatsmieten (Soll) im
  *   Rückstand ist (Grenze für eine fristlose Kündigung nach § 543 BGB), sonst mittel.
  * - Leerstand: je Haus nach Fläche; ab 10 % hoch, darunter mittel.
@@ -12,29 +13,36 @@
 import { dezimal, type Decimal } from "./geld";
 import type { IsoDatum } from "./datum";
 import { covenantKennzahlen, hausKennzahlen, istAktiv, type HausDaten } from "./kennzahlen";
-import { pruefeCovenant, restschuld, zinsbindung, type KreditDaten, type ReferenzWert } from "./kredit";
+import { covenantPuffer, type Folge } from "./covenant";
+import { restschuld, zinsbindung, type KreditDaten, type ReferenzWert } from "./kredit";
 
 export type WarnStufe = "hoch" | "mittel";
 
 export type Warnung =
   | { art: "zinsbindung"; stufe: WarnStufe; kreditId: string; bis: IsoDatum; monate: number; restschuld: Decimal | null }
-  | {
-      art: "covenant";
-      stufe: WarnStufe;
-      kreditId: string;
-      kennzahl: string;
-      vergleich: "HOECHSTENS" | "MINDESTENS";
-      schwellenwert: Decimal;
-      wert: Decimal;
-    }
+  | ({ art: "covenant" } & CovenantWarnung)
+  | ({ art: "sperre" } & CovenantWarnung)
   | { art: "rueckstand"; stufe: WarnStufe; hausId: string; anzahl: number; anzahlHoch: number; summe: Decimal }
   | { art: "leerstand"; stufe: WarnStufe; hausId: string; quote: Decimal; leereEinheiten: number; einheiten: number; erwartetMonat: Decimal };
+
+export interface CovenantWarnung {
+  stufe: WarnStufe;
+  kreditId: string;
+  kennzahl: string;
+  vergleich: "HOECHSTENS" | "MINDESTENS";
+  schwellenwert: Decimal;
+  wert: Decimal;
+  /** Abstand relativ zum Schwellenwert in Prozent (negativ = verletzt) */
+  abstandRelativ: Decimal | null;
+}
 
 export interface CovenantDaten {
   kreditId: string;
   kennzahl: string;
   vergleich: "HOECHSTENS" | "MINDESTENS" | null;
   schwellenwert: Decimal | null;
+  /** fehlt = Covenant */
+  folge?: Folge;
 }
 
 export const SCHWELLEN = {
@@ -70,20 +78,20 @@ export function ermittleWarnungen(
     if (eigene.length === 0) continue;
     const kz = covenantKennzahlen(k, haeuser, kredite, referenzwerte, stichtag);
     for (const c of eigene) {
-      const p = pruefeCovenant(c, { LTV: kz.ltv, DSCR: kz.dscr, ICR: kz.icr });
-      if (p.eingehalten === null || !p.wert || !c.vergleich || !c.schwellenwert) continue;
-      const abstand = p.wert.minus(c.schwellenwert).abs();
-      const knapp = abstand.lessThan(c.schwellenwert.abs().times(SCHWELLEN.covenantKnappProzent).dividedBy(100));
+      const p = covenantPuffer(c, kz);
+      if (!p || !c.vergleich) continue;
+      const knapp = p.abstandRelativ !== null && p.abstandRelativ.lessThan(SCHWELLEN.covenantKnappProzent);
       if (!p.eingehalten || knapp) {
-        warnungen.push({
-          art: "covenant",
+        const basis: CovenantWarnung = {
           stufe: p.eingehalten ? "mittel" : "hoch",
           kreditId: k.id,
           kennzahl: c.kennzahl.trim().toUpperCase(),
           vergleich: c.vergleich,
-          schwellenwert: c.schwellenwert,
+          schwellenwert: p.schwellenwert,
           wert: p.wert,
-        });
+          abstandRelativ: p.abstandRelativ,
+        };
+        warnungen.push(c.folge === "AUSSCHUETTUNGSSPERRE" ? { art: "sperre", ...basis } : { art: "covenant", ...basis });
       }
     }
   }
