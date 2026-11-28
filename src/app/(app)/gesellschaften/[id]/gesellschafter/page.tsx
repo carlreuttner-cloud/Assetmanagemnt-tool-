@@ -41,6 +41,13 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
   });
   if (!g) notFound();
   const schreiben = darf(kontext.rolle, "gesellschaften", "schreiben");
+  // Investoren, die dieser Gesellschaft zugewiesen sind, können mit einem Kapitalkonto verknüpft werden (Investorenportal)
+  const zugaenge = (
+    await kontext.db.mitgliedschaft.findMany({
+      where: { rolle: "INVESTOR", gesellschaftZuweisungen: { some: { gesellschaftId: id } } },
+      select: { id: true, benutzer: { select: { name: true, email: true } } },
+    })
+  ).map((m) => ({ wert: m.id, text: m.benutzer.name ? `${m.benutzer.name} (${m.benutzer.email})` : m.benutzer.email }));
   const v = g.waterfallvertrag;
   const tk = t.kapitalkonten;
   const stichtag = heute();
@@ -213,7 +220,7 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
                 <summary className="cursor-pointer text-sm font-medium text-slate-700">{t.allgemein.bearbeiten}</summary>
                 <div className="mt-3 space-y-3">
                   <Formular aktion={gesellschafterAendern.bind(null, { id: gs.id, gesellschaftId: id })} absenden={t.allgemein.speichern}>
-                    <GesellschafterFelder t={t} wert={{ name: gs.name, beteiligung: f.eingabe(gs.beteiligungProzent), gewinnanteil: f.eingabe(gs.gewinnanteilProzent), notiz: gs.notiz }} />
+                    <GesellschafterFelder t={t} zugaenge={zugaenge} wert={{ name: gs.name, beteiligung: f.eingabe(gs.beteiligungProzent), gewinnanteil: f.eingabe(gs.gewinnanteilProzent), notiz: gs.notiz, zugang: gs.mitgliedschaftId }} />
                   </Formular>
                   <Formular aktion={gesellschafterLoeschen.bind(null, gs.id, id)} absenden={t.allgemein.loeschen} art="gefahr" bestaetigen={t.allgemein.loeschenBestaetigen} />
                 </div>
@@ -227,7 +234,7 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
       {schreiben && (
         <Karte titel={t.allgemein.hinzufuegen}>
           <Formular aktion={gesellschafterSpeichern.bind(null, id)} absenden={t.allgemein.speichern} zuruecksetzen>
-            <GesellschafterFelder t={t} />
+            <GesellschafterFelder t={t} zugaenge={zugaenge} />
           </Formular>
         </Karte>
       )}
@@ -235,7 +242,15 @@ export default async function GesellschafterSeite({ params }: PageProps<"/gesell
   );
 }
 
-function GesellschafterFelder({ t, wert }: { t: ReturnType<typeof texte>; wert?: { name: string; beteiligung: string; gewinnanteil: string; notiz: string | null } }) {
+function GesellschafterFelder({
+  t,
+  wert,
+  zugaenge,
+}: {
+  t: ReturnType<typeof texte>;
+  wert?: { name: string; beteiligung: string; gewinnanteil: string; notiz: string | null; zugang: string | null };
+  zugaenge: Array<{ wert: string; text: string }>;
+}) {
   const tw = t.waterfall;
   return (
     <Felder>
@@ -243,6 +258,7 @@ function GesellschafterFelder({ t, wert }: { t: ReturnType<typeof texte>; wert?:
       <Feld name="beteiligungProzent" label={`${tw.beteiligung} (%)`} wert={wert?.beteiligung} inputMode="decimal" />
       <Feld name="gewinnanteilProzent" label={`${tw.gewinnanteil} (%)`} wert={wert?.gewinnanteil} inputMode="decimal" hinweis={tw.gewinnanteilHinweis} />
       <Feld name="notiz" label={t.allgemein.notiz} wert={wert?.notiz} />
+      <Auswahl name="mitgliedschaftId" label={tw.portalZugang} wert={wert?.zugang} optionen={zugaenge} leerText={tw.portalKeiner} hinweis={tw.portalHinweis} />
     </Felder>
   );
 }
