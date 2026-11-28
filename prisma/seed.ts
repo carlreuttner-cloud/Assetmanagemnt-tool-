@@ -15,6 +15,17 @@ import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 import { legeTestdokumenteAn } from "./testdaten/dateien";
 import { baueBankangebote } from "./testdaten/bankangebote";
 import { baueSicherheiten } from "./testdaten/sicherheiten";
+import { baueSondertilgungen } from "./testdaten/sondertilgung";
+import { baueNachrangdarlehen } from "./testdaten/nachrang";
+import { baueKapitalabrufe } from "./testdaten/kapitalabruf";
+import { bauePlanIst } from "./testdaten/plan-ist";
+import { baueDatenraumDokumente } from "./testdaten/datenraum";
+import { bauePortal } from "./testdaten/portal";
+import { baueEnergie } from "./testdaten/energie";
+import { baueInstandhaltung } from "./testdaten/instandhaltung";
+import { baueSerienbriefe } from "./testdaten/serienbriefe";
+import { baueMieterstaende } from "./testdaten/mieterstaende";
+import { baueHausverwaltungen } from "./testdaten/hausverwaltungen";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
 import { baueZinssicherungen } from "./testdaten/zinssicherungen";
@@ -71,6 +82,17 @@ async function main() {
 
   await baueBankangebote(db, mandantId, admin.id);
   await baueSicherheiten(db, mandantId);
+  await baueSondertilgungen(db, mandantId);
+  await baueNachrangdarlehen(db, mandantId);
+  await baueKapitalabrufe(db, mandantId);
+  await bauePlanIst(db, mandantId);
+  await baueDatenraumDokumente(db, mandantId, admin.id);
+  await bauePortal(db, mandantId, mInvestor.id);
+  await baueEnergie(db, mandantId);
+  await baueInstandhaltung(db, mandantId);
+  await baueSerienbriefe(db, mandantId);
+  await baueMieterstaende(db, mandantId);
+  await baueHausverwaltungen(db, mandantId);
 
   // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
   await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });
@@ -212,6 +234,8 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     data: p.kredite.flatMap((k) => k.covenants.map((c) => ({
       mandantId, kreditId: kredit.get(k.schluessel)!, kennzahl: c.kennzahl, vergleich: c.vergleich,
       schwellenwert: c.schwellenwert, pruefrhythmus: c.pruefrhythmus, folge: c.folge ?? "COVENANT", beschreibung: c.beschreibung ?? null,
+      // Testtermine aus dem Rhythmus-Text; „jährlich“ ohne Datum bleibt offen (zeigt die Datenlücke).
+      ...(c.pruefrhythmus === "jährlich zum 31.12." ? { ersterTest: tag("2025-12-31"), testIntervallMonate: 12 } : c.pruefrhythmus === "halbjährlich" ? { ersterTest: tag("2025-06-30"), testIntervallMonate: 6 } : {}),
     }))),
   });
   await db.kreditbuchung.createMany({
