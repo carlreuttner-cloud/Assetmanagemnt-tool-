@@ -57,6 +57,7 @@ export const NAVIGATION: NavGruppe[] = [
   {
     schluessel: "analyse",
     reiter: [
+      { bereich: "kiAssistent", pfad: "/ki-fragen", textSchluessel: "kiFragen" },
       { bereich: "kiAssistent", pfad: "/ki-assistent", textSchluessel: "kiAssistent" },
     ],
   },

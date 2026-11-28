@@ -2,6 +2,9 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { fuelle, type Texte } from "@/i18n";
 import { ERGEBNIS_SCHEMA, datenpaketAlsText, pruefeErgebnis, type Datenpaket, type GeprueftesErgebnis } from "./ki-analyse";
+import { ANTWORT_SCHEMA, PLAN_SCHEMA, ergebnisseAlsText, katalogAlsText, pruefeAntwort, pruefePlan, type FrageDaten, type GepruefteAntwort, type Objekte, type PlanEintrag } from "./ki-antwort";
+import type { Formatierer } from "./format";
+import type { IsoDatum } from "./datum";
 import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
 
 /** Modell für die Analyse; über KI_MODELL änderbar. */
@@ -43,7 +46,7 @@ export interface AnalyseAntwort {
 export class KiFehler extends Error {}
 
 /** Eine Anfrage mit strukturierter Ausgabe; liefert das geparste JSON und den Verbrauch. */
-async function frageClaude(anweisung: string, nachricht: string, schema: object, t: Texte): Promise<{ json: unknown; modell: string; tokensEingabe: number; tokensAusgabe: number }> {
+async function frageClaude(anweisung: string, nachricht: string, schema: object, t: Texte, effort: "low" | "medium" | "high" = "high"): Promise<{ json: unknown; modell: string; tokensEingabe: number; tokensAusgabe: number }> {
   const tk = t.ki;
   const client = new Anthropic();
   let antwort: Anthropic.Beta.Messages.BetaMessage;
@@ -54,7 +57,7 @@ async function frageClaude(anweisung: string, nachricht: string, schema: object,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       thinking: { type: "adaptive" },
-      output_config: { effort: "high", format: { type: "json_schema", schema: schema as Record<string, unknown> } },
+      output_config: { effort, format: { type: "json_schema", schema: schema as Record<string, unknown> } },
       system: [{ type: "text", text: anweisung, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: nachricht }],
     });
@@ -178,4 +181,55 @@ export async function fuehreExportPruefungDurch(beschreibung: unknown, t: Texte)
       .map((h) => ({ text: String(h.text).trim().slice(0, 400), art: h.schwere === "warnung" ? ("warnung" as const) : ("hinweis" as const) }));
   }, t);
   return { hinweise, modell };
+}
+
+// ---------------------------------------------------------------------------
+// Generative Antworten: Schritt 1 wählt Datenabfragen, Schritt 2 Bausteine
+// ---------------------------------------------------------------------------
+
+const ANWEISUNG_PLAN = `Du bist der Assistent einer deutschen Immobilien-Asset-Management-Software. Zu einer Frage wählst du, welche Datenabfragen die Software ausführen soll. Du siehst den Katalog der Abfragen und die sichtbaren Objekte mit Kürzeln (G01 = Gesellschaft, H01 = Haus).
+
+Regeln:
+1. Wähle 1 bis 6 Abfragen, die die Frage beantworten. "objekt" ist ALLE oder ein Kürzel aus der Liste, passend zu den erlaubten Objekten der Abfrage.
+2. Für Vergleiche (höchster, niedrigster, Rangfolge) eine Tabellen-Abfrage (GESELLSCHAFTEN, HAEUSER, KREDITE) wählen, für Entwicklungen über die Zeit VERLAUF, für Summen eines Objekts KENNZAHLEN.
+3. Nenne nur Kürzel, die in der Liste stehen. Erfinde keine Objekte.
+4. Passt keine Abfrage, wähle KENNZAHLEN mit ALLE.`;
+
+const ANWEISUNG_ANTWORT = `Du bist der Assistent einer deutschen Immobilien-Asset-Management-Software. Du beantwortest eine Frage, indem du Bausteine auswählst, die die Software mit ihren eigenen, berechneten Daten füllt. Du siehst die Ergebnisse der Datenabfragen A1, A2 … mit Feldnamen und Werten.
+
+Bausteine ("typ"), alle anderen Felder leer (null bzw. leere Liste), wenn sie nicht gebraucht werden:
+- TEXT: kurzer Antworttext auf Deutsch in "text" (zwei bis fünf Sätze). Zahlen NIE selbst schreiben, sondern nur als Platzhalter: {A1.feld} für einen Wert einer KENNZAHLEN-Abfrage, {A2.G03.feld} für einen Wert einer Zeile einer Tabellen-Abfrage (Kürzel der Zeile). Objekte mit Kürzel und Namen nennen, z. B. „G03 Lindenhof“. Jahreszahlen sind erlaubt.
+- KACHELN: Kennzahl-Kacheln aus einer Abfrage vom Typ "werte"; "abfrage" und "felder" (höchstens 8).
+- KREIS: Leerstand nach Nutzungsart (Wohnen, Gewerbe, Stellplätze) aus einer Abfrage vom Typ "werte"; nur "abfrage".
+- TABELLE: aus einer Abfrage vom Typ "tabelle"; "felder" (Spalten), optional "sortierFeld" mit "absteigend" und "zeilen" (alle, top5, top10).
+- SAEULEN: waagerechte Balken je Zeile einer Abfrage vom Typ "tabelle"; genau ein Feld in "felder", dazu "absteigend" und "zeilen".
+- LINIE: Liniendiagramm aus einer Abfrage vom Typ "reihe"; "felder" mit gleicher Einheit (z. B. verkehrswert und restschuld).
+- REGLER: Was-wäre-wenn-Regler für ein Objekt ("objekt": ALLE oder Kürzel); "regler" aus mietsteigerung, mietausfall, zinsVariabelPP, anschlusszins. Die Software rechnet; du gibst keine Werte vor.
+
+Regeln:
+1. Beginne mit einem TEXT, der die Frage direkt beantwortet, dann 1 bis 6 passende weitere Bausteine. Höchstens 10 Bausteine.
+2. Jeder Baustein außer TEXT braucht einen klaren "titel" mit Einheit, z. B. „Leerstand je Gesellschaft (Prozent der Fläche)“, ohne Zahlen außer Jahreszahlen.
+3. Du rechnest nicht und erfindest keine Zahlen. Werte nur über Platzhalter. Unbekannte Werte heißen „unbekannt“; nenne sie als Datenlücke, schätze nicht.
+4. Werte mit unterschiedlichem Stand nicht vermischen; unvollständige Summen als unvollständig bezeichnen.
+5. Abkürzungen beim ersten Vorkommen im Text erklären (JNKM = Jahresnettokaltmiete, LTV, DSCR, ICR).
+6. Wenn die Daten die Frage nicht beantworten, sage das im TEXT und nenne, welche Daten fehlen.`;
+
+export interface FrageAntwort {
+  plan: PlanEintrag[];
+  antwort: GepruefteAntwort;
+  modell: string;
+  tokensEingabe: number;
+  tokensAusgabe: number;
+}
+
+/** Schritt 1: Die KI wählt Abfragen aus dem Katalog (geprüft gegen die sichtbaren Objekte). */
+export async function waehleKiAbfragen(frage: string, stichtag: IsoDatum, objekte: Objekte, t: Texte) {
+  const { json, ...rest } = await frageClaude(ANWEISUNG_PLAN, katalogAlsText(frage, stichtag, objekte, t), PLAN_SCHEMA, t, "low");
+  return { plan: geprueft(() => pruefePlan(json, objekte), t), ...rest };
+}
+
+/** Schritt 2: Die KI wählt Bausteine zu den berechneten Ergebnissen (geprüft im Code). */
+export async function waehleKiBausteine(frage: string, daten: FrageDaten, t: Texte, f: Formatierer) {
+  const { json, ...rest } = await frageClaude(ANWEISUNG_ANTWORT, ergebnisseAlsText(frage, daten, t, f), ANTWORT_SCHEMA, t, "medium");
+  return { antwort: geprueft(() => pruefeAntwort(json, daten, t.kiFragen.pruefung), t), ...rest };
 }

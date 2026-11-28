@@ -74,6 +74,7 @@ model Mandant {
   waterfallvertraege      Waterfallvertrag[]
   dokumentnachweise       Dokumentnachweis[]
   kiAnalysen              KiAnalyse[]
+  kiFragen                KiFrage[]
   kiVorschlaege           KiVorschlag[]
   portfolios              Portfolio[]
   lesezeichen             Lesezeichen[]
@@ -97,6 +98,7 @@ model Benutzer {
   importvorgaenge     Importvorgang[]
   szenarien           Szenario[]
   kiAnalysen          KiAnalyse[]
+  kiFragen            KiFrage[]
   kiVorschlaege       KiVorschlag[]
   lesezeichen         Lesezeichen[]
   dokumente           Dokument[]
@@ -1293,4 +1295,31 @@ model Exitrechnung {
 
   @@index([mandantId])
   @@index([hausId])
+}
+
+/// Frage an den KI-Assistenten mit generativer Antwort (Text und Bausteine wie Diagramme,
+/// Tabellen, Kacheln). Die KI wählt nur Datenabfragen und Bausteine; alle Zahlen stehen in
+/// `daten` (vom Code berechnet, mit Quelle und Stichtag) und werden so angezeigt, wie sie beim
+/// Fragen galten. Nur für den fragenden Benutzer sichtbar, weil `daten` seiner Sichtbarkeit folgt.
+model KiFrage {
+  id            String          @id @default(cuid())
+  mandantId     String
+  benutzerId    String
+  frage         String
+  stichtag      DateTime        @db.Date
+  modell        String
+  status        KiAnalyseStatus
+  /// Gewählte Datenabfragen und ihre Ergebnisse (Werte als Text)
+  daten         Json?
+  /// Bausteine der Antwort nach der Prüfung
+  antwort       Json?
+  fehler        String?
+  tokensEingabe Int?
+  tokensAusgabe Int?
+  erstelltAm    DateTime        @default(now())
+
+  mandant  Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  benutzer Benutzer @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId, benutzerId])
 }
