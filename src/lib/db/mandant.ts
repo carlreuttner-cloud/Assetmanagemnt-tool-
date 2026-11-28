@@ -42,6 +42,7 @@ const FREMDSCHLUESSEL: Record<string, string> = {
   portfolioId: "portfolio",
   dokumentId: "dokument",
   massnahmeId: "massnahme",
+  uploadLinkId: "uploadLink",
 };
 /** Gleiche Prüfung für die Relationsschreibweise `haus: { connect: { id } }`. */
 const RELATIONEN: Record<string, string> = Object.fromEntries(

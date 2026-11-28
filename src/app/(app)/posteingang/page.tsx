@@ -11,6 +11,7 @@ import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { eingangHochladen, regelLoeschen, schnellUebernehmen } from "./aktionen";
 import { SicherheitMarke } from "./eingang-bausteine";
+import { UploadLinks } from "./upload-links";
 
 const ANSICHTEN = {
   offen: ["ZU_PRUEFEN"],
@@ -29,7 +30,7 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
   const sp = await searchParams;
   const ansicht: Ansicht = (Object.keys(ANSICHTEN) as Ansicht[]).find((a) => a === einParam(sp.ansicht)) ?? "offen";
 
-  const [zahlen, eintraege, regeln] = await Promise.all([
+  const [zahlen, eintraege, regeln, links] = await Promise.all([
     kontext.db.eingang.groupBy({ by: ["status"], _count: { _all: true } }),
     kontext.db.eingang.findMany({
       where: { status: { in: [...ANSICHTEN[ansicht]] } },
@@ -41,6 +42,11 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
       orderBy: { geaendertAm: "desc" },
       take: 100,
       include: { gesellschaft: { select: { name: true } }, haus: { select: { bezeichnung: true } }, kredit: { select: { bezeichnung: true } } },
+    }),
+    kontext.db.uploadLink.findMany({
+      orderBy: [{ widerrufenAm: { sort: "desc", nulls: "first" } }, { erstelltAm: "desc" }],
+      take: 100,
+      select: { id: true, name: true, absenderArt: true, schluesselEnde: true, gueltigBis: true, widerrufenAm: true, zuletztGenutzt: true, anzahlDateien: true, erstelltAm: true },
     }),
   ]);
   const anzahl = (a: Ansicht) => zahlen.filter((z) => (ANSICHTEN[a] as readonly string[]).includes(z.status)).reduce((s, z) => s + z._count._all, 0);
@@ -115,6 +121,8 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
           </Tabelle>
         )}
       </Karte>
+
+      <UploadLinks links={links} t={t} f={f} />
 
       <Karte titel={te.regeln.titel}>
         <p className="mb-3 text-sm text-slate-600">{te.regeln.beschreibung}</p>

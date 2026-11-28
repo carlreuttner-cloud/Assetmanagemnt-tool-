@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -8,6 +9,7 @@ import { ladeEingangKandidaten, nimmAuf, uebernimm, type Uebernahme } from "@/li
 import { ABSENDER_ARTEN, DOKUMENT_KATEGORIEN, type AbsenderArt } from "@/lib/dokument-vorschlag";
 import type { EingangVorschlag } from "@/lib/eingang";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
+import { MAX_GUELTIG_TAGE, neuerSchluessel } from "@/lib/upload-link";
 
 const MAX_DATEIEN = 20;
 
@@ -110,6 +112,44 @@ export async function regelLoeschen(id: string): Promise<AktionsErgebnis> {
   return fuehreAus(async () => {
     const { db } = await schreibKontext();
     await db.zuordnungsregel.deleteMany({ where: { id } });
+    refresh();
+  });
+}
+
+/** Legt einen Upload-Link an. Der Link wird nur in dieser Antwort angezeigt, gespeichert wird der Hash. */
+export async function uploadLinkAnlegen(_v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const tu = t.uploadLink;
+    const f = formularLeser(fd, kontext.mandant.sprache);
+    const name = f.pflicht("name", tu.name).slice(0, 120);
+    const absenderArt = f.text("absenderArt") as AbsenderArt | null;
+    if (absenderArt && !ABSENDER_ARTEN.includes(absenderArt)) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: t.dateien.absender }));
+    const tageText = f.text("tage") ?? "30";
+    const tage = Number(tageText);
+    if (!/^\d{1,3}$/.test(tageText) || tage < 1 || tage > MAX_GUELTIG_TAGE) throw new EingabeFehler(fuelle(tu.tageFehler, { max: MAX_GUELTIG_TAGE }));
+    const gueltigBis = new Date();
+    gueltigBis.setDate(gueltigBis.getDate() + tage);
+    gueltigBis.setHours(23, 59, 59, 0);
+    const s = neuerSchluessel();
+    await db.uploadLink.create({ data: { name, absenderArt, schluesselHash: s.hash, schluesselEnde: s.ende, gueltigBis, erstelltVonId: kontext.benutzer.id } as never });
+    // Öffentliche Adresse aus APP_URL (Produktion), sonst aus der Anfrage (lokal)
+    let basis = process.env.APP_URL?.replace(/\/+$/, "");
+    if (!basis) {
+      const h = await headers();
+      const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+      basis = `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}`;
+    }
+    refresh();
+    return { ok: fuelle(tu.angelegt, { url: `${basis}/hochladen/${s.schluessel}` }) };
+  });
+}
+
+export async function uploadLinkWiderrufen(id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    const link = await db.uploadLink.findFirst({ where: { id, widerrufenAm: null }, select: { id: true } });
+    if (link) await db.uploadLink.update({ where: { id }, data: { widerrufenAm: new Date() } });
     refresh();
   });
 }

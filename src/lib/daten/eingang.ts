@@ -78,6 +78,8 @@ export type Aufnahme = {
   dateiname: string;
   quelle: "HOCHLADEN" | "UPLOAD_LINK" | "EMAIL";
   hochgeladenVonId?: string | null;
+  /** Upload-Link, über den die Datei kam; seine Absenderart gilt, wenn im Text keine erkannt wird */
+  uploadLink?: { id: string; name: string; absenderArt: AbsenderArt | null } | null;
   absenderAdresse?: string | null;
   absenderHinweis?: string | null;
   betreff?: string | null;
@@ -105,7 +107,7 @@ export async function nimmAuf(db: Db, mandant: { id: string; sprache: string }, 
     db.dokument.findFirst({ where: { pruefsumme }, select: { titel: true } }),
     db.eingang.findFirst({ where: { pruefsumme, status: { not: "ABGELEHNT" } }, select: { dateiname: true } }),
   ]);
-  if (dokument || eingang) return { ok: false, fehler: `${name}: ${te.doppelt.replace("{titel}", dokument?.titel ?? eingang!.dateiname)}` };
+  if (dokument || eingang) return { ok: false, fehler: `${name}: ${te.doppelt.replace("{titel}", a.quelle === "HOCHLADEN" ? (dokument?.titel ?? eingang!.dateiname) : name)}` };
 
   const speicherPfad = await speichere(mandant.id, "eingang", DOKUMENT_TYPEN[mimeType], a.daten);
   let text = { quelle: "KEINE" as "PDF_TEXT" | "OCR" | "KEINE", seiten: [] as string[], seitenAnzahl: null as number | null, hinweis: null as string | null };
@@ -116,6 +118,11 @@ export async function nimmAuf(db: Db, mandant: { id: string; sprache: string }, 
   }
   const volltext = [a.betreff, a.mailtext, ...text.seiten.map((s) => s.replace(/\u0000/g, ""))].filter(Boolean).join("\n");
   const vorschlag = await erstelleVorschlag(db, t, { text: volltext, dateiname: name, absenderAdresse: a.absenderAdresse ?? null });
+  if (a.uploadLink?.absenderArt && !vorschlag.absenderArt) {
+    vorschlag.absenderArt = a.uploadLink.absenderArt;
+    vorschlag.absenderName = a.uploadLink.name;
+    vorschlag.gruende.push({ schluessel: "uploadLink", werte: { wert: a.uploadLink.name } });
+  }
   const neu = await db.eingang.create({
     data: {
       quelle: a.quelle,
@@ -135,6 +142,7 @@ export async function nimmAuf(db: Db, mandant: { id: string; sprache: string }, 
       mailtext: a.mailtext ?? null,
       vorschlag: vorschlag as never,
       hochgeladenVonId: a.hochgeladenVonId ?? null,
+      uploadLinkId: a.uploadLink?.id ?? null,
     } as never,
     select: { id: true },
   });

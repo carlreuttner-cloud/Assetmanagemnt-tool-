@@ -66,6 +66,7 @@ model Mandant {
   dokumente               Dokument[]
   eingaenge               Eingang[]
   zuordnungsregeln        Zuordnungsregel[]
+  uploadLinks             UploadLink[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
@@ -1392,6 +1393,7 @@ model Eingang {
   /// Vorschlag mit Begründungen (siehe src/lib/eingang.ts)
   vorschlag       Json?
   hochgeladenVonId String?
+  uploadLinkId    String?
   dokumentId      String?             @unique
   bearbeitetVonId String?
   bearbeitetAm    DateTime?
@@ -1399,9 +1401,35 @@ model Eingang {
 
   mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   dokument Dokument? @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
+  uploadLink UploadLink? @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
 
   @@index([mandantId, status])
   @@index([mandantId, pruefsumme])
+}
+
+/// Persönlicher, widerrufbarer Link zum Hochladen in den Posteingang (z. B. für Hausverwaltung,
+/// Bank oder Gutachter), ohne Zugriff auf den Rest der App. Gespeichert wird nur der Hash des Schlüssels.
+model UploadLink {
+  id              String    @id @default(cuid())
+  mandantId       String
+  /// Für wen der Link ist, z. B. „Hausverwaltung Müller“
+  name            String
+  absenderArt     AbsenderArt?
+  schluesselHash  String    @unique
+  /// Die letzten Zeichen des Schlüssels zum Wiedererkennen
+  schluesselEnde  String
+  gueltigBis      DateTime
+  widerrufenAm    DateTime?
+  zuletztGenutzt  DateTime?
+  anzahlDateien   Int       @default(0)
+  erstelltVonId   String?
+  erstelltAm      DateTime  @default(now())
+  geaendertAm     DateTime  @updatedAt
+
+  mandant   Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  eingaenge Eingang[]
+
+  @@index([mandantId])
 }
 
 enum RegelMerkmal {

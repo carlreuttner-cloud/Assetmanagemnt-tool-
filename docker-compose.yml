@@ -50,6 +50,8 @@ services:
       # KI (optional): ohne Schlüssel läuft die App normal, KI-Funktionen zeigen einen Hinweis
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       KI_MODELL: ${KI_MODELL:-}
+      # Öffentliche Adresse für Upload-Links (optional, lokal leer lassen)
+      APP_URL: ${APP_URL:-}
     ports:
       - "3000:3000"
     volumes:
