@@ -21,6 +21,8 @@ const VERGLEICHE = ["HOECHSTENS", "MINDESTENS"] as const;
 const FOLGEN = ["COVENANT", "AUSSCHUETTUNGSSPERRE"] as const;
 const ABSCHLUSS_QUELLEN = ["JAHRESABSCHLUSS", "BWA", "SONSTIGE"] as const;
 const ABSCHLUSS_STATUS = ["ENDGUELTIG", "ENTWURF"] as const;
+const ST_RECHTE = ["UNBEKANNT", "KEINES", "PROZENT", "BETRAG"] as const;
+const ST_JAHRE = ["KALENDERJAHR", "VERTRAGSJAHR"] as const;
 const BUCHUNGSARTEN = ["ZINS", "TILGUNG", "SONDERTILGUNG", "GEBUEHR", "AUSZAHLUNG", "SONSTIGES"] as const;
 
 async function schreibKontext() {
@@ -189,6 +191,31 @@ export async function covenantTestSetzen(id: string, _v: AktionsErgebnis, fd: Fo
   return fuehreAus(async () => {
     const { db, t, sprache } = await schreibKontext();
     await db.covenant.update({ where: { id }, data: testTermin(formularLeser(fd, sprache), t) });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+/** Sondertilgungsrecht laut Vertrag; ohne Prozent oder Betrag nur „unbekannt“ oder „keines“. */
+export async function sondertilgungSetzen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db, t, sprache } = await schreibKontext();
+    const ts = t.sondertilgung;
+    const f = formularLeser(fd, sprache);
+    const recht = f.auswahl("recht", ts.recht, ST_RECHTE);
+    const wert = recht === "PROZENT" ? f.prozentOptional("wert", ts.wert) : recht === "BETRAG" ? f.betragOptional("wert", ts.wert) : null;
+    if ((recht === "PROZENT" || recht === "BETRAG") && (!wert || !wert.greaterThan(0))) throw new EingabeFehler(ts.wertFehlt);
+    const bis = f.datumOptional("bis", ts.bis);
+    await db.kredit.update({
+      where: { id: kreditId },
+      data: {
+        sondertilgungRecht: recht,
+        sondertilgungWert: zuText(wert),
+        sondertilgungJahr: f.auswahl("jahr", ts.jahr, ST_JAHRE),
+        sondertilgungUebertragbar: fd.get("uebertragbar") === "on",
+        sondertilgungBis: bis ? alsDbDatum(bis) : null,
+      },
+    });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });

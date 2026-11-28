@@ -17,6 +17,8 @@ import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
 import { DokumenteKarte } from "@/components/dokumente";
 import { ladeCheckliste } from "@/lib/daten/dokumente";
+import { sondertilgungAusDb } from "@/lib/daten/sondertilgung";
+import { SondertilgungKarte } from "./sondertilgung-karte";
 import { covenantKennzahlen } from "@/lib/kennzahlen";
 import {
   gesicherterSatz,
@@ -656,6 +658,8 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           )}
         </Karte>
       )}
+
+      <SondertilgungKarte kreditId={kredit.id} eingabe={sondertilgungAusDb(kredit)} stichtag={stichtag} schreiben={schreiben} t={t} f={f} />
 
       <Karte titel={tk.buchungen}>
         {schreiben && (

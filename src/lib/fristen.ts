@@ -12,7 +12,7 @@ import { plusMonate, type IsoDatum } from "./datum";
 import { DRINGEND_MONATE, refinanzierungsEreignis, vorbereitungAb } from "./refinanzierung";
 import type { Nutzungsart } from "./nutzungsart";
 
-export const FRIST_ARTEN = ["refinanzierung", "zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
+export const FRIST_ARTEN = ["refinanzierung", "sondertilgung", "zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
 
 /** Ohne Zeitraumgrenze werden Covenant-Tests so weit im Voraus gezeigt. */
 export const COVENANT_VORLAUF_MONATE = 24;
@@ -58,6 +58,11 @@ export type FristTexte = {
   /** mit {ereignis}, {datum}, {monate}, {dringend} */
   grundRefinanzierung?: string;
   ereignisse?: { zinsbindung: string; kreditende: string };
+  /** mit {offen}, {datum}, {regel}, {verfall} */
+  grundSondertilgung?: string;
+  sondertilgungVerfall?: string;
+  sondertilgungUebertrag?: string;
+  sondertilgungOhneRecht?: string;
   basisLetzte: string;
   basisBeginn: string;
   gewerbe: string;
@@ -66,7 +71,10 @@ export type FristTexte = {
 };
 
 export type FristEingabe = {
-  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }>; covenants?: Array<{ kennzahl: string; bedingung: string; ersterTest: IsoDatum | null; intervallMonate: number | null }> }>;
+  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }>; covenants?: Array<{ kennzahl: string; bedingung: string; ersterTest: IsoDatum | null; intervallMonate: number | null }>;
+    /** laufendes Sondertilgungsjahr mit offenem Betrag; "unbekannt", wenn das Recht nicht erfasst ist */
+    sondertilgung?: { bis: IsoDatum; offen: string; regel: string; uebertragbar: boolean } | "unbekannt" | null;
+  }>;
   mietverhaeltnisse: Array<{
     id: string;
     mieter: string;
@@ -110,6 +118,22 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
         href: `/refinanzierung/${k.id}`,
         gesellschaftId: k.gesellschaftId,
         grundlage: fuelle(t.grundRefinanzierung, { ereignis: t.ereignisse?.[e.art] ?? e.art, datum: datum(e.datum), monate: "24", dringend: String(DRINGEND_MONATE) }),
+      });
+    }
+    if (k.sondertilgung === "unbekannt") {
+      if (k.zinsArt === "FEST" && k.zinsbindungBis && k.zinsbindungBis >= stichtag && t.sondertilgungOhneRecht) {
+        luecken.push({ art: "sondertilgung", titel: k.bezeichnung, unter: k.gesellschaft, href: `${href}#sondertilgung`, grund: t.sondertilgungOhneRecht });
+      }
+    } else if (k.sondertilgung && t.grundSondertilgung && imRahmen(k.sondertilgung.bis)) {
+      const st = k.sondertilgung;
+      fristen.push({
+        art: "sondertilgung",
+        datum: st.bis,
+        titel: k.bezeichnung,
+        unter: k.gesellschaft,
+        href: `${href}#sondertilgung`,
+        gesellschaftId: k.gesellschaftId,
+        grundlage: fuelle(t.grundSondertilgung, { offen: st.offen, datum: datum(st.bis), regel: st.regel, verfall: (st.uebertragbar ? t.sondertilgungUebertrag : t.sondertilgungVerfall) ?? "" }),
       });
     }
     for (const c of k.covenants ?? []) {

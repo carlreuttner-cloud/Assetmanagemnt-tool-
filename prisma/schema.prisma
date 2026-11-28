@@ -482,6 +482,19 @@ enum Tilgungsart {
   ENDFAELLIG
 }
 
+enum SondertilgungRecht {
+  UNBEKANNT
+  KEINES
+  PROZENT
+  BETRAG
+}
+
+enum SondertilgungJahr {
+  KALENDERJAHR
+  /// ab dem Auszahlungstag
+  VERTRAGSJAHR
+}
+
 model Kredit {
   id                  String      @id @default(cuid())
   mandantId           String
@@ -508,6 +521,15 @@ model Kredit {
   /// Annuität: aktuelle Rate (Zins + Tilgung) je Zahlung.
   /// Ratentilgung: Tilgungsbetrag je Zahlung. Endfällig: leer.
   ratenbetrag         Decimal?    @db.Decimal(14, 2)
+  /// Sondertilgungsrecht laut Vertrag; UNBEKANNT = nicht erfasst (Datenlücke)
+  sondertilgungRecht        SondertilgungRecht @default(UNBEKANNT)
+  /// Prozent des Ursprungsbetrags (PROZENT) oder Betrag in € (BETRAG) je Jahr
+  sondertilgungWert         Decimal?           @db.Decimal(14, 6)
+  sondertilgungJahr         SondertilgungJahr  @default(KALENDERJAHR)
+  /// Nicht genutzte Beträge gehen ins nächste Jahr über
+  sondertilgungUebertragbar Boolean            @default(false)
+  /// Recht gilt bis (leer: bis Ende der Zinsbindung bzw. Laufzeit)
+  sondertilgungBis          DateTime?          @db.Date
   notiz               String?
   erstelltAm          DateTime    @default(now())
   geaendertAm         DateTime    @updatedAt

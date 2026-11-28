@@ -44,6 +44,7 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "gesellschaften", pfad: "/kredite", textSchluessel: "kredite", auch: ["/gesellschaften/kredite"] },
       { bereich: "gesellschaften", pfad: "/refinanzierung", textSchluessel: "refinanzierung" },
       { bereich: "gesellschaften", pfad: "/zinsrisiko", textSchluessel: "zinsrisiko" },
+      { bereich: "gesellschaften", pfad: "/sondertilgungen", textSchluessel: "sondertilgungen" },
       { bereich: "gesellschaften", pfad: "/sicherheiten", textSchluessel: "sicherheiten" },
       { bereich: "gesellschaften", pfad: "/beleihungsreserve", textSchluessel: "beleihungsreserve" },
       { bereich: "gesellschaften", pfad: "/kredite/angebote", textSchluessel: "bankangebote", aktion: "schreiben" },
