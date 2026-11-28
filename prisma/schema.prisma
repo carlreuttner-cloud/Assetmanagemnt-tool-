@@ -1002,6 +1002,8 @@ model Aenderungsprotokoll {
 enum ImportArt {
   KREDITBUCHUNGEN
   MIETERLISTE
+  /// alte Leerstandsliste (mehrere Häuser und Stichtage)
+  LEERSTANDSLISTE
 }
 
 /// Protokoll jedes übernommenen Imports: wer, wann, welche Datei und was sich geändert hat.

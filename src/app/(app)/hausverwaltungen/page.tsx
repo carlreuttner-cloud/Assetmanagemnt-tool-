@@ -16,6 +16,7 @@ import { formatierer } from "@/lib/format";
 import { dezimal } from "@/lib/geld";
 import { entwicklung, haeuserAm } from "@/lib/hausverwaltung";
 import { hausverwaltungSpeichern } from "./aktionen";
+import { geteilteReihen } from "./ton";
 
 export default async function HausverwaltungenSeite() {
   const kontext = await pruefeZugriff("haeuser");
@@ -44,11 +45,14 @@ export default async function HausverwaltungenSeite() {
       return { v, ids, einheiten: bestand.reduce((s, h) => s + h.einheiten, 0), flaeche, leerFlaeche, quote: flaeche.isZero() ? null : leerFlaeche.dividedBy(flaeche).times(100), leere: leere.length, entgangen, ohneErwartet };
     }),
   );
-  const reihen = verwaltungen.map((v, i) => ({
-    name: v.name,
-    farbe: DIAGRAMM_FARBEN[i % DIAGRAMM_FARBEN.length],
-    punkte: entwicklung(staende, { zuordnungen, hausverwaltungId: v.id }).map((p) => ({ x: p.stichtag, y: p.summen.leerQuote.wert })),
-  }));
+  const reihen = verwaltungen.flatMap((v, i) =>
+    geteilteReihen(
+      v.name,
+      DIAGRAMM_FARBEN[i % DIAGRAMM_FARBEN.length],
+      entwicklung(staende, { zuordnungen, hausverwaltungId: v.id }).map((p) => ({ x: p.stichtag, y: p.summen.leerQuote.wert, nurLeerstand: p.nurLeerstand })),
+      t.mieterstand.arten.NUR_LEERSTAND,
+    ),
+  );
 
   return (
     <div className="max-w-6xl space-y-6">
@@ -101,7 +105,7 @@ export default async function HausverwaltungenSeite() {
         <Karte titel={th.entwicklungVergleich}>
           <p className="mb-3 text-xs text-slate-500">{th.entwicklungVergleichBeschreibung}</p>
           <Liniendiagramm reihen={reihen} formatY={(w) => f.prozent(w, 1)} formatX={(d) => f.datum(d).slice(3)} ab0 />
-          <p className="mt-2 text-xs text-slate-500">{th.lueckeHinweis}</p>
+          <p className="mt-2 text-xs text-slate-500">{th.lueckeHinweis} {th.gestricheltHinweis}</p>
         </Karte>
       )}
 
