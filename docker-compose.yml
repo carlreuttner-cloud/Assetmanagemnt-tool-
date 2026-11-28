@@ -32,6 +32,9 @@ services:
       DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
       SEED_PASSWORT: ${SEED_PASSWORT:-}
       UPLOAD_DIR: /app/uploads
+      # für „npm run mail:test“ (Testmails an den lokalen Test-Mailserver)
+      MAIL_SMTP_HOST: mail-eingang
+      EINGANG_MAIL_DOMAIN: ${EINGANG_MAIL_DOMAIN:-}
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -50,8 +53,35 @@ services:
       # KI (optional): ohne Schlüssel läuft die App normal, KI-Funktionen zeigen einen Hinweis
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       KI_MODELL: ${KI_MODELL:-}
+      # Öffentliche Adresse für Upload-Links (optional, lokal leer lassen)
+      APP_URL: ${APP_URL:-}
+      # E-Mail-Eingang: Domain der Import-Adressen; Webhook für einen echten Mail-Dienst nur mit Schlüssel
+      EINGANG_MAIL_DOMAIN: ${EINGANG_MAIL_DOMAIN:-}
+      EINGANG_MAIL_SCHLUESSEL: ${EINGANG_MAIL_SCHLUESSEL:-}
     ports:
       - "3000:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Lokaler Test-Mailserver für den E-Mail-Eingang (nur Testmails; echter Empfang: Produktionsreife)
+  mail-eingang:
+    build:
+      context: .
+      target: builder
+    command: npm run mail:eingang
+    user: app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://immo:${POSTGRES_PASSWORD}@db:5432/immo?schema=public
+      UPLOAD_DIR: /app/uploads
+      EINGANG_MAIL_DOMAIN: ${EINGANG_MAIL_DOMAIN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      KI_MODELL: ${KI_MODELL:-}
+    ports:
+      - "127.0.0.1:2525:2525"
     volumes:
       - uploads:/app/uploads
     depends_on:

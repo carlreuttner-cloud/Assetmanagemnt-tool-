@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { Begriff, Kennzahl } from "@/components/herleitung";
 import { LeerstandZelle, NutzungsartPunkt } from "@/components/nutzungsart";
 import { KnopfLink, Leer, MieteZelle, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
@@ -6,13 +7,17 @@ import { texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { heute } from "@/lib/datum";
+import { ladeHausverwaltungen, ladeZuordnungen, passtZuHv, verwaltungJeHaus } from "@/lib/daten/hausverwaltung";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { formatierer, type Formatierer } from "@/lib/format";
 import { addiere, hausKennzahlen, kennzahlenAus, leereSummen, type Kennzahlen, type Summen } from "@/lib/kennzahlen";
 import { NUTZUNGSARTEN, nutzungsartAus, type Nutzungsart } from "@/lib/nutzungsart";
+import { hvOptionen } from "../hausverwaltungen/ton";
 
 export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser">) {
-  const { gesellschaft, art: artParam } = await searchParams;
+  const { gesellschaft, art: artParam, hv: hvParam, sort: sortParam } = await searchParams;
+  const hv = typeof hvParam === "string" && hvParam ? hvParam : undefined;
+  const sort = sortParam === "hv" ? "hv" : undefined;
   const art = nutzungsartAus(artParam);
   const kontext = await pruefeZugriff("haeuser");
   const t = texte(kontext.mandant.sprache);
@@ -21,7 +26,7 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
   const filter = typeof gesellschaft === "string" && gesellschaft ? gesellschaft : undefined;
 
   const grundlage = await ladeRechengrundlage(kontext, { bereich: true });
-  const [haeuser, gesellschaften] = await Promise.all([
+  const [haeuser, gesellschaften, zuordnungen, verwaltungen] = await Promise.all([
     kontext.db.haus.findMany({
       where: { id: erlaubt(grundlage.sicht.hausIds), gesellschaftId: filter },
       orderBy: [{ ort: "asc" }, { bezeichnung: "asc" }],
@@ -32,20 +37,27 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    ladeZuordnungen(kontext),
+    ladeHausverwaltungen(kontext),
   ]);
+  const hvJeHaus = verwaltungJeHaus(zuordnungen, stichtag);
   const { kredite, referenzwerte } = grundlage;
   const daten = new Map(grundlage.haeuser.map((h) => [h.id, h]));
   const zeilen = haeuser
     .map((h) => ({ h, k: hausKennzahlen(daten.get(h.id)!, kredite, referenzwerte, stichtag) }))
     // Filter Nutzungsart: nur Häuser, die Einheiten dieser Art haben
-    .filter((z) => !art || z.k.nachArt[art].einheiten > 0);
-  const href = (werte: { gesellschaft?: string; art?: Nutzungsart }) => {
+    .filter((z) => !art || z.k.nachArt[art].einheiten > 0)
+    .filter((z) => passtZuHv(hv, hvJeHaus.get(z.h.id)));
+  // Sortierung nach Hausverwaltung: Häuser ohne Hausverwaltung zuletzt
+  if (sort === "hv") zeilen.sort((a, b) => (hvJeHaus.get(a.h.id)?.name ?? "\uffff").localeCompare(hvJeHaus.get(b.h.id)?.name ?? "\uffff", "de") || a.h.bezeichnung.localeCompare(b.h.bezeichnung, "de"));
+  const href = (werte: { gesellschaft?: string; art?: Nutzungsart; hv?: string; sort?: string }) => {
     const p = new URLSearchParams();
-    if (werte.gesellschaft) p.set("gesellschaft", werte.gesellschaft);
-    if (werte.art) p.set("art", werte.art);
+    for (const [k, w] of Object.entries(werte)) if (w) p.set(k, w);
     const q = p.toString();
     return q ? `/haeuser?${q}` : "/haeuser";
   };
+  const aktuell = { gesellschaft: filter, art, hv, sort };
+  const th = t.hausverwaltungen;
   // Summenzeile: Häuser plus anteilige Kredite (über die Häuser summiert)
   const summe = kennzahlenAus(zeilen.reduce<Summen>((s, z) => addiere(s, z.k), leereSummen()));
   const schreiben = darf(kontext.rolle, "haeuser", "schreiben");
@@ -59,19 +71,38 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
         aktionen={schreiben && <KnopfLink href={`/haeuser/neu${filter ? `?gesellschaft=${filter}` : ""}`} art="primaer">{t.haeuser.neu}</KnopfLink>}
       />
 
-      {gesellschaften.length > 1 && (
-        <div className="mb-4 flex flex-wrap gap-2 text-sm">
-          <FilterLink href={href({ art })} aktiv={!filter} text={t.haeuser.alleGesellschaften} />
-          {gesellschaften.map((g) => (
-            <FilterLink key={g.id} href={href({ gesellschaft: g.id, art })} aktiv={filter === g.id} text={g.name} />
-          ))}
-        </div>
+      {(gesellschaften.length > 1 || verwaltungen.length > 0) && (
+        <FilterZeile>
+          {gesellschaften.length > 1 && (
+            <AuswahlFilter
+              name="gesellschaft"
+              label={t.listen.gesellschaft}
+              optionen={[
+                { href: href({ ...aktuell, gesellschaft: undefined }), text: t.haeuser.alleGesellschaften, aktiv: !filter },
+                ...gesellschaften.map((g) => ({ href: href({ ...aktuell, gesellschaft: g.id }), text: g.name, aktiv: filter === g.id })),
+              ]}
+            />
+          )}
+          {verwaltungen.length > 0 && (
+            <>
+              <AuswahlFilter name="hv" label={th.filter} optionen={hvOptionen(verwaltungen, hv, (w) => href({ ...aktuell, hv: w }), t)} />
+              <AuswahlFilter
+                name="sort"
+                label={th.sortierung}
+                optionen={[
+                  { href: href({ ...aktuell, sort: undefined }), text: th.sortStandard, aktiv: !sort },
+                  { href: href({ ...aktuell, sort: "hv" }), text: th.sortHv, aktiv: sort === "hv" },
+                ]}
+              />
+            </>
+          )}
+        </FilterZeile>
       )}
       <Reiter
         eintraege={[
-          { href: href({ gesellschaft: filter }), text: t.nutzung.alle, aktiv: !art },
+          { href: href({ ...aktuell, art: undefined }), text: t.nutzung.alle, aktiv: !art },
           ...NUTZUNGSARTEN.map((a) => ({
-            href: href({ gesellschaft: filter, art: a }),
+            href: href({ ...aktuell, art: a }),
             text: (
               <span className="inline-flex items-center gap-1.5">
                 <NutzungsartPunkt art={a} />
@@ -119,6 +150,14 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
                     <div className="text-xs text-slate-500">
                       {[h.plz, h.ort].filter(Boolean).join(" ")} · {h.gesellschaft.name}
                     </div>
+                    {hvJeHaus.get(h.id) && (
+                      <div className="text-xs text-slate-500" data-hv={hvJeHaus.get(h.id)!.name}>
+                        {th.kurz}:{" "}
+                        <Link href={`/hausverwaltungen/${hvJeHaus.get(h.id)!.id}`} className="hover:underline">
+                          {hvJeHaus.get(h.id)!.name}
+                        </Link>
+                      </div>
+                    )}
                   </td>
                   <td className={rechts}>
                     {k.einheiten}
@@ -177,17 +216,6 @@ export default async function HaeuserSeite({ searchParams }: PageProps<"/haeuser
         )}
       </div>
     </div>
-  );
-}
-
-function FilterLink({ href, aktiv, text }: { href: string; aktiv: boolean; text: string }) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-full px-3 py-1 ring-1 ring-inset ${aktiv ? "bg-slate-900 text-white ring-slate-900" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
-    >
-      {text}
-    </Link>
   );
 }
 
