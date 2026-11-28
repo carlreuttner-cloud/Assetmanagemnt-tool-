@@ -2,7 +2,8 @@
  * Verkaufs-Waterfall: Verteilung eines Verkaufserlöses einer Gesellschaft. Reine Funktionen.
  *
  * Reihenfolge:
- *   Verkaufspreis − Verkaufskosten − Kreditablösung − Vorfälligkeitsentschädigung − Steuern = Netto-Erlös
+ *   Verkaufspreis − Verkaufskosten − Ablösung der Bankdarlehen − Vorfälligkeitsentschädigung − Steuern = Netto-Erlös
+ *   0. Nachrang- und Gesellschafterdarlehen nach Rang (gleicher Rang anteilig, ohne Rang zuletzt)
  *   1. Rückzahlung der Einlagen (anteilig nach offenem Einlagensaldo)
  *   2. Vorzugsrendite auf das eingezahlte Kapital (anteilig nach offener Vorzugsrendite)
  *   3. Gewinnverteilung des Rests nach den vertraglichen Gewinnanteilen
@@ -40,9 +41,17 @@ export interface WaterfallVerkauf {
   preisAnnahme: boolean;
 }
 
+export type WaterfallKreditArt = "BANK" | "GESELLSCHAFTERDARLEHEN" | "NACHRANGDARLEHEN";
+
 export interface WaterfallKredit {
   id: string;
   name: string;
+  /** fehlt = Bankdarlehen */
+  art?: WaterfallKreditArt;
+  /** Rang bei Nachrang- und Gesellschafterdarlehen (1 = zuerst); null = zuletzt */
+  rang?: number | null;
+  /** Darlehensgeber bei Gesellschafterdarlehen */
+  gesellschafterId?: string | null;
   /** Summe der Anteile der verkauften Häuser an diesem Kredit in Prozent */
   anteilProzent: Decimal;
   /** belegte Restschuld (ganzer Kredit) oder null */
@@ -91,12 +100,16 @@ export interface GesellschafterAnteil {
   ausschuettungenBisher: Decimal;
   offeneEinlage: Decimal;
   offeneVorzugsrendite: Decimal | null;
+  /** Rückzahlung eigener Gesellschafterdarlehen; 0 ohne Darlehen */
+  darlehen: Decimal | null;
   rueckzahlung: Decimal | null;
   vorzugsrendite: Decimal | null;
   gewinn: Decimal | null;
   summe: Decimal | null;
-  /** (Summe + bisherige Rückzahlungen und Ausschüttungen) ÷ Einlagen */
+  /** (Summe + bisherige Rückzahlungen und Ausschüttungen) ÷ Einlagen; ohne Darlehen */
   multiple: Decimal | null;
+  /** Summe + Darlehen */
+  gesamt: Decimal | null;
 }
 
 export interface KreditAbloesung {
@@ -107,17 +120,25 @@ export interface KreditAbloesung {
   restschuldStichtag: IsoDatum | null;
   abloesung: Decimal | null;
   vorfaelligkeit: Decimal | null;
+  art: WaterfallKreditArt;
+  rang: number | null;
+  nachrangig: boolean;
+  /** bei nachrangigen Darlehen: tatsächlich aus dem Netto-Erlös gezahlt */
+  gezahlt: Decimal | null;
 }
 
 export interface WaterfallErgebnis {
   verkaufspreis: Decimal | null;
   verkaufskosten: Decimal | null;
+  /** Ablösung der Bankdarlehen */
   kreditabloesung: Decimal | null;
   vorfaelligkeit: Decimal | null;
   steuern: Decimal | null;
   nettoErloes: Decimal | null;
   kredite: KreditAbloesung[];
-  stufen: { rueckzahlung: Decimal | null; vorzugsrendite: Decimal | null; gewinn: Decimal | null };
+  stufen: { nachrang: Decimal | null; rueckzahlung: Decimal | null; vorzugsrendite: Decimal | null; gewinn: Decimal | null };
+  /** Netto-Erlös reicht nicht für alle nachrangigen Darlehen */
+  nachrangUnterdeckung: boolean;
   gesellschafter: GesellschafterAnteil[];
   luecken: Luecke[];
   /** Netto-Erlös reicht nicht für die Rückzahlung der Einlagen */
@@ -142,7 +163,7 @@ export function verzinsung(betrag: Decimal, von: IsoDatum, bis: IsoDatum, satzPr
 }
 
 /** Verteilt einen Betrag anteilig nach Gewichten; die Rundungsdifferenz geht an den größten Anteil. */
-function verteile(betrag: Decimal, gewichte: Decimal[]): Decimal[] {
+export function verteile(betrag: Decimal, gewichte: Decimal[]): Decimal[] {
   const gesamt = summe(gewichte);
   if (gesamt.isZero()) return gewichte.map(() => null0());
   const teile = gewichte.map((g) => aufCent(betrag.times(g).dividedBy(gesamt)));
@@ -164,6 +185,7 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
   const kredite: KreditAbloesung[] = e.kredite.map((k) => {
     if (k.restschuld === null) luecken.push({ art: "restschuld", bezug: k.name });
     if (k.vorfaelligkeit === null) luecken.push({ art: "vorfaelligkeit", bezug: k.name });
+    const art = k.art ?? "BANK";
     return {
       id: k.id,
       name: k.name,
@@ -172,15 +194,42 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
       restschuldStichtag: k.restschuldStichtag,
       abloesung: k.restschuld ? aufCent(k.restschuld.times(k.anteilProzent).dividedBy(100)) : null,
       vorfaelligkeit: k.vorfaelligkeit,
+      art,
+      rang: k.rang ?? null,
+      nachrangig: art !== "BANK",
+      gezahlt: null,
     };
   });
-  const kreditabloesung = summeOderNull(kredite.map((k) => k.abloesung));
+  const bank = kredite.filter((k) => !k.nachrangig);
+  const nachrangige = kredite.filter((k) => k.nachrangig);
+  const kreditabloesung = summeOderNull(bank.map((k) => k.abloesung));
   const vorfaelligkeit = summeOderNull(kredite.map((k) => k.vorfaelligkeit));
   if (e.steuern === null) luecken.push({ art: "steuern" });
   const nettoErloes =
     verkaufspreis && verkaufskosten && kreditabloesung && vorfaelligkeit && e.steuern
       ? verkaufspreis.minus(verkaufskosten).minus(kreditabloesung).minus(vorfaelligkeit).minus(e.steuern)
       : null;
+
+  // Stufe 0: nachrangige Darlehen nach Rang aus dem Netto-Erlös
+  let verfuegbar: Decimal | null = nettoErloes === null ? null : nettoErloes.isNegative() ? null0() : nettoErloes;
+  let nachrangSumme: Decimal | null = nachrangige.length === 0 ? null0() : null;
+  let nachrangUnterdeckung = false;
+  if (verfuegbar !== null && nachrangige.every((k) => k.abloesung !== null)) {
+    const raenge = [...new Set(nachrangige.map((k) => k.rang ?? Number.MAX_SAFE_INTEGER))].sort((a, b) => a - b);
+    let gezahlt = null0();
+    for (const r of raenge) {
+      const gruppe = nachrangige.filter((k) => (k.rang ?? Number.MAX_SAFE_INTEGER) === r);
+      const forderung = summe(gruppe.map((k) => k.abloesung!));
+      const zahlung = kleiner(verfuegbar, forderung);
+      if (zahlung.lessThan(forderung)) nachrangUnterdeckung = true;
+      verteile(zahlung, gruppe.map((k) => k.abloesung!)).forEach((z, i) => (gruppe[i].gezahlt = z));
+      verfuegbar = verfuegbar.minus(zahlung);
+      gezahlt = gezahlt.plus(zahlung);
+    }
+    nachrangSumme = gezahlt;
+  } else if (nachrangige.length > 0) {
+    verfuegbar = null;
+  }
 
   // Gesellschafter: Einlagen, bisherige Rückflüsse
   if (e.gesellschafter.length === 0) luecken.push({ art: "keineGesellschafter" });
@@ -224,8 +273,8 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
   let vorzug: Decimal[] | null = null;
   let gewinn: Decimal[] | null = null;
   let unterdeckung = false;
-  if (nettoErloes && einzahlungenBekannt && e.vertrag) {
-    let rest = nettoErloes.isNegative() ? null0() : nettoErloes;
+  if (verfuegbar !== null && einzahlungenBekannt && e.vertrag) {
+    let rest = verfuegbar;
     const offen = basis.map((b) => (b.offeneEinlage.isNegative() ? null0() : b.offeneEinlage));
     const stufe1 = kleiner(rest, summe(offen));
     unterdeckung = rest.lessThan(summe(offen));
@@ -241,6 +290,8 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
 
   const gesellschafter: GesellschafterAnteil[] = basis.map((b, i) => {
     const s = rueckzahlung && vorzug && gewinn ? rueckzahlung[i].plus(vorzug[i]).plus(gewinn[i]) : null;
+    const eigene = nachrangige.filter((k) => k.art === "GESELLSCHAFTERDARLEHEN" && e.kredite.find((x) => x.id === k.id)?.gesellschafterId === b.g.id);
+    const darlehen = eigene.some((k) => k.gezahlt === null) ? null : summe(eigene.map((k) => k.gezahlt!));
     return {
       id: b.g.id,
       name: b.g.name,
@@ -249,11 +300,13 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
       ausschuettungenBisher: b.ausschuettungenBisher,
       offeneEinlage: b.offeneEinlage,
       offeneVorzugsrendite: offeneVorzug[i],
+      darlehen,
       rueckzahlung: rueckzahlung?.[i] ?? null,
       vorzugsrendite: vorzug?.[i] ?? null,
       gewinn: gewinn?.[i] ?? null,
       summe: s,
       multiple: s && !b.einlagen.isZero() ? s.plus(b.rueckzahlungenBisher).plus(b.ausschuettungenBisher).dividedBy(b.einlagen) : null,
+      gesamt: s && darlehen ? s.plus(darlehen) : null,
     };
   });
 
@@ -268,7 +321,8 @@ export function rechneWaterfall(e: WaterfallEingabe): WaterfallErgebnis {
     steuern: e.steuern,
     nettoErloes,
     kredite,
-    stufen: { rueckzahlung: rueckzahlung && summe(rueckzahlung), vorzugsrendite: vorzug && summe(vorzug), gewinn: gewinn && summe(gewinn) },
+    nachrangUnterdeckung,
+    stufen: { nachrang: nachrangSumme, rueckzahlung: rueckzahlung && summe(rueckzahlung), vorzugsrendite: vorzug && summe(vorzug), gewinn: gewinn && summe(gewinn) },
     gesellschafter,
     luecken: eindeutig,
     unterdeckung,
