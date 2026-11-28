@@ -85,7 +85,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 45 (C1): Investorenrenditen.** IRR, Eigenkapital-Multiple und Cash-on-Cash je Investor und Gesellschaft, nur aus datierten Zahlungen.
 - [x] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
 - [x] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
-- [ ] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
+- [x] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
 - [ ] **Phase 49 (C8): Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
 - [ ] **Phase 50 (D3): Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
 - [ ] **Phase 51 (D2): Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.

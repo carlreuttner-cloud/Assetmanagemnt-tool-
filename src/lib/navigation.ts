@@ -66,6 +66,7 @@ export const NAVIGATION: NavGruppe[] = [
     reiter: [
       { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang", aktion: "schreiben" },
       { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
+      { bereich: "dokumente", pfad: "/datenraum", textSchluessel: "datenraum", aktion: "schreiben" },
       { bereich: "import", pfad: "/import", textSchluessel: "import" },
     ],
   },
