@@ -24,6 +24,7 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "haeuser", pfad: "/bewertung", textSchluessel: "bewertung" },
       { bereich: "gesellschaften", pfad: "/kapitalkonten", textSchluessel: "kapitalkonten" },
       { bereich: "gesellschaften", pfad: "/renditen", textSchluessel: "renditen" },
+      { bereich: "gesellschaften", pfad: "/kapitalabrufe", textSchluessel: "kapitalabrufe" },
       { bereich: "uebersicht", pfad: "/fristen", textSchluessel: "fristen" },
       { bereich: "berichte", pfad: "/berichte", textSchluessel: "berichte" },
     ],

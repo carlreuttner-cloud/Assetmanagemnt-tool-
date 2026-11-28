@@ -8,6 +8,7 @@ import type { FristEingabe } from "@/lib/fristen";
 import { texte, type Texte } from "@/i18n";
 import { formatierer, type Formatierer } from "@/lib/format";
 import { erlaubt } from "./portfolio";
+import { ladeKapitalabrufe } from "./kapitalabruf";
 import { SONDERTILGUNG_FELDER, sondertilgungAusDb } from "./sondertilgung";
 import { laufendesJahr, sondertilgung, sondertilgungRegel } from "@/lib/sondertilgung";
 
@@ -29,7 +30,7 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
   const stichtag = heute();
   const mitKrediten = darf(kontext.rolle, "gesellschaften");
   const mitMietern = darf(kontext.rolle, "mieter");
-  const [gesellschaften, kredite, mvs] = await Promise.all([
+  const [gesellschaften, kredite, mvs, abrufe] = await Promise.all([
     kontext.db.gesellschaft.findMany({ where: { id: erlaubt(sicht.gesellschaftIds) }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     mitKrediten
       ? kontext.db.kredit.findMany({
@@ -58,8 +59,21 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
           },
         })
       : [],
+    mitKrediten ? ladeKapitalabrufe(kontext) : [],
   ]);
   return {
+    kapitalabrufe: abrufe
+      .filter((a) => a.stand.offen.greaterThan(0))
+      .map((a) => ({
+        id: a.id,
+        bezeichnung: a.bezeichnung,
+        gesellschaftId: a.gesellschaftId,
+        gesellschaft: a.gesellschaft,
+        faelligAm: a.faelligAm,
+        offen: f.betragGanz(a.stand.offen),
+        betrag: f.betragGanz(a.stand.betrag),
+        offeneGesellschafter: a.positionen.filter((p) => p.stand.offen.greaterThan(0)).length,
+      })),
     gesellschaften,
     kredite: kredite.map((k) => ({
       id: k.id,

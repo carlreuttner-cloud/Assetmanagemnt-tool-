@@ -91,6 +91,8 @@ model Mandant {
   portfolios              Portfolio[]
   lesezeichen             Lesezeichen[]
   dokumentSeiten          DokumentSeite[]
+  kapitalabrufe           Kapitalabruf[]
+  kapitalabrufPositionen  KapitalabrufPosition[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -216,6 +218,7 @@ model Gesellschaft {
   bankangebote      Bankangebot[]
   sicherheiten      Sicherheit[]
   quartalsberichte  Quartalsbericht[]
+  kapitalabrufe     Kapitalabruf[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -505,37 +508,37 @@ enum SondertilgungJahr {
 }
 
 model Kredit {
-  id                  String      @id @default(cuid())
-  mandantId           String
-  gesellschaftId      String
-  bezeichnung         String
+  id                        String             @id @default(cuid())
+  mandantId                 String
+  gesellschaftId            String
+  bezeichnung               String
   /// Bank bzw. Darlehensgeber
-  bank                String?
-  kreditart           KreditArt   @default(BANK)
+  bank                      String?
+  kreditart                 KreditArt          @default(BANK)
   /// Rang der Rückzahlung bei Nachrang- und Gesellschafterdarlehen (1 = zuerst); Bankdarlehen gehen immer vor
-  rang                Int?
+  rang                      Int?
   /// Darlehensgeber bei Gesellschafterdarlehen
-  gesellschafterId    String?
-  kreditnummer        String?
-  iban                String?
-  ursprungsbetrag     Decimal     @db.Decimal(14, 2)
-  auszahlungsdatum    DateTime?   @db.Date
-  zinsArt             ZinsArt
+  gesellschafterId          String?
+  kreditnummer              String?
+  iban                      String?
+  ursprungsbetrag           Decimal            @db.Decimal(14, 2)
+  auszahlungsdatum          DateTime?          @db.Date
+  zinsArt                   ZinsArt
   /// Fester Sollzins in Prozent p. a. (bei FEST)
-  sollzins            Decimal?    @db.Decimal(9, 6)
+  sollzins                  Decimal?           @db.Decimal(9, 6)
   /// Referenzzins bei VARIABEL, z. B. "3M-EURIBOR"
-  referenzzins        String?
+  referenzzins              String?
   /// Aufschlag auf den Referenzzins in Prozentpunkten
-  marge               Decimal?    @db.Decimal(9, 6)
-  zinsbindungBis      DateTime?   @db.Date
-  laufzeitBis         DateTime?   @db.Date
-  zahlweise           Zahlweise   @default(MONATLICH)
-  tilgungsart         Tilgungsart @default(ANNUITAET)
+  marge                     Decimal?           @db.Decimal(9, 6)
+  zinsbindungBis            DateTime?          @db.Date
+  laufzeitBis               DateTime?          @db.Date
+  zahlweise                 Zahlweise          @default(MONATLICH)
+  tilgungsart               Tilgungsart        @default(ANNUITAET)
   /// Anfängliche Tilgung in Prozent p. a. des Ursprungsbetrags
-  anfaenglicheTilgung Decimal?    @db.Decimal(9, 6)
+  anfaenglicheTilgung       Decimal?           @db.Decimal(9, 6)
   /// Annuität: aktuelle Rate (Zins + Tilgung) je Zahlung.
   /// Ratentilgung: Tilgungsbetrag je Zahlung. Endfällig: leer.
-  ratenbetrag         Decimal?    @db.Decimal(14, 2)
+  ratenbetrag               Decimal?           @db.Decimal(14, 2)
   /// Sondertilgungsrecht laut Vertrag; UNBEKANNT = nicht erfasst (Datenlücke)
   sondertilgungRecht        SondertilgungRecht @default(UNBEKANNT)
   /// Prozent des Ursprungsbetrags (PROZENT) oder Betrag in € (BETRAG) je Jahr
@@ -545,9 +548,9 @@ model Kredit {
   sondertilgungUebertragbar Boolean            @default(false)
   /// Recht gilt bis (leer: bis Ende der Zinsbindung bzw. Laufzeit)
   sondertilgungBis          DateTime?          @db.Date
-  notiz               String?
-  erstelltAm          DateTime    @default(now())
-  geaendertAm         DateTime    @updatedAt
+  notiz                     String?
+  erstelltAm                DateTime           @default(now())
+  geaendertAm               DateTime           @updatedAt
 
   mandant           Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft      Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
@@ -1173,10 +1176,11 @@ model Gesellschafter {
   notiz               String?
   angelegtAm          DateTime @default(now())
 
-  mandant      Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschaft Gesellschaft      @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  mandant      Mandant                @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft           @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
   bewegungen   Kapitalbewegung[]
   darlehen     Kredit[]
+  abrufe       KapitalabrufPosition[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -1193,9 +1197,12 @@ model Kapitalbewegung {
   betrag           Decimal            @db.Decimal(14, 2)
   quelle           String?
   notiz            String?
+  /// Zahlungseingang auf eine Position eines Kapitalabrufs
+  abrufPositionId  String?
 
-  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschafter Gesellschafter @relation(fields: [gesellschafterId], references: [id], onDelete: Cascade)
+  mandant        Mandant               @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschafter Gesellschafter        @relation(fields: [gesellschafterId], references: [id], onDelete: Cascade)
+  abrufPosition  KapitalabrufPosition? @relation(fields: [abrufPositionId], references: [id], onDelete: SetNull)
 
   @@index([mandantId])
   @@index([gesellschafterId])
@@ -1791,4 +1798,42 @@ model Quartalsbericht {
 
   @@index([mandantId])
   @@index([gesellschaftId, jahr, quartal])
+}
+
+/// Kapitalabruf einer Gesellschaft: Gesamtbetrag, anteilig nach Beteiligung auf die Gesellschafter verteilt.
+model Kapitalabruf {
+  id             String   @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  bezeichnung    String
+  abrufAm        DateTime @db.Date
+  faelligAm      DateTime @db.Date
+  gesamtbetrag   Decimal  @db.Decimal(14, 2)
+  notiz          String?
+  erstelltVon    String?
+  erstelltAm     DateTime @default(now())
+
+  mandant      Mandant                @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft           @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  positionen   KapitalabrufPosition[]
+
+  @@index([mandantId, gesellschaftId])
+}
+
+/// Anteil eines Gesellschafters an einem Kapitalabruf; Eingänge sind Einlagen (Kapitalbewegung) mit Verweis hierauf.
+model KapitalabrufPosition {
+  id               String  @id @default(cuid())
+  mandantId        String
+  abrufId          String
+  gesellschafterId String
+  /// Beteiligung zum Zeitpunkt des Abrufs
+  anteilProzent    Decimal @db.Decimal(9, 6)
+  betrag           Decimal @db.Decimal(14, 2)
+
+  mandant        Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  abruf          Kapitalabruf      @relation(fields: [abrufId], references: [id], onDelete: Cascade)
+  gesellschafter Gesellschafter    @relation(fields: [gesellschafterId], references: [id], onDelete: Cascade)
+  eingaenge      Kapitalbewegung[]
+
+  @@index([mandantId, abrufId])
 }

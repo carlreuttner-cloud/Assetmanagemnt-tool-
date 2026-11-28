@@ -83,7 +83,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 43 (B8): Ankaufsprüfung.** Neues Objekt mit Kaufpreis und Finanzierung durchrechnen, mit Auswirkung auf die Kennzahlen von Gesellschaft und Portfolio.
 - [x] **Phase 44 (C4): Gesellschafter- und Nachrangdarlehen.** Eigene Kreditart mit Rang, fließt in den Waterfall ein.
 - [x] **Phase 45 (C1): Investorenrenditen.** IRR, Eigenkapital-Multiple und Cash-on-Cash je Investor und Gesellschaft, nur aus datierten Zahlungen.
-- [ ] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
+- [x] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
 - [ ] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
 - [ ] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
 - [ ] **Phase 49 (C8): Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
