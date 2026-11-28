@@ -73,7 +73,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 36 (B5): Beleihungsreserve.** Mögliche Nachfinanzierung bei frei wählbarem Ziel-LTV je Haus, Gesellschaft und Portfolio, nur aus belegter Restschuld und Verkehrswert mit Stichtag.
 - [x] **Phase 37 (B7): Covenant-Nachweis.** Testtermine je Covenant im Fristenkalender, PDF für die Bank auf Knopfdruck mit Herleitung und Quellen.
 - [x] **Phase 38 (C2): Ausschüttungsplanung.** Geplante Ausschüttungen mit automatischer Prüfung von Liquidität, Ausschüttungssperren und Covenants.
-- [ ] **Phase 39 (C5): Quartalsbericht.** Automatisch erzeugt, mit 4-Augen-Freigabe und eingefrorenem Stand zum Stichtag.
+- [x] **Phase 39 (C5): Quartalsbericht.** Automatisch erzeugt, mit 4-Augen-Freigabe und eingefrorenem Stand zum Stichtag.
 
 ### Danach
 

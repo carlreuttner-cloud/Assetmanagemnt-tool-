@@ -73,6 +73,7 @@ model Mandant {
   bankangebote            Bankangebot[]
   sicherheiten            Sicherheit[]
   covenantNachweise       CovenantNachweis[]
+  quartalsberichte        Quartalsbericht[]
   sicherheitHaeuser       SicherheitHaus[]
   sicherheitKredite       SicherheitKredit[]
   aenderungsprotokoll     Aenderungsprotokoll[]
@@ -214,6 +215,7 @@ model Gesellschaft {
   planpositionen    Planposition[]
   bankangebote      Bankangebot[]
   sicherheiten      Sicherheit[]
+  quartalsberichte  Quartalsbericht[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -1715,4 +1717,39 @@ model CovenantNachweis {
 
   @@index([mandantId])
   @@index([kreditId, stichtag])
+}
+
+enum BerichtStatus {
+  ENTWURF
+  FREIGEGEBEN
+  VERWORFEN
+}
+
+/// Quartalsbericht mit eingefrorenem Stand zum Quartalsende (JSON) und Vier-Augen-Freigabe.
+/// gesellschaftId null = ganzes Portfolio des Mandanten.
+model Quartalsbericht {
+  id                 String        @id @default(cuid())
+  mandantId          String
+  gesellschaftId     String?
+  jahr               Int
+  quartal            Int
+  stichtag           DateTime      @db.Date
+  status             BerichtStatus @default(ENTWURF)
+  inhalt             Json
+  /// Kommentar der Geschäftsführung; nur im Entwurf änderbar
+  kommentar          String?
+  erstelltVonId      String
+  erstelltVonName    String
+  erstelltAm         DateTime      @default(now())
+  freigegebenVonId   String?
+  freigegebenVonName String?
+  freigegebenAm      DateTime?
+  verworfenGrund     String?
+  geaendertAm        DateTime      @updatedAt
+
+  mandant      Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft? @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([gesellschaftId, jahr, quartal])
 }
