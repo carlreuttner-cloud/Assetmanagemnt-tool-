@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ausschnitt,
   einheitlicherName,
+  erkenneAbsender,
   erkenneDatum,
   erkenneJahr,
   erkenneKategorie,
@@ -57,5 +58,21 @@ describe("Dokument-Vorschlag", () => {
     expect(teile.map((t) => t.text).join("")).toBe("Grundschuld und GRUNDSCHULD");
     expect(ausschnitt("aaa Flurstück 345/7 bbb", "flurstück")?.treffer).toBe("Flurstück");
     expect(ausschnitt("aaa", "zzz")).toBeNull();
+  });
+});
+
+describe("Absender", () => {
+  it("bekannte Bank aus den Krediten hat Vorrang", () => {
+    expect(erkenneAbsender("Saldenbestätigung\nSparkasse Hamburg\nDarlehen 4711", "Saldenbestätigung", ["Sparkasse Hamburg", "Deutsche Bank"])).toEqual({ art: "BANK", name: "Sparkasse Hamburg", grund: "bekannteBank", begriff: "Sparkasse Hamburg" });
+  });
+  it("Stichwort im Kopf mit Satzteil als Name", () => {
+    expect(erkenneAbsender("Grundbuch von Hamburg\nAmtsgericht Hamburg, Grundbuchamt. Abruf vom 14.03.2026", "Grundbuchauszug", [])).toMatchObject({ art: "BEHOERDE", name: "Amtsgericht Hamburg, Grundbuchamt", grund: "stichwort" });
+    expect(erkenneAbsender("Müller Hausverwaltung GmbH\nNebenkostenabrechnung 2025", null, [])).toMatchObject({ art: "HAUSVERWALTUNG", name: "Müller Hausverwaltung GmbH" });
+  });
+  it("Registergericht im Briefkopf macht einen Jahresabschluss nicht zur Behördenpost", () => {
+    expect(erkenneAbsender("Jahresabschluss zum 31.12.2025\nLindenhof GmbH\nAmtsgericht Berlin (Charlottenburg), HRA 990011 B", "Jahresabschluss", [])).toEqual({ art: "STEUERBERATER", name: null, grund: "kategorie", begriff: "Jahresabschluss" });
+  });
+  it("ohne Hinweise kein Vorschlag (unbekannt statt geraten)", () => {
+    expect(erkenneAbsender("Sehr geehrte Damen und Herren", null, [])).toBeNull();
   });
 });

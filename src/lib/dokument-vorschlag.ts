@@ -145,3 +145,81 @@ export function markiere(text: string, begriff: string): Array<{ text: string; t
   if (pos < text.length) teile.push({ text: text.slice(pos), treffer: false });
   return teile;
 }
+
+// ---------------------------------------------------------------------------
+// Absender
+// ---------------------------------------------------------------------------
+
+export const ABSENDER_ARTEN = ["BANK", "HAUSVERWALTUNG", "GUTACHTER", "STEUERBERATER", "NOTAR", "BEHOERDE", "VERSICHERUNG", "MIETER", "GESELLSCHAFTER", "SONSTIGE"] as const;
+export type AbsenderArt = (typeof ABSENDER_ARTEN)[number];
+
+/** Stichwörter je Absender-Art (klein geschrieben); das erste ist am aussagekräftigsten. */
+const ABSENDER_WOERTER: Array<{ art: AbsenderArt; woerter: string[] }> = [
+  { art: "BANK", woerter: ["sparkasse", "volksbank", "raiffeisenbank", "landesbank", "hypothekenbank", "bank ag", "bank eg", "bausparkasse"] },
+  { art: "HAUSVERWALTUNG", woerter: ["hausverwaltung", "immobilienverwaltung", "objektverwaltung", "wohnungsverwaltung", "property management"] },
+  { art: "GUTACHTER", woerter: ["sachverständige", "sachverständiger", "gutachter", "sachverständigenbüro"] },
+  { art: "STEUERBERATER", woerter: ["steuerberatungsgesellschaft", "steuerberater", "wirtschaftsprüfungsgesellschaft", "wirtschaftsprüfer"] },
+  { art: "NOTAR", woerter: ["notarin", "notar ", "notariat"] },
+  { art: "BEHOERDE", woerter: ["amtsgericht", "finanzamt", "grundbuchamt", "registergericht", "landratsamt", "bezirksamt", "stadtverwaltung"] },
+  { art: "VERSICHERUNG", woerter: ["versicherung ag", "versicherungs-ag", "versicherungsgesellschaft", "versicherer"] },
+];
+
+/** Übliche Absender-Art je Kategorie, wenn der Text nichts Eindeutiges enthält. */
+const ABSENDER_JE_KATEGORIE: Partial<Record<Kategorie, AbsenderArt>> = {
+  Jahresabschluss: "STEUERBERATER",
+  BWA: "STEUERBERATER",
+  Handelsregisterauszug: "BEHOERDE",
+  Grundbuchauszug: "BEHOERDE",
+  Kaufvertrag: "NOTAR",
+  Verkehrswertgutachten: "GUTACHTER",
+  "Nachweis Gebäudeversicherung": "VERSICHERUNG",
+  Darlehensvertrag: "BANK",
+  Saldenbestätigung: "BANK",
+  Kontoauszug: "BANK",
+};
+
+export type AbsenderVorschlag = {
+  art: AbsenderArt;
+  name: string | null;
+  /** Begründung als Schlüssel und Begriff, z. B. { grund: "bekannteBank", begriff: "Sparkasse Hamburg" } */
+  grund: "bekannteBank" | "stichwort" | "kategorie";
+  begriff: string;
+};
+
+/** Zeile des Textes, in der das Stichwort steht (gekürzt) – als Vorschlag für den Namen. */
+function zeileMit(text: string, wort: string): string | null {
+  const zeile = text.split(/\r?\n/).find((z) => klein(z).includes(wort));
+  if (!zeile) return null;
+  // Nur der Satzteil mit dem Stichwort, z. B. „Amtsgericht Hamburg, Grundbuchamt“ statt der ganzen Zeile
+  const sauber = (zeile.split(/\.\s/).find((teil) => klein(teil).includes(wort)) ?? zeile).replace(/\s+/g, " ").trim();
+  return sauber.length > 80 ? null : sauber;
+}
+
+/**
+ * Absender aus dem Kopf des Dokuments (erste 800 Zeichen, dort steht der Briefkopf) und der
+ * Kategorie:
+ * 1. eine bekannte Bank aus den Krediten des Mandanten,
+ * 2. ein Stichwort einer Absender-Art (Sparkasse, Hausverwaltung, Sachverständiger …),
+ * 3. die übliche Absender-Art der Kategorie (ohne Namen).
+ * Hat die Kategorie eine übliche Absender-Art, zählen 1. und 2. nur, wenn sie dazu passen
+ * (z. B. nennt ein Jahresabschluss Banken und das Registergericht, kommt aber vom Steuerberater).
+ * Nur ein Vorschlag; der Benutzer bestätigt.
+ */
+export function erkenneAbsender(text: string, kategorie: string | null, bekannteBanken: string[]): AbsenderVorschlag | null {
+  const kopf = text.slice(0, 800);
+  const kk = klein(kopf);
+  const ueblich = kategorie ? ABSENDER_JE_KATEGORIE[kategorie as Kategorie] : undefined;
+  const passt = (art: AbsenderArt) => !ueblich || ueblich === art;
+  if (passt("BANK")) {
+    for (const bank of [...new Set(bekannteBanken)].filter((b) => b.length >= 4).sort((a, b) => b.length - a.length)) {
+      if (kk.includes(klein(bank))) return { art: "BANK", name: bank, grund: "bekannteBank", begriff: bank };
+    }
+  }
+  for (const { art, woerter } of ABSENDER_WOERTER) {
+    if (!passt(art)) continue;
+    for (const w of woerter) {
+      if (kk.includes(w)) return { art, name: zeileMit(kopf, w), grund: "stichwort", begriff: w.trim() };
+    }
+  }
+  return ueblich ? { art: ueblich, name: null, grund: "kategorie", begriff: kategorie! } : null;
+}

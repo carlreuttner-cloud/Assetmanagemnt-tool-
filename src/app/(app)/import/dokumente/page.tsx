@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { Formular } from "@/components/formular";
-import { Feld, Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
+import { Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
-import { DOKUMENT_TYPEN, MAX_DOKUMENT_MB } from "@/lib/dateispeicher";
 import { dokumentFilter, sucheDokumente } from "@/lib/daten/dateien";
 import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
+import { ABSENDER_ARTEN } from "@/lib/dokument-vorschlag";
 import { ImportReiter } from "../import-reiter";
-import { dokumentHochladen } from "./aktionen";
 
 export default async function DokumenteSeite({ searchParams }: PageProps<"/import/dokumente">) {
   const kontext = await pruefeZugriff("dokumente");
@@ -20,7 +19,9 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
   const sp = await searchParams;
   const begriff = (einParam(sp.q) ?? "").trim().slice(0, 100);
   const schreiben = darf(kontext.rolle, "dokumente", "schreiben");
-  const filter = dokumentFilter(await sichtbarkeit(kontext));
+  const sichtFilter = dokumentFilter(await sichtbarkeit(kontext));
+  const absender = ABSENDER_ARTEN.find((a) => a === einParam(sp.absender)) ?? null;
+  const filter = absender ? { AND: [sichtFilter, { absenderArt: absender }] } : sichtFilter;
 
   const [treffer, dokumente] = await Promise.all([
     begriff.length >= 2 ? sucheDokumente(kontext, begriff) : Promise.resolve(null),
@@ -33,6 +34,8 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
         titel: true,
         dateiname: true,
         kategorie: true,
+        absenderArt: true,
+        absenderName: true,
         jahr: true,
         dokumentDatum: true,
         bestaetigt: true,
@@ -56,6 +59,7 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
         <tr>
           <th>{td.name}</th>
           <th>{td.kategorie}</th>
+          <th>{td.absender}</th>
           <th>{td.zuordnung}</th>
           <th>{td.jahr} / {td.datum}</th>
           <th>{td.text}</th>
@@ -81,6 +85,10 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
               </div>
             </td>
             <td>{d.kategorie ?? "–"}</td>
+            <td>
+              {d.absenderArt ? td.absenderArten[d.absenderArt] : <span className="italic text-slate-400">{td.keinAbsender}</span>}
+              {d.absenderName && <div className="text-xs text-slate-500">{d.absenderName}</div>}
+            </td>
             <td>{d.gesellschaft?.name ?? d.haus?.bezeichnung ?? d.kredit?.bezeichnung ?? "–"}</td>
             <td>{d.jahr ?? (d.dokumentDatum ? f.datum(d.dokumentDatum) : "–")}</td>
             <td>
@@ -158,16 +166,12 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
 
       {schreiben && (
         <Karte titel={td.hochladen}>
-          <Formular aktion={dokumentHochladen} absenden={td.hochladenKnopf} laeuftText={td.laeuft}>
-            <Feld
-              name="datei"
-              typ="file"
-              label={td.datei}
-              hinweis={fuelle(td.dateiHinweis, { mb: MAX_DOKUMENT_MB })}
-              accept={Object.keys(DOKUMENT_TYPEN).join(",")}
-              pflicht
-            />
-          </Formular>
+          <p className="text-sm text-slate-600">
+            {t.eingang.zumImport}{" "}
+            <Link href="/posteingang" className="font-medium text-sky-700 hover:underline">
+              {t.eingang.zumPosteingang} →
+            </Link>
+          </p>
         </Karte>
       )}
 
@@ -178,7 +182,19 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
         </Karte>
       )}
 
-      <Karte titel={td.alle}>{fertig.length === 0 ? <Leer>{td.keine}</Leer> : liste(fertig)}</Karte>
+      <Karte titel={td.alle}>
+        <FilterZeile>
+          <AuswahlFilter
+            name="absender"
+            label={td.absenderFilter}
+            optionen={[
+              { href: "/import/dokumente", text: td.alleAbsender, aktiv: !absender },
+              ...ABSENDER_ARTEN.map((a) => ({ href: `/import/dokumente?absender=${a}`, text: td.absenderArten[a], aktiv: absender === a })),
+            ]}
+          />
+        </FilterZeile>
+        {fertig.length === 0 ? <Leer>{td.keine}</Leer> : liste(fertig)}
+      </Karte>
     </div>
   );
 }

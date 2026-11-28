@@ -48,7 +48,7 @@ async function ocrBild(pfad: string): Promise<string> {
 async function ocrPdf(pfad: string, seiten: number): Promise<string[]> {
   const ordner = await mkdtemp(join(tmpdir(), "ocr-"));
   try {
-    await ausfuehren("pdftoppm", ["-r", "250", "-gray", "-png", "-f", "1", "-l", String(seiten), pfad, join(ordner, "s")], { timeout: ZEITLIMIT * 2 });
+    await ausfuehren("pdftoppm", ["-r", "250", "-gray", "-png", "-f", "1", "-l", String(seiten), pfad, join(/*turbopackIgnore: true*/ ordner, "s")], { timeout: ZEITLIMIT * 2 });
     const bilder = (await readdir(ordner)).filter((d) => d.endsWith(".png")).sort();
     const texte: string[] = [];
     for (const b of bilder) texte.push(await ocrBild(join(ordner, b)));

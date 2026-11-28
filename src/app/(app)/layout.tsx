@@ -20,7 +20,7 @@ import { QUELLEN_COOKIE } from "@/lib/quellen";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const kontext = await getKontext();
   const t = texte(kontext.mandant.sprache);
-  const gruppen: NavGruppeMitText[] = erlaubteNavigation((b) => darf(kontext.rolle, b)).map((g) => ({
+  const gruppen: NavGruppeMitText[] = erlaubteNavigation((b, aktion) => darf(kontext.rolle, b, aktion)).map((g) => ({
     ...g,
     text: t.navigationGruppen[g.schluessel],
     reiterTexte: Object.fromEntries(g.reiter.map((r) => [r.pfad, t.navigation[r.textSchluessel]])),
@@ -141,7 +141,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 quellen: t.export.quellen,
                 monat: t.allgemein.monat,
                 jahr: t.allgemein.jahr,
+                glossar: Object.fromEntries(
+                  Object.entries(t.glossar)
+                    .filter(([k]) => k !== "titel")
+                    .map(([, v]) => [(v as { kurz: string }).kurz, (v as { lang: string }).lang]),
+                ),
+                auswahl: { ...t.exportAuswahl, regeln: { ...t.exportAuswahl.regeln } },
               }}
+              ki={{ erlaubt: darf(kontext.rolle, "kiAssistent") }}
             />
             <QuellenSchalter an={quellenAn} texte={{ schalter: t.quellen.schalter, an: t.quellen.an, aus: t.quellen.aus, hinweis: t.quellen.hinweis }} />
           </div>
