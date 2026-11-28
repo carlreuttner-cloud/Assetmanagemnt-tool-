@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
@@ -8,6 +9,8 @@ import { ladeEingangKandidaten, nimmAuf, uebernimm, type Uebernahme } from "@/li
 import { ABSENDER_ARTEN, DOKUMENT_KATEGORIEN, type AbsenderArt } from "@/lib/dokument-vorschlag";
 import type { EingangVorschlag } from "@/lib/eingang";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
+import { istAbsenderMuster, neueKennung, normalisiereAdresse } from "@/lib/mail-eingang";
+import { MAX_GUELTIG_TAGE, neuerSchluessel } from "@/lib/upload-link";
 
 const MAX_DATEIEN = 20;
 
@@ -95,13 +98,63 @@ export async function eingangAblehnen(id: string): Promise<AktionsErgebnis> {
 }
 
 /** Gibt eine Mail aus der Quarantäne zur Prüfung frei. */
-export async function eingangFreigeben(id: string): Promise<AktionsErgebnis> {
+/** Gibt einen Eintrag aus der Quarantäne frei; auf Wunsch wird der Absender künftig erlaubt. */
+export async function eingangFreigeben(id: string, erlauben = false): Promise<AktionsErgebnis> {
   return fuehreAus(async () => {
-    const { db, t } = await schreibKontext();
-    const e = await db.eingang.findFirst({ where: { id }, select: { status: true, vorschlag: true } });
+    const { kontext, db, t } = await schreibKontext();
+    const e = await db.eingang.findFirst({ where: { id }, select: { status: true, vorschlag: true, absenderAdresse: true, absenderHinweis: true } });
     if (!e || e.status !== "QUARANTAENE") throw new EingabeFehler(t.fehler.unbekannt);
     const v = e.vorschlag as unknown as EingangVorschlag | null;
     await db.eingang.update({ where: { id }, data: { status: v && v.sicherheit !== "niedrig" ? "ZU_PRUEFEN" : "UNSICHER" } });
+    if (erlauben && e.absenderAdresse && istAbsenderMuster(e.absenderAdresse)) {
+      const adresse = normalisiereAdresse(e.absenderAdresse);
+      if (!(await db.mailAbsender.findFirst({ where: { adresse }, select: { id: true } })))
+        await db.mailAbsender.create({ data: { adresse, name: e.absenderHinweis, absenderArt: v?.absenderArt ?? null, erstelltVonId: kontext.benutzer.id } as never });
+    }
+    refresh();
+  });
+}
+
+/** Legt die Import-Adresse an oder erneuert sie (die alte Adresse nimmt danach nichts mehr an). */
+export async function postfachErneuern(): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    const kennung = neueKennung(kontext.mandant.name);
+    const vorhanden = await db.mailPostfach.findFirst({ select: { id: true } });
+    if (vorhanden) await db.mailPostfach.update({ where: { id: vorhanden.id }, data: { kennung, aktiv: true } });
+    else await db.mailPostfach.create({ data: { kennung } as never });
+    refresh();
+  });
+}
+
+export async function postfachSchalten(aktiv: boolean): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    await db.mailPostfach.updateMany({ data: { aktiv } });
+    refresh();
+  });
+}
+
+export async function mailAbsenderAnlegen(_v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const tm = t.mailEingang;
+    const f = formularLeser(fd, kontext.mandant.sprache);
+    const adresse = normalisiereAdresse(f.pflicht("adresse", tm.adresse));
+    if (!istAbsenderMuster(adresse)) throw new EingabeFehler(tm.adresseFehler);
+    const absenderArt = f.text("absenderArt") as AbsenderArt | null;
+    if (absenderArt && !ABSENDER_ARTEN.includes(absenderArt)) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: t.dateien.absender }));
+    if (await db.mailAbsender.findFirst({ where: { adresse }, select: { id: true } })) throw new EingabeFehler(tm.schonBekannt);
+    await db.mailAbsender.create({ data: { adresse, name: f.text("name")?.slice(0, 200) ?? null, absenderArt, erstelltVonId: kontext.benutzer.id } as never });
+    refresh();
+    return { ok: tm.angelegt };
+  });
+}
+
+export async function mailAbsenderLoeschen(id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    await db.mailAbsender.deleteMany({ where: { id } });
     refresh();
   });
 }
@@ -110,6 +163,44 @@ export async function regelLoeschen(id: string): Promise<AktionsErgebnis> {
   return fuehreAus(async () => {
     const { db } = await schreibKontext();
     await db.zuordnungsregel.deleteMany({ where: { id } });
+    refresh();
+  });
+}
+
+/** Legt einen Upload-Link an. Der Link wird nur in dieser Antwort angezeigt, gespeichert wird der Hash. */
+export async function uploadLinkAnlegen(_v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const tu = t.uploadLink;
+    const f = formularLeser(fd, kontext.mandant.sprache);
+    const name = f.pflicht("name", tu.name).slice(0, 120);
+    const absenderArt = f.text("absenderArt") as AbsenderArt | null;
+    if (absenderArt && !ABSENDER_ARTEN.includes(absenderArt)) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: t.dateien.absender }));
+    const tageText = f.text("tage") ?? "30";
+    const tage = Number(tageText);
+    if (!/^\d{1,3}$/.test(tageText) || tage < 1 || tage > MAX_GUELTIG_TAGE) throw new EingabeFehler(fuelle(tu.tageFehler, { max: MAX_GUELTIG_TAGE }));
+    const gueltigBis = new Date();
+    gueltigBis.setDate(gueltigBis.getDate() + tage);
+    gueltigBis.setHours(23, 59, 59, 0);
+    const s = neuerSchluessel();
+    await db.uploadLink.create({ data: { name, absenderArt, schluesselHash: s.hash, schluesselEnde: s.ende, gueltigBis, erstelltVonId: kontext.benutzer.id } as never });
+    // Öffentliche Adresse aus APP_URL (Produktion), sonst aus der Anfrage (lokal)
+    let basis = process.env.APP_URL?.replace(/\/+$/, "");
+    if (!basis) {
+      const h = await headers();
+      const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+      basis = `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}`;
+    }
+    refresh();
+    return { ok: fuelle(tu.angelegt, { url: `${basis}/hochladen/${s.schluessel}` }) };
+  });
+}
+
+export async function uploadLinkWiderrufen(id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    const link = await db.uploadLink.findFirst({ where: { id, widerrufenAm: null }, select: { id: true } });
+    if (link) await db.uploadLink.update({ where: { id }, data: { widerrufenAm: new Date() } });
     refresh();
   });
 }

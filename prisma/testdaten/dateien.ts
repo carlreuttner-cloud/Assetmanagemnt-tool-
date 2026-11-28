@@ -16,6 +16,7 @@ const DOKUMENTE = [
   { datei: "JA2025_Lindenhof_final.pdf", bestaetigt: true },
   { datei: "Grundbuch_Abruf.pdf", bestaetigt: true },
   { datei: "Scan_0001.pdf", bestaetigt: false },
+  { datei: "TermSheet_Testbank_Nord.pdf", bestaetigt: true },
 ];
 
 export async function legeTestdokumenteAn(db: PrismaClient, mandantId: string, benutzerId: string) {

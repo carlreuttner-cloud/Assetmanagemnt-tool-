@@ -4,12 +4,20 @@
  * Feld für mehrere Dateien mit Ziehen und Ablegen (Drag & Drop). Die abgelegten Dateien landen
  * im normalen Datei-Feld, sodass das umgebende Formular sie wie ausgewählte Dateien sendet.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function DateiZone({ name, accept, texte }: { name: string; accept: string; texte: { ziehen: string; auswaehlen: string; gewaehlt: string; hinweis: string } }) {
   const feld = useRef<HTMLInputElement>(null);
   const [anzahl, setAnzahl] = useState(0);
   const [darueber, setDarueber] = useState(false);
+  // Nach dem Zurücksetzen des Formulars (erfolgreiches Hochladen) die Anzeige der Auswahl leeren
+  useEffect(() => {
+    const form = feld.current?.form;
+    if (!form) return;
+    const leeren = () => setAnzahl(0);
+    form.addEventListener("reset", leeren);
+    return () => form.removeEventListener("reset", leeren);
+  }, []);
   return (
     <div
       onDragOver={(e) => {
