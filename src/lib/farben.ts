@@ -25,3 +25,13 @@ export const NEUTRAL_FARBE = "#cbd5e1";
 
 /** Reihenfolge der Farben für allgemeine Diagramme (Kredite, Gesellschaften …). */
 export const DIAGRAMM_FARBEN = ["#0f766e", "#1d4ed8", "#b45309", "#7c3aed", "#be123c", "#4d7c0f", "#0369a1", "#a16207"];
+
+/**
+ * Gedämpfte Farben für Änderungen zwischen zwei Ständen: Text und heller Hintergrund.
+ * Die Bedeutung steht immer zusätzlich als Pfeil und im Tooltip, damit sie ohne Farbe lesbar ist.
+ */
+export const AENDERUNG_FARBE = {
+  besser: { text: "#2f6b4a", hintergrund: "#e5f1ea", rand: "#a9cdb7" }, // gedecktes Grün
+  schlechter: { text: "#9a4038", hintergrund: "#f7e7e4", rand: "#deb3ac" }, // gedämpftes Ziegelrot
+  neutral: { text: "#3f5f7f", hintergrund: "#e7edf4", rand: "#b3c3d6" }, // Schieferblau
+} as const;

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { Begriff } from "@/components/herleitung";
+import { StandVergleich } from "@/components/mieterstand";
 import { LeerstandKreis, NutzungsartMarke, NutzungsartPunkt } from "@/components/nutzungsart";
 import { Kachel, Kacheln, Leer, Marke, MieteZelle, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
@@ -12,6 +13,7 @@ import { bereichsSicht } from "@/lib/auth/auswahl";
 import type { Kontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { heute, isoDatum } from "@/lib/datum";
+import { ladeStaende, standAnsicht } from "@/lib/daten/mieterstand";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
@@ -47,7 +49,7 @@ export async function EinheitenListe({
   const sicht = await bereichsSicht(kontext);
   const darfMieter = darf(kontext.rolle, "mieter");
 
-  const [haeuser, einheiten] = await Promise.all([
+  const [haeuser, einheiten, staende] = await Promise.all([
     kontext.db.haus.findMany({
       where: { id: erlaubt(sicht.hausIds), gesellschaftId: filter.g },
       orderBy: { bezeichnung: "asc" },
@@ -61,7 +63,9 @@ export async function EinheitenListe({
         mietverhaeltnisse: { include: { mieter: { select: { name: true } } } },
       },
     }),
+    ladeStaende(kontext, erlaubt(sicht.hausIds, filter.h), filter.g),
   ]);
+  const staendeAnsicht = standAnsicht(staende, { stand: einParam(sp.stand), vergleich: einParam(sp.vergleich), art });
   const alleGesellschaften = await kontext.db.gesellschaft.findMany({
     where: { id: erlaubt(sicht.gesellschaftIds), haeuser: { some: { id: erlaubt(sicht.hausIds) } } },
     orderBy: { name: "asc" },
@@ -112,6 +116,16 @@ export async function EinheitenListe({
   return (
     <div className="space-y-4">
       <Seitenkopf titel={titel} beschreibung={beschreibung} />
+
+      <StandVergleich
+        ansicht={staendeAnsicht}
+        t={t}
+        f={f}
+        pfad={pfad}
+        erhalten={{ ...filter }}
+        nurAenderungen={sp.nur === "1"}
+        offen={!!(sp.stand || sp.vergleich || sp.nur)}
+      />
 
       <Kacheln>
         {(festeArt ? [festeArt] : sichtbareArten).map((a) => {

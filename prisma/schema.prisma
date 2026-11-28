@@ -98,6 +98,8 @@ model Mandant {
   energieausweise         Energieausweis[]
   energieverbraeuche      Energieverbrauch[]
   bauteile                Bauteil[]
+  mieterstaende           Mieterstand[]
+  mieterstandZeilen       MieterstandZeile[]
   briefvorlagen           Briefvorlage[]
   briefserien             Briefserie[]
 }
@@ -268,6 +270,7 @@ model Haus {
   energieausweise    Energieausweis[]
   energieverbraeuche Energieverbrauch[]
   bauteile           Bauteil[]
+  mieterstaende      Mieterstand[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -415,6 +418,7 @@ model Einheit {
   investitionen     Investition[]
   massnahmen        Massnahme[]
   dokumente         Dokument[]
+  standZeilen       MieterstandZeile[]
 
   @@index([mandantId])
   @@index([hausId])
@@ -1017,6 +1021,7 @@ model Importvorgang {
   benutzer Benutzer? @relation(fields: [benutzerId], references: [id], onDelete: SetNull)
   haus     Haus?     @relation(fields: [hausId], references: [id], onDelete: SetNull)
   kredit   Kredit?   @relation(fields: [kreditId], references: [id], onDelete: SetNull)
+  staende  Mieterstand[]
 
   @@index([mandantId, erstelltAm])
 }
@@ -2074,4 +2079,63 @@ model Briefserie {
   dokumente    Dokument[]
 
   @@index([mandantId])
+}
+
+enum MieterstandArt {
+  /// vollständige Mieterliste
+  VOLLSTAENDIG
+  /// nur Leerstandsdaten (z. B. alte Leerstandsliste); nicht genannte Einheiten sind unbekannt
+  NUR_LEERSTAND
+}
+
+/// Gespeicherter Stand einer Mieterliste je Haus. Wird nie überschrieben; bei mehreren
+/// Ständen zum selben Stichtag gilt der zuletzt angelegte.
+model Mieterstand {
+  id              String         @id @default(cuid())
+  mandantId       String
+  hausId          String
+  stichtag        DateTime       @db.Date
+  art             MieterstandArt @default(VOLLSTAENDIG)
+  /// Herkunft, z. B. Dateiname der importierten Liste
+  quelle          String
+  importvorgangId String?
+  erstelltVon     String?
+  erstelltAm      DateTime       @default(now())
+
+  mandant       Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus          Haus               @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  importvorgang Importvorgang?     @relation(fields: [importvorgangId], references: [id], onDelete: SetNull)
+  zeilen        MieterstandZeile[]
+
+  @@index([mandantId, hausId, stichtag])
+}
+
+/// Eine Einheit in einem Mieterstand. Fehlende Werte bleiben null (= unbekannt).
+model MieterstandZeile {
+  id             String     @id @default(cuid())
+  mandantId      String
+  standId        String
+  einheitId      String?
+  /// Bezeichnung wie in der Liste (bleibt erhalten, auch wenn die Einheit gelöscht wird)
+  einheit        String
+  art            EinheitArt
+  flaeche        Decimal?   @db.Decimal(10, 2)
+  /// true = leer, false = vermietet, null = unbekannt
+  leer           Boolean?
+  mieter         String?
+  beginn         DateTime?  @db.Date
+  ende           DateTime?  @db.Date
+  sollMiete      Decimal?   @db.Decimal(14, 2)
+  istMiete       Decimal?   @db.Decimal(14, 2)
+  /// Nebenkostenvorauszahlung je Monat
+  nebenkosten    Decimal?   @db.Decimal(14, 2)
+  /// erwartete Miete bei Leerstand (Soll-Miete der leeren Einheit)
+  erwarteteMiete Decimal?   @db.Decimal(14, 2)
+
+  mandant  Mandant     @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  stand    Mieterstand @relation(fields: [standId], references: [id], onDelete: Cascade)
+  einheitR Einheit?    @relation(fields: [einheitId], references: [id], onDelete: SetNull)
+
+  @@index([standId])
+  @@index([mandantId, einheitId])
 }

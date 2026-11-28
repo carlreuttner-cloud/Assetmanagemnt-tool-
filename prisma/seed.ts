@@ -24,6 +24,7 @@ import { bauePortal } from "./testdaten/portal";
 import { baueEnergie } from "./testdaten/energie";
 import { baueInstandhaltung } from "./testdaten/instandhaltung";
 import { baueSerienbriefe } from "./testdaten/serienbriefe";
+import { baueMieterstaende } from "./testdaten/mieterstaende";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
 import { baueZinssicherungen } from "./testdaten/zinssicherungen";
@@ -89,6 +90,7 @@ async function main() {
   await baueEnergie(db, mandantId);
   await baueInstandhaltung(db, mandantId);
   await baueSerienbriefe(db, mandantId);
+  await baueMieterstaende(db, mandantId);
 
   // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
   await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });
