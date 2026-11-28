@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StandVergleich } from "@/components/mieterstand";
 import { LeerstandKreis, NutzungsartMarke, NutzungsartPunkt } from "@/components/nutzungsart";
 import { Kachel, Kacheln, KnopfLink, Leer, Marke, MieteZelle, Reiter, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
@@ -6,6 +7,7 @@ import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { bereichsSicht } from "@/lib/auth/auswahl";
 import { heute, isoDatum } from "@/lib/datum";
+import { ladeStaende, standAnsicht } from "@/lib/daten/mieterstand";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
@@ -31,7 +33,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const sicht = await bereichsSicht(kontext);
   const hausIds = erlaubt(sicht.hausIds, hausFilter);
 
-  const [haeuser, einheiten] = await Promise.all([
+  const [haeuser, einheiten, staende] = await Promise.all([
     kontext.db.haus.findMany({ where: { id: erlaubt(sicht.hausIds) }, orderBy: { bezeichnung: "asc" }, select: { id: true, bezeichnung: true } }),
     kontext.db.einheit.findMany({
       where: { hausId: hausIds, art },
@@ -41,7 +43,10 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
         mietverhaeltnisse: { include: { mieter: { select: { id: true, name: true, istFirma: true } } }, orderBy: { beginn: "desc" } },
       },
     }),
+    ladeStaende(kontext, hausIds),
   ]);
+  const ein = (w: string | string[] | undefined) => (typeof w === "string" ? w : undefined);
+  const staendeAnsicht = standAnsicht(staende, { stand: ein(sp.stand), vergleich: ein(sp.vergleich), art });
 
   const vertraege = einheiten.flatMap((e) =>
     e.mietverhaeltnisse.map((m) => {
@@ -123,6 +128,16 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
         titel={tm.titel}
         beschreibung={t.seiten.mieter}
         aktionen={schreiben && <KnopfLink href="/mieter/neu" art="primaer">{tm.neuesMietverhaeltnis}</KnopfLink>}
+      />
+
+      <StandVergleich
+        ansicht={staendeAnsicht}
+        t={t}
+        f={f}
+        pfad="/mieter"
+        erhalten={{ status, haus: hausFilter, art, q: suche || undefined }}
+        nurAenderungen={sp.nur === "1"}
+        offen={!!(sp.stand || sp.vergleich || sp.nur)}
       />
 
       <Kacheln>
