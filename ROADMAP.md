@@ -91,7 +91,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 51 (D2): Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
 - [x] **Phase 52 (D1): Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
 - [x] **Phase 53: Stände der Mieterliste.** Jede übernommene Mieterliste bleibt als eigener Stand mit Stichtag und Quelle; Auswahl „Stand vom“ und „Vergleichen mit“ in Einheiten- und Mieteransicht, farbige Änderungen je Feld und Summe mit Pfeil und Tooltip, Zusammenfassung, Schalter „Nur Änderungen“.
-- [ ] **Phase 54: Hausverwaltungen.** Hausverwaltung als eigener Datensatz, je Haus mit Zeitraum; Filter und Sortierung in allen Listen, Leerstand je Hausverwaltung, Leerstandsentwicklung als Diagramm.
+- [x] **Phase 54: Hausverwaltungen.** Hausverwaltung als eigener Datensatz, je Haus mit Zeitraum; Filter und Sortierung in allen Listen, Leerstand je Hausverwaltung, Leerstandsentwicklung als Diagramm.
 - [ ] **Phase 55: Alte Leerstandslisten importieren.** Dateien mit mehreren Häusern und Stichtagen, Zuordnung mit Vorschau und Bestätigung, Stände „nur Leerstandsdaten“.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden

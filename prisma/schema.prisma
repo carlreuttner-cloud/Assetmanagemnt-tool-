@@ -99,6 +99,8 @@ model Mandant {
   energieverbraeuche      Energieverbrauch[]
   bauteile                Bauteil[]
   mieterstaende           Mieterstand[]
+  hausverwaltungen        Hausverwaltung[]
+  hausverwaltungZuordnungen HausverwaltungZuordnung[]
   mieterstandZeilen       MieterstandZeile[]
   briefvorlagen           Briefvorlage[]
   briefserien             Briefserie[]
@@ -271,6 +273,7 @@ model Haus {
   energieverbraeuche Energieverbrauch[]
   bauteile           Bauteil[]
   mieterstaende      Mieterstand[]
+  verwaltungen       HausverwaltungZuordnung[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -2138,4 +2141,41 @@ model MieterstandZeile {
 
   @@index([standId])
   @@index([mandantId, einheitId])
+}
+
+/// Hausverwaltung als Unternehmen (nicht der Benutzerzugang). Wird je Haus mit Zeitraum zugeordnet.
+model Hausverwaltung {
+  id              String   @id @default(cuid())
+  mandantId       String
+  name            String
+  ansprechpartner String?
+  email           String?
+  telefon         String?
+  notiz           String?
+  erstelltAm      DateTime @default(now())
+  geaendertAm     DateTime @updatedAt
+
+  mandant     Mandant                   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  zuordnungen HausverwaltungZuordnung[]
+
+  @@index([mandantId])
+}
+
+/// Zuordnung Haus → Hausverwaltung für einen Zeitraum; bis = null heißt „läuft“.
+model HausverwaltungZuordnung {
+  id               String    @id @default(cuid())
+  mandantId        String
+  hausId           String
+  hausverwaltungId String
+  von              DateTime  @db.Date
+  bis              DateTime? @db.Date
+  notiz            String?
+  erstelltAm       DateTime  @default(now())
+
+  mandant        Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus           Haus           @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  hausverwaltung Hausverwaltung @relation(fields: [hausverwaltungId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId, hausId])
+  @@index([hausverwaltungId])
 }
