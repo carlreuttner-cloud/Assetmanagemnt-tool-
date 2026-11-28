@@ -17,11 +17,12 @@ export default async function NeuerKreditSeite({ searchParams }: PageProps<"/ges
     orderBy: { bezeichnung: "asc" },
     select: { id: true, bezeichnung: true },
   });
+  const gesellschafter = await kontext.db.gesellschafter.findMany({ where: { gesellschaftId: gewaehlt.id }, orderBy: { name: "asc" }, select: { id: true, name: true } });
   return (
     <div className="max-w-4xl">
       <Seitenkopf titel={t.kredite.neu} zurueck={{ href: `/gesellschaften/${gewaehlt.id}`, text: gewaehlt.name }} />
       <Karte>
-        <KreditFormular t={t} f={formatierer(kontext.mandant)} gesellschaftId={gewaehlt.id} gesellschaften={gesellschaften} haeuser={haeuser} />
+        <KreditFormular t={t} f={formatierer(kontext.mandant)} gesellschaftId={gewaehlt.id} gesellschaften={gesellschaften} haeuser={haeuser} gesellschafter={gesellschafter} />
       </Karte>
     </div>
   );

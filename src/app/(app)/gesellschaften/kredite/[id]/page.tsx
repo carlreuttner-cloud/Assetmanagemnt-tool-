@@ -69,6 +69,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
     where: { id, gesellschaftId: erlaubt(grundlage.sicht.gesellschaftIds) },
     include: {
       gesellschaft: { select: { id: true, name: true } },
+      gesellschafter: { select: { name: true } },
       haeuser: { include: { haus: { select: { id: true, bezeichnung: true } } } },
       covenants: { orderBy: { kennzahl: "asc" } },
       buchungen: { orderBy: [{ datum: "desc" }] },
@@ -416,6 +417,9 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           <Angaben
             eintraege={[
               [tk.gesellschaft, <Link key="g" href={`/gesellschaften/${kredit.gesellschaft.id}`} className="hover:underline">{kredit.gesellschaft.name}</Link>],
+              [tk.kreditart, kredit.kreditart === "BANK" ? t.kreditarten.BANK : <Marke key="a" ton="warnung">{t.kreditarten[kredit.kreditart]}</Marke>],
+              ...(kredit.kreditart !== "BANK" ? ([[tk.rang, kredit.rang === null ? t.waterfall.ohneRang : fuelle(t.waterfall.rangWert, { rang: String(kredit.rang) })]] as Array<[string, string]>) : []),
+              ...(kredit.gesellschafter ? ([[tk.darlehensgeber, kredit.gesellschafter.name]] as Array<[string, string]>) : []),
               [tk.iban, kredit.iban],
               [tk.auszahlungsdatum, f.datum(kredit.auszahlungsdatum)],
               [tk.laufzeitBis, f.datum(kredit.laufzeitBis)],

@@ -482,6 +482,15 @@ enum Tilgungsart {
   ENDFAELLIG
 }
 
+enum KreditArt {
+  /// Bankdarlehen (vorrangig, in der Regel grundpfandrechtlich gesichert)
+  BANK
+  /// Darlehen eines Gesellschafters an die Gesellschaft
+  GESELLSCHAFTERDARLEHEN
+  /// Nachrangdarlehen eines Dritten (z. B. Mezzanine)
+  NACHRANGDARLEHEN
+}
+
 enum SondertilgungRecht {
   UNBEKANNT
   KEINES
@@ -500,7 +509,13 @@ model Kredit {
   mandantId           String
   gesellschaftId      String
   bezeichnung         String
+  /// Bank bzw. Darlehensgeber
   bank                String?
+  kreditart           KreditArt   @default(BANK)
+  /// Rang der Rückzahlung bei Nachrang- und Gesellschafterdarlehen (1 = zuerst); Bankdarlehen gehen immer vor
+  rang                Int?
+  /// Darlehensgeber bei Gesellschafterdarlehen
+  gesellschafterId    String?
   kreditnummer        String?
   iban                String?
   ursprungsbetrag     Decimal     @db.Decimal(14, 2)
@@ -536,6 +551,7 @@ model Kredit {
 
   mandant           Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft      Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  gesellschafter    Gesellschafter?    @relation(fields: [gesellschafterId], references: [id], onDelete: SetNull)
   haeuser           KreditHaus[]
   covenants         Covenant[]
   buchungen         Kreditbuchung[]
@@ -1160,6 +1176,7 @@ model Gesellschafter {
   mandant      Mandant           @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft Gesellschaft      @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
   bewegungen   Kapitalbewegung[]
+  darlehen     Kredit[]
 
   @@index([mandantId])
   @@index([gesellschaftId])

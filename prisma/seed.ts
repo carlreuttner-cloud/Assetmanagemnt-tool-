@@ -16,6 +16,7 @@ import { legeTestdokumenteAn } from "./testdaten/dateien";
 import { baueBankangebote } from "./testdaten/bankangebote";
 import { baueSicherheiten } from "./testdaten/sicherheiten";
 import { baueSondertilgungen } from "./testdaten/sondertilgung";
+import { baueNachrangdarlehen } from "./testdaten/nachrang";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
 import { baueZinssicherungen } from "./testdaten/zinssicherungen";
@@ -73,6 +74,7 @@ async function main() {
   await baueBankangebote(db, mandantId, admin.id);
   await baueSicherheiten(db, mandantId);
   await baueSondertilgungen(db, mandantId);
+  await baueNachrangdarlehen(db, mandantId);
 
   // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
   await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });

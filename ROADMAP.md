@@ -81,7 +81,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 41 (B3): Zinsrisiko.** Gewichteter Durchschnittszins, durchschnittliche Restlaufzeit der Zinsbindung, Anteil fest/variabel/abgesichert, Mehrkosten pro Jahr bei +100 Basispunkten.
 - [x] **Phase 42 (B6): Sondertilgungsrechte.** Erlaubt, genutzt und noch offen je Jahr, mit Frist im Kalender.
 - [x] **Phase 43 (B8): Ankaufsprüfung.** Neues Objekt mit Kaufpreis und Finanzierung durchrechnen, mit Auswirkung auf die Kennzahlen von Gesellschaft und Portfolio.
-- [ ] **Phase 44 (C4): Gesellschafter- und Nachrangdarlehen.** Eigene Kreditart mit Rang, fließt in den Waterfall ein.
+- [x] **Phase 44 (C4): Gesellschafter- und Nachrangdarlehen.** Eigene Kreditart mit Rang, fließt in den Waterfall ein.
 - [ ] **Phase 45 (C1): Investorenrenditen.** IRR, Eigenkapital-Multiple und Cash-on-Cash je Investor und Gesellschaft, nur aus datierten Zahlungen.
 - [ ] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
 - [ ] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
