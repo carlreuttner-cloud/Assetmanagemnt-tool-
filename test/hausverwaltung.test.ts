@@ -68,6 +68,9 @@ describe("Hausverwaltungen", () => {
     expect(p[0].summen.leerQuote.wert?.toString()).toBe("10");
     expect(p[0].summen.istMonat.wert).toBeNull();
     expect(p[0].nurLeerstand).toBe(true);
-    expect(entwicklung([stand("h2", "2025-12-31", [zeile("1", true, 60)], "NUR_LEERSTAND")])[0].summen.leerQuote.wert).toBeNull();
+    // ohne Stammdaten: Fläche aus den Zeilen des Stands (dort stehen alle Einheiten des Hauses)
+    const z = entwicklung([stand("h2", "2025-12-31", [zeile("1", true, 60), { ...zeile("2", false, 40), leer: null }], "NUR_LEERSTAND")]);
+    expect(z[0].summen.leerQuote.wert?.toString()).toBe("60");
+    expect(z[0].summen.leerQuote.unvollstaendig).toBe(true);
   });
 });

@@ -116,8 +116,8 @@ export function entwicklung(
         const summen = standSummen(s.zeilen);
         if (s.art === "NUR_LEERSTAND") {
           nurLeerstand = true;
-          const gesamt = o.flaecheJeHaus?.get(hausId) ?? null;
-          summen.flaeche = { wert: gesamt, unvollstaendig: gesamt === null };
+          const gesamt = o.flaecheJeHaus?.get(hausId) ?? summen.flaeche.wert;
+          summen.flaeche = { wert: gesamt, unvollstaendig: gesamt === null || (!o.flaecheJeHaus?.has(hausId) && summen.flaeche.unvollstaendig) };
           summen.istMonat = { wert: null, unvollstaendig: true };
           summen.sollMonat = { wert: null, unvollstaendig: true };
           summen.leerQuote =

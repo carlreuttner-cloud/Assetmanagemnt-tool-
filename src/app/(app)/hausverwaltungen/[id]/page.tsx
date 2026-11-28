@@ -18,6 +18,7 @@ import { formatierer } from "@/lib/format";
 import { dezimal, type Decimal } from "@/lib/geld";
 import { entwicklung, haeuserAm, type EntwicklungsPunkt } from "@/lib/hausverwaltung";
 import { inFlaeche } from "@/lib/nutzungsart";
+import { geteilteReihen } from "../ton";
 import { hausverwaltungLoeschen, hausverwaltungSpeichern, zuordnungLoeschen, zuordnungSpeichern } from "../aktionen";
 
 export default async function HausverwaltungSeite({ params }: PageProps<"/hausverwaltungen/[id]">) {
@@ -55,8 +56,8 @@ export default async function HausverwaltungSeite({ params }: PageProps<"/hausve
   const gesamt = entwicklung(staende, { zuordnungen: alleZuordnungen, hausverwaltungId: id });
   const jeHaus = jemals.map((hausId) => ({ hausId, punkte: entwicklung(staende, { zuordnungen: alleZuordnungen, hausverwaltungId: id, hausId }) }));
   const reihen = (wert: (p: EntwicklungsPunkt) => Decimal | null): Reihe[] => [
-    { name: th.gesamt, farbe: "#334155", punkte: gesamt.map((p) => ({ x: p.stichtag, y: wert(p) })) },
-    ...jeHaus.map((h, i) => ({ name: hausName.get(h.hausId) ?? h.hausId, farbe: DIAGRAMM_FARBEN[i % DIAGRAMM_FARBEN.length], gestrichelt: true, punkte: h.punkte.map((p) => ({ x: p.stichtag, y: wert(p) })) })),
+    ...geteilteReihen(th.gesamt, "#334155", gesamt.map((p) => ({ x: p.stichtag, y: wert(p), nurLeerstand: p.nurLeerstand })), tm.arten.NUR_LEERSTAND),
+    ...jeHaus.map((h, i) => ({ name: hausName.get(h.hausId) ?? h.hausId, farbe: DIAGRAMM_FARBEN[i % DIAGRAMM_FARBEN.length], punkte: h.punkte.map((p) => ({ x: p.stichtag, y: wert(p) })) })),
   ];
   const monat = (d: string) => f.datum(d).slice(3);
 
@@ -186,7 +187,9 @@ export default async function HausverwaltungSeite({ params }: PageProps<"/hausve
                 <Liniendiagramm reihen={reihen(wert)} formatY={format} formatX={monat} ab0 />
               </div>
             ))}
-            <p className="text-xs text-slate-500">{th.lueckeHinweis}</p>
+            <p className="text-xs text-slate-500">
+              {th.lueckeHinweis} {th.gestricheltHinweis}
+            </p>
             <details>
               <summary className="cursor-pointer text-sm text-sky-700">{th.tabelle}</summary>
               <Tabelle>
