@@ -67,6 +67,10 @@ async function main() {
 
   await legeTestdokumenteAn(db, mandantId, admin.id);
 
+  // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
+  await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });
+  await db.mailAbsender.create({ data: { mandantId, adresse: "@testbank-nord.example", name: "Testbank Nord AG", absenderArt: "BANK", erstelltVonId: admin.id } });
+
   // --- Mandant 2: zeigt Mandantentrennung und Mandantenwechsel ----------------------
   const m2 = await db.mandant.create({ data: { name: "Zweite Kunde AG", slug: "zweite-kunde" } });
   await db.mitgliedschaft.create({ data: { mandantId: m2.id, benutzerId: admin.id, rolle: "ADMIN" } });

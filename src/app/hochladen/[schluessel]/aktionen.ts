@@ -32,7 +32,8 @@ export async function linkHochladen(schluessel: string, _v: AktionsErgebnis, fd:
         daten: new Uint8Array(await datei.arrayBuffer()),
         dateiname: datei.name,
         quelle: "UPLOAD_LINK",
-        uploadLink: { id: link.id, name: link.name, absenderArt: link.absenderArt },
+        uploadLinkId: link.id,
+        absenderVorgabe: link.absenderArt ? { art: link.absenderArt, name: link.name, grund: "uploadLink" } : null,
         absenderHinweis: link.name,
         mailtext,
       });

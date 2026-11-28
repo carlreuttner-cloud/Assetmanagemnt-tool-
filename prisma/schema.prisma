@@ -67,6 +67,9 @@ model Mandant {
   eingaenge               Eingang[]
   zuordnungsregeln        Zuordnungsregel[]
   uploadLinks             UploadLink[]
+  mailPostfach            MailPostfach?
+  mailAbsender            MailAbsender[]
+  eingangMails            EingangMail[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
@@ -1394,6 +1397,7 @@ model Eingang {
   vorschlag       Json?
   hochgeladenVonId String?
   uploadLinkId    String?
+  eingangMailId   String?
   dokumentId      String?             @unique
   bearbeitetVonId String?
   bearbeitetAm    DateTime?
@@ -1402,6 +1406,7 @@ model Eingang {
   mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   dokument Dokument? @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
   uploadLink UploadLink? @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
+  eingangMail EingangMail? @relation(fields: [eingangMailId], references: [id], onDelete: SetNull)
 
   @@index([mandantId, status])
   @@index([mandantId, pruefsumme])
@@ -1430,6 +1435,71 @@ model UploadLink {
   eingaenge Eingang[]
 
   @@index([mandantId])
+}
+
+/// Import-Adresse des Mandanten für den E-Mail-Eingang: <kennung>@<EINGANG_MAIL_DOMAIN>
+model MailPostfach {
+  id          String   @id @default(cuid())
+  mandantId   String   @unique
+  kennung     String   @unique
+  aktiv       Boolean  @default(true)
+  erstelltAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+}
+
+/// Bekannte Absender für den E-Mail-Eingang: eine Adresse oder eine ganze Domain („@bank.de“).
+/// Mails anderer Absender kommen in Quarantäne.
+model MailAbsender {
+  id            String       @id @default(cuid())
+  mandantId     String
+  /// klein geschrieben; „@domain.de“ für alle Adressen der Domain
+  adresse       String
+  name          String?
+  absenderArt   AbsenderArt?
+  erstelltVonId String?
+  erstelltAm    DateTime     @default(now())
+  geaendertAm   DateTime     @updatedAt
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+
+  @@unique([mandantId, adresse])
+}
+
+enum MailErgebnis {
+  /// Anhänge in die Prüfung aufgenommen
+  AUFGENOMMEN
+  /// Unbekannter oder verdächtiger Absender: Anhänge in Quarantäne
+  QUARANTAENE
+  /// Keine verwertbaren Anhänge
+  OHNE_ANHANG
+  /// Bereits empfangen (gleiche Message-ID)
+  DOPPELT
+  FEHLER
+}
+
+/// Protokoll jeder empfangenen Mail an die Import-Adresse, auch wenn nichts aufgenommen wurde.
+model EingangMail {
+  id              String       @id @default(cuid())
+  mandantId       String
+  von             String
+  vonName         String?
+  betreff         String?
+  nachrichtId     String?
+  /// Ergebnis der Absenderprüfung des Mail-Dienstes (SPF/DKIM/DMARC), falls mitgeliefert
+  pruefung        String?
+  ergebnis        MailErgebnis
+  hinweis         String?
+  anzahlAnhaenge  Int          @default(0)
+  aufgenommen     Int          @default(0)
+  groesseBytes    Int          @default(0)
+  empfangenAm     DateTime     @default(now())
+
+  mandant   Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  eingaenge Eingang[]
+
+  @@index([mandantId, empfangenAm])
 }
 
 enum RegelMerkmal {

@@ -9,6 +9,7 @@ import { ladeEingangKandidaten, nimmAuf, uebernimm, type Uebernahme } from "@/li
 import { ABSENDER_ARTEN, DOKUMENT_KATEGORIEN, type AbsenderArt } from "@/lib/dokument-vorschlag";
 import type { EingangVorschlag } from "@/lib/eingang";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
+import { istAbsenderMuster, neueKennung, normalisiereAdresse } from "@/lib/mail-eingang";
 import { MAX_GUELTIG_TAGE, neuerSchluessel } from "@/lib/upload-link";
 
 const MAX_DATEIEN = 20;
@@ -97,13 +98,63 @@ export async function eingangAblehnen(id: string): Promise<AktionsErgebnis> {
 }
 
 /** Gibt eine Mail aus der Quarantäne zur Prüfung frei. */
-export async function eingangFreigeben(id: string): Promise<AktionsErgebnis> {
+/** Gibt einen Eintrag aus der Quarantäne frei; auf Wunsch wird der Absender künftig erlaubt. */
+export async function eingangFreigeben(id: string, erlauben = false): Promise<AktionsErgebnis> {
   return fuehreAus(async () => {
-    const { db, t } = await schreibKontext();
-    const e = await db.eingang.findFirst({ where: { id }, select: { status: true, vorschlag: true } });
+    const { kontext, db, t } = await schreibKontext();
+    const e = await db.eingang.findFirst({ where: { id }, select: { status: true, vorschlag: true, absenderAdresse: true, absenderHinweis: true } });
     if (!e || e.status !== "QUARANTAENE") throw new EingabeFehler(t.fehler.unbekannt);
     const v = e.vorschlag as unknown as EingangVorschlag | null;
     await db.eingang.update({ where: { id }, data: { status: v && v.sicherheit !== "niedrig" ? "ZU_PRUEFEN" : "UNSICHER" } });
+    if (erlauben && e.absenderAdresse && istAbsenderMuster(e.absenderAdresse)) {
+      const adresse = normalisiereAdresse(e.absenderAdresse);
+      if (!(await db.mailAbsender.findFirst({ where: { adresse }, select: { id: true } })))
+        await db.mailAbsender.create({ data: { adresse, name: e.absenderHinweis, absenderArt: v?.absenderArt ?? null, erstelltVonId: kontext.benutzer.id } as never });
+    }
+    refresh();
+  });
+}
+
+/** Legt die Import-Adresse an oder erneuert sie (die alte Adresse nimmt danach nichts mehr an). */
+export async function postfachErneuern(): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db } = await schreibKontext();
+    const kennung = neueKennung(kontext.mandant.name);
+    const vorhanden = await db.mailPostfach.findFirst({ select: { id: true } });
+    if (vorhanden) await db.mailPostfach.update({ where: { id: vorhanden.id }, data: { kennung, aktiv: true } });
+    else await db.mailPostfach.create({ data: { kennung } as never });
+    refresh();
+  });
+}
+
+export async function postfachSchalten(aktiv: boolean): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    await db.mailPostfach.updateMany({ data: { aktiv } });
+    refresh();
+  });
+}
+
+export async function mailAbsenderAnlegen(_v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const tm = t.mailEingang;
+    const f = formularLeser(fd, kontext.mandant.sprache);
+    const adresse = normalisiereAdresse(f.pflicht("adresse", tm.adresse));
+    if (!istAbsenderMuster(adresse)) throw new EingabeFehler(tm.adresseFehler);
+    const absenderArt = f.text("absenderArt") as AbsenderArt | null;
+    if (absenderArt && !ABSENDER_ARTEN.includes(absenderArt)) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: t.dateien.absender }));
+    if (await db.mailAbsender.findFirst({ where: { adresse }, select: { id: true } })) throw new EingabeFehler(tm.schonBekannt);
+    await db.mailAbsender.create({ data: { adresse, name: f.text("name")?.slice(0, 200) ?? null, absenderArt, erstelltVonId: kontext.benutzer.id } as never });
+    refresh();
+    return { ok: tm.angelegt };
+  });
+}
+
+export async function mailAbsenderLoeschen(id: string): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db } = await schreibKontext();
+    await db.mailAbsender.deleteMany({ where: { id } });
     refresh();
   });
 }

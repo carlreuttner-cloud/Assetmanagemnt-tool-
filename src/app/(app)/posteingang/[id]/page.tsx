@@ -8,6 +8,7 @@ import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { ladeEingangKandidaten } from "@/lib/daten/eingang";
 import type { EingangVorschlag } from "@/lib/eingang";
 import { formatierer } from "@/lib/format";
+import { mailHinweise } from "@/lib/mail-eingang";
 import { BestaetigenFormular } from "../../import/dokumente/[id]/bestaetigen-formular";
 import { eingangAblehnen, eingangFreigeben, eingangUebernehmen } from "../aktionen";
 import { Gruende, SicherheitMarke } from "../eingang-bausteine";
@@ -20,7 +21,7 @@ export default async function EingangSeite({ params }: PageProps<"/posteingang/[
   const te = t.eingang;
   const td = te.detail;
   const f = formatierer(kontext.mandant);
-  const e = await kontext.db.eingang.findFirst({ where: { id }, include: { dokument: { select: { id: true, titel: true } } } });
+  const e = await kontext.db.eingang.findFirst({ where: { id }, include: { dokument: { select: { id: true, titel: true } }, eingangMail: { select: { pruefung: true, hinweis: true } } } });
   if (!e) notFound();
   const v = e.vorschlag as unknown as EingangVorschlag | null;
   const seiten = Array.isArray(e.seiten) ? (e.seiten as string[]) : [];
@@ -73,8 +74,17 @@ export default async function EingangSeite({ params }: PageProps<"/posteingang/[
       {e.status === "QUARANTAENE" && (
         <Karte>
           <p className="mb-3 text-sm text-amber-900">{td.quarantaeneHinweis}</p>
+          {e.eingangMail && (
+            <ul className="mb-3 list-disc pl-5 text-sm text-slate-700" data-quarantaene-gruende>
+              {mailHinweise(e.eingangMail.hinweis).map((h) => (
+                <li key={h}>{t.mailEingang.hinweise[h as keyof typeof t.mailEingang.hinweise] ?? h}</li>
+              ))}
+              {e.eingangMail.pruefung && <li>{fuelle(t.mailEingang.pruefungText, { text: e.eingangMail.pruefung })}</li>}
+            </ul>
+          )}
           <div className="flex flex-wrap gap-3">
-            <Formular aktion={eingangFreigeben.bind(null, e.id)} absenden={td.freigeben} />
+            <Formular aktion={eingangFreigeben.bind(null, e.id, false)} absenden={td.freigeben} />
+            {e.absenderAdresse && <Formular aktion={eingangFreigeben.bind(null, e.id, true)} absenden={fuelle(t.mailEingang.freigebenUndErlauben, { adresse: e.absenderAdresse })} art="sekundaer" />}
             <Formular aktion={eingangAblehnen.bind(null, e.id)} absenden={td.ablehnen} art="gefahr" bestaetigen={td.ablehnenBestaetigen} />
           </div>
         </Karte>

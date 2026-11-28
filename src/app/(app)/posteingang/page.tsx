@@ -11,6 +11,7 @@ import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { eingangHochladen, regelLoeschen, schnellUebernehmen } from "./aktionen";
 import { SicherheitMarke } from "./eingang-bausteine";
+import { MailEingang } from "./mail-eingang";
 import { UploadLinks } from "./upload-links";
 
 const ANSICHTEN = {
@@ -30,7 +31,7 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
   const sp = await searchParams;
   const ansicht: Ansicht = (Object.keys(ANSICHTEN) as Ansicht[]).find((a) => a === einParam(sp.ansicht)) ?? "offen";
 
-  const [zahlen, eintraege, regeln, links] = await Promise.all([
+  const [zahlen, eintraege, regeln, links, postfach, mailAbsender, mails] = await Promise.all([
     kontext.db.eingang.groupBy({ by: ["status"], _count: { _all: true } }),
     kontext.db.eingang.findMany({
       where: { status: { in: [...ANSICHTEN[ansicht]] } },
@@ -47,6 +48,13 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
       orderBy: [{ widerrufenAm: { sort: "desc", nulls: "first" } }, { erstelltAm: "desc" }],
       take: 100,
       select: { id: true, name: true, absenderArt: true, schluesselEnde: true, gueltigBis: true, widerrufenAm: true, zuletztGenutzt: true, anzahlDateien: true, erstelltAm: true },
+    }),
+    kontext.db.mailPostfach.findFirst({ select: { kennung: true, aktiv: true } }),
+    kontext.db.mailAbsender.findMany({ orderBy: { adresse: "asc" }, select: { id: true, adresse: true, name: true, absenderArt: true } }),
+    kontext.db.eingangMail.findMany({
+      orderBy: { empfangenAm: "desc" },
+      take: 25,
+      select: { id: true, von: true, vonName: true, betreff: true, ergebnis: true, hinweis: true, pruefung: true, anzahlAnhaenge: true, aufgenommen: true, empfangenAm: true },
     }),
   ]);
   const anzahl = (a: Ansicht) => zahlen.filter((z) => (ANSICHTEN[a] as readonly string[]).includes(z.status)).reduce((s, z) => s + z._count._all, 0);
@@ -121,6 +129,8 @@ export default async function PosteingangSeite({ searchParams }: PageProps<"/pos
           </Tabelle>
         )}
       </Karte>
+
+      <MailEingang postfach={postfach} absender={mailAbsender} mails={mails} t={t} f={f} />
 
       <UploadLinks links={links} t={t} f={f} />
 
