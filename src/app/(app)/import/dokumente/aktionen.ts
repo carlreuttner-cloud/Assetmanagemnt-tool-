@@ -10,7 +10,7 @@ import { DOKUMENT_TYPEN, MAX_DOKUMENT_MB, dokumentTypAusInhalt, entferne, pfadAu
 import { alsDbDatum } from "@/lib/datum";
 import { dokumentFilter, ladeZuordnungsKandidaten } from "@/lib/daten/dateien";
 import { erkenneText } from "@/lib/dokument-text";
-import { DOKUMENT_KATEGORIEN, einheitlicherName, erkenneDatum, erkenneJahr, erkenneKategorie, erkenneObjekt, jahrbezogen, ueblicheZuordnung } from "@/lib/dokument-vorschlag";
+import { ABSENDER_ARTEN, DOKUMENT_KATEGORIEN, einheitlicherName, erkenneAbsender, type AbsenderArt, erkenneDatum, erkenneJahr, erkenneKategorie, erkenneObjekt, jahrbezogen, ueblicheZuordnung } from "@/lib/dokument-vorschlag";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
 
 async function schreibKontext() {
@@ -73,6 +73,8 @@ export async function dokumentHochladen(_v: AktionsErgebnis, fd: FormData): Prom
       const jahr = jahrbezogen(kategorie) ? erkenneJahr(volltext, dateiname) : null;
       const datum = jahr ? null : erkenneDatum(volltext);
       const objekt = erkenneObjekt(volltext, await ladeZuordnungsKandidaten(kontext), ueblicheZuordnung(kategorie))?.objekt ?? null;
+      const banken = await db.kredit.findMany({ where: { bank: { not: null } }, distinct: ["bank"], select: { bank: true } });
+      const absender = erkenneAbsender(volltext, kategorie, banken.map((b) => b.bank!));
       await db.dokument.update({
         where: { id: dokument.id },
         data: {
@@ -83,6 +85,8 @@ export async function dokumentHochladen(_v: AktionsErgebnis, fd: FormData): Prom
           gesellschaftId: objekt?.art === "gesellschaft" ? objekt.id : null,
           hausId: objekt?.art === "haus" ? objekt.id : null,
           kreditId: objekt?.art === "kredit" ? objekt.id : null,
+          absenderArt: absender?.art ?? null,
+          absenderName: absender?.name ?? null,
         },
       });
     } catch (fehler) {
@@ -109,6 +113,9 @@ export async function dokumentBestaetigen(id: string, _v: AktionsErgebnis, fd: F
     const jahr = jahrText ? Number(jahrText) : null;
     if (jahrText && (!/^\d{4}$/.test(jahrText) || jahr! < 1900 || jahr! > 2100)) throw new EingabeFehler(fuelle(t.fehler.zahl, { feld: td.jahr }));
     const datum = f.datumOptional("dokumentDatum", td.datum);
+    const absenderArt = f.text("absenderArt") as AbsenderArt | null;
+    if (absenderArt && !ABSENDER_ARTEN.includes(absenderArt)) throw new EingabeFehler(fuelle(t.fehler.pflichtfeld, { feld: td.absender }));
+    const absenderName = f.text("absenderName")?.slice(0, 200) ?? null;
     const zuordnung = f.text("zuordnung");
     let gesellschaftId: string | null = null;
     let hausId: string | null = null;
@@ -131,6 +138,8 @@ export async function dokumentBestaetigen(id: string, _v: AktionsErgebnis, fd: F
         gesellschaftId,
         hausId,
         kreditId,
+        absenderArt,
+        absenderName,
         bestaetigt: true,
       },
     });
@@ -160,4 +169,17 @@ export async function dokumentLoeschen(id: string): Promise<AktionsErgebnis> {
   });
   if (ergebnis.fehler) return ergebnis;
   redirect("/import/dokumente");
+}
+
+/** Gibt ein Dokument für die Investoren der zugeordneten Gesellschaft frei bzw. nimmt die Freigabe zurück. */
+export async function investorFreigabeSetzen(id: string, freigeben: boolean): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const d = await db.dokument.findFirst({ where: { id, ...dokumentFilter(await sichtbarkeit(kontext)) }, select: { bestaetigt: true, gesellschaftId: true, hausId: true, kreditId: true } });
+    if (!d) throw new EingabeFehler(t.fehler.unbekannt);
+    if (freigeben && (!d.bestaetigt || !(d.gesellschaftId || d.hausId || d.kreditId))) throw new EingabeFehler(t.dateien.investorNurBestaetigt);
+    await db.dokument.update({ where: { id }, data: freigeben ? { investorFreigabeAm: new Date(), investorFreigabeVon: kontext.benutzer.name } : { investorFreigabeAm: null, investorFreigabeVon: null } });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
 }

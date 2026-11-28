@@ -7,6 +7,7 @@ import type { Formatierer } from "@/lib/format";
 import type { Kennzahlen } from "@/lib/kennzahlen";
 import { Begriff, Kennzahl } from "./herleitung";
 import { Kachel, Kacheln } from "./ui";
+import { LeerstandKreis } from "./nutzungsart";
 
 export function KennzahlKacheln({ k, t, f, stichtag, mitEinheiten = true }: { k: Kennzahlen; t: Texte; f: Formatierer; stichtag: string; mitEinheiten?: boolean }) {
   const tk = t.kennzahlen;
@@ -51,6 +52,9 @@ export function KennzahlKacheln({ k, t, f, stichtag, mitEinheiten = true }: { k:
         unter={
           <>
             {tk.erwartetLeer}: <Kennzahl art="erwartetLeerMonat" {...p} /> / {f.betrag(k.erwartetLeerJahr)}
+            <div className="mt-2">
+              <LeerstandKreis nachArt={k.nachArt} t={t} f={f} groesse={40} legende />
+            </div>
           </>
         }
       />

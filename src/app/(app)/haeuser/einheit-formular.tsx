@@ -3,11 +3,12 @@ import { Auswahl, Feld, Felder, Textfeld } from "@/components/ui";
 import type { Texte } from "@/i18n";
 import type { Formatierer } from "@/lib/format";
 import { einheitSpeichern } from "./aktionen";
+import type { Nutzungsart } from "@/lib/nutzungsart";
 
 type Einheit = {
   id: string;
   bezeichnung: string;
-  art: "WOHNUNG" | "GEWERBE";
+  art: Nutzungsart;
   flaeche: { toFixed(): string };
   lage: string | null;
   erwarteteMiete: { toFixed(): string } | null;
@@ -27,7 +28,7 @@ export function EinheitFormular({ t, f, hausId, einheit }: { t: Texte; f: Format
           optionen={Object.entries(t.einheitArten).map(([wert, text]) => ({ wert, text }))}
           pflicht
         />
-        <Feld name="flaeche" label={e.flaeche} wert={f.eingabe(einheit?.flaeche)} inputMode="decimal" pflicht />
+        <Feld name="flaeche" label={e.flaeche} wert={f.eingabe(einheit?.flaeche)} inputMode="decimal" hinweis={e.flaecheHinweisStellplatz} pflicht />
         <Feld name="lage" label={e.lage} wert={einheit?.lage} platzhalter="2. OG links" />
         <Feld
           name="erwarteteMiete"

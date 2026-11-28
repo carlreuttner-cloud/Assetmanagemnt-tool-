@@ -4,12 +4,13 @@ import { fuelle, texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { alsDbDatum, heute, plusMonate } from "@/lib/datum";
 import { ladeFristEingabe } from "@/lib/daten/fristen";
-import { einParam, filterHref } from "@/lib/filter";
+import { auswahlOptionen, einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { FRIST_ARTEN, nachMonat, sammleFristen, type Frist, type FristArt } from "@/lib/fristen";
+import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 
 const ZEITRAEUME = ["12", "24", "36", "alle"] as const;
-const TON: Record<FristArt, Ton> = { zinsbindung: "schlecht", kreditende: "warnung", sicherungsende: "warnung", mietende: "warnung", mieterhoehung: "gut" };
+const TON: Record<FristArt, Ton> = { refinanzierung: "warnung", kapitalabruf: "warnung", sondertilgung: "gut", zinsbindung: "schlecht", kreditende: "warnung", sicherungsende: "warnung", covenanttest: "neutral", mietende: "warnung", mieterhoehung: "gut", energieausweis: "warnung" };
 
 export default async function FristenSeite({ searchParams }: PageProps<"/fristen">) {
   const sp = await searchParams;
@@ -25,6 +26,7 @@ export default async function FristenSeite({ searchParams }: PageProps<"/fristen
 
   const eingabe = await ladeFristEingabe(kontext);
   const { fristen: alle, luecken } = sammleFristen(eingabe, stichtag, bis, tf, (d) => f.datum(d));
+  const sichtbareLuecken = art ? luecken.filter((l) => l.art === art) : luecken;
   const nachG = filter.g ? alle.filter((x) => x.gesellschaftId === filter.g) : alle;
   const fristen = art ? nachG.filter((x) => x.art === art) : nachG;
   const { faellig, monate } = nachMonat(fristen, stichtag);
@@ -50,12 +52,9 @@ export default async function FristenSeite({ searchParams }: PageProps<"/fristen
           ]}
         />
         {eingabe.gesellschaften.length > 1 && (
-          <Reiter
-            eintraege={[
-              { href: filterHref("/fristen", filter, "g", undefined), text: tf.alleGesellschaften, aktiv: !filter.g },
-              ...eingabe.gesellschaften.map((g) => ({ href: filterHref("/fristen", filter, "g", g.id), text: g.name, aktiv: filter.g === g.id })),
-            ]}
-          />
+          <FilterZeile>
+            <AuswahlFilter name="g" label={t.listen.gesellschaft} optionen={auswahlOptionen("/fristen", filter, "g", tf.alleGesellschaften, eingabe.gesellschaften)} />
+          </FilterZeile>
         )}
       </div>
 
@@ -84,22 +83,32 @@ export default async function FristenSeite({ searchParams }: PageProps<"/fristen
         ))
       )}
 
-      {luecken.length > 0 && (!art || art === "mieterhoehung") && (
-        <Karte titel={`${tf.luecken} (${luecken.length})`}>
+      {sichtbareLuecken.length > 0 && (
+        <Karte titel={`${tf.luecken} (${sichtbareLuecken.length})`}>
           <p className="mb-3 text-xs text-slate-500">{tf.lueckenHinweis}</p>
-          <details>
-            <summary className="cursor-pointer text-sm text-slate-700">{luecken[0].grund}</summary>
-            <ul className="mt-2 space-y-1 text-sm">
-              {luecken.map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} className="hover:underline">
-                    {l.titel}
-                  </Link>
-                  <span className="text-xs text-slate-500"> · {l.unter}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
+          {[...new Set(sichtbareLuecken.map((l) => l.art))].map((a) => {
+            const liste = sichtbareLuecken.filter((l) => l.art === a);
+            return (
+              <details key={a} className="mb-2" data-luecken={a}>
+                <summary className="cursor-pointer text-sm text-slate-700">
+                  {tf.arten[a]} ({liste.length})
+                </summary>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {liste.map((l, i) => (
+                    <li key={`${l.href}-${i}`}>
+                      <Link href={l.href} className="hover:underline">
+                        {l.titel}
+                      </Link>
+                      <span className="text-xs text-slate-500">
+                        {" "}
+                        · {l.unter} · {l.grund}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            );
+          })}
         </Karte>
       )}
 

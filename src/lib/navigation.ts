@@ -7,6 +7,8 @@ export type NavReiter = {
   textSchluessel: keyof Texte["navigation"];
   /** weitere Pfade, die zu diesem Reiter gehören (z. B. Detailseiten an anderer Stelle) */
   auch?: string[];
+  /** Nur zeigen, wenn die Rolle im Bereich schreiben darf (z. B. Posteingang, Bankangebote) */
+  aktion?: "schreiben";
 };
 
 export type NavGruppe = { schluessel: keyof Texte["navigationGruppen"]; reiter: NavReiter[] };
@@ -21,7 +23,11 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "gesellschaften", pfad: "/portfolios", textSchluessel: "portfolios" },
       { bereich: "haeuser", pfad: "/bewertung", textSchluessel: "bewertung" },
       { bereich: "gesellschaften", pfad: "/kapitalkonten", textSchluessel: "kapitalkonten" },
+      { bereich: "gesellschaften", pfad: "/renditen", textSchluessel: "renditen" },
+      { bereich: "gesellschaften", pfad: "/kapitalabrufe", textSchluessel: "kapitalabrufe" },
+      { bereich: "gesellschaften", pfad: "/plan-ist", textSchluessel: "planIst" },
       { bereich: "uebersicht", pfad: "/fristen", textSchluessel: "fristen" },
+      { bereich: "berichte", pfad: "/berichte", textSchluessel: "berichte" },
     ],
   },
   {
@@ -30,17 +36,31 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "haeuser", pfad: "/haeuser", textSchluessel: "haeuser" },
       { bereich: "haeuser", pfad: "/einheiten", textSchluessel: "einheiten", auch: ["/haeuser/einheiten"] },
       { bereich: "mieter", pfad: "/mieter", textSchluessel: "mieter" },
+      { bereich: "mieter", pfad: "/serienbriefe", textSchluessel: "serienbriefe" },
+      { bereich: "haeuser", pfad: "/gewerbe", textSchluessel: "gewerbe" },
+      { bereich: "haeuser", pfad: "/stellplaetze", textSchluessel: "stellplaetze" },
       { bereich: "haeuser", pfad: "/investitionen", textSchluessel: "investitionen" },
+      { bereich: "haeuser", pfad: "/energie", textSchluessel: "energie" },
+      { bereich: "haeuser", pfad: "/instandhaltung", textSchluessel: "instandhaltung" },
+      { bereich: "haeuser", pfad: "/hausverwaltungen", textSchluessel: "hausverwaltungen" },
     ],
   },
   {
     schluessel: "finanzierung",
     reiter: [
       { bereich: "gesellschaften", pfad: "/kredite", textSchluessel: "kredite", auch: ["/gesellschaften/kredite"] },
+      { bereich: "gesellschaften", pfad: "/refinanzierung", textSchluessel: "refinanzierung" },
+      { bereich: "gesellschaften", pfad: "/zinsrisiko", textSchluessel: "zinsrisiko" },
+      { bereich: "gesellschaften", pfad: "/sondertilgungen", textSchluessel: "sondertilgungen" },
+      { bereich: "gesellschaften", pfad: "/sicherheiten", textSchluessel: "sicherheiten" },
+      { bereich: "gesellschaften", pfad: "/beleihungsreserve", textSchluessel: "beleihungsreserve" },
+      { bereich: "gesellschaften", pfad: "/kredite/angebote", textSchluessel: "bankangebote", aktion: "schreiben" },
       { bereich: "gesellschaften", pfad: "/tilgungsplaene", textSchluessel: "tilgungsplaene" },
       { bereich: "gesellschaften", pfad: "/liquiditaet", textSchluessel: "liquiditaet" },
+      { bereich: "gesellschaften", pfad: "/ausschuettungen", textSchluessel: "ausschuettungen" },
       { bereich: "gesellschaften", pfad: "/gesellschaften/referenzzinsen", textSchluessel: "referenzzinsen" },
       { bereich: "szenarien", pfad: "/szenarien", textSchluessel: "szenarien" },
+      { bereich: "szenarien", pfad: "/ankauf", textSchluessel: "ankauf" },
       { bereich: "szenarien", pfad: "/exit", textSchluessel: "exit" },
       { bereich: "szenarien", pfad: "/ki-vorschlag", textSchluessel: "kiVorschlag" },
     ],
@@ -48,23 +68,30 @@ export const NAVIGATION: NavGruppe[] = [
   {
     schluessel: "dokumente",
     reiter: [
+      { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang", aktion: "schreiben" },
       { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
+      { bereich: "dokumente", pfad: "/datenraum", textSchluessel: "datenraum", aktion: "schreiben" },
       { bereich: "import", pfad: "/import", textSchluessel: "import" },
     ],
   },
   {
     schluessel: "analyse",
     reiter: [
+      { bereich: "kiAssistent", pfad: "/ki-fragen", textSchluessel: "kiFragen" },
       { bereich: "kiAssistent", pfad: "/ki-assistent", textSchluessel: "kiAssistent" },
     ],
+  },
+  {
+    schluessel: "portal",
+    reiter: [{ bereich: "investorenportal", pfad: "/portal", textSchluessel: "portal" }],
   },
 ];
 
 const passt = (pfad: string, praefix: string) => (praefix === "/" ? pfad === "/" : pfad === praefix || pfad.startsWith(`${praefix}/`));
 
 /** Gruppen mit den Reitern, die die Rolle sehen darf (leere Gruppen entfallen). */
-export function erlaubteNavigation(darf: (bereich: NavReiter["bereich"]) => boolean): NavGruppe[] {
-  return NAVIGATION.map((g) => ({ ...g, reiter: g.reiter.filter((r) => darf(r.bereich)) })).filter((g) => g.reiter.length > 0);
+export function erlaubteNavigation(darf: (bereich: NavReiter["bereich"], aktion?: "schreiben") => boolean): NavGruppe[] {
+  return NAVIGATION.map((g) => ({ ...g, reiter: g.reiter.filter((r) => darf(r.bereich, r.aktion)) })).filter((g) => g.reiter.length > 0);
 }
 
 /** Aktive Gruppe und aktiver Reiter zu einem Pfad: der längste passende Pfad gewinnt. */

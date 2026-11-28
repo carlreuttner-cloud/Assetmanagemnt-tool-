@@ -7,6 +7,7 @@ import { Auswahl, Feld, Felder, Marke, Tabelle, knopfKlasse, type Ton } from "@/
 import { formatierer } from "@/lib/format";
 import type { Aenderung, PlanAktion, PlanZeile } from "@/lib/import/mieterliste";
 import { mieterlisteUebernehmen, mieterlisteVorschau, type MieterVorschau, type MieterVorschauErgebnis } from "./aktionen";
+import type { Nutzungsart } from "@/lib/nutzungsart";
 
 export const AKTION_TON: Record<PlanAktion, Ton> = {
   neu: "gut",
@@ -23,7 +24,7 @@ function wert(a: Aenderung, w: string | null, f: Formatierer, t: Texte) {
   if (w === null) return "–";
   if (a.feld === "beginn" || a.feld === "ende" || a.feld === "letzteMieterhoehung") return f.datum(w);
   if (a.feld === "flaeche") return f.flaeche(w);
-  if (a.feld === "art") return t.einheitArten[w as "WOHNUNG" | "GEWERBE"];
+  if (a.feld === "art") return t.einheitArten[w as Nutzungsart];
   return f.betrag(w);
 }
 

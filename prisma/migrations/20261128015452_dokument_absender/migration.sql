@@ -1,0 +1,6 @@
+-- CreateEnum
+CREATE TYPE "AbsenderArt" AS ENUM ('BANK', 'HAUSVERWALTUNG', 'GUTACHTER', 'STEUERBERATER', 'NOTAR', 'BEHOERDE', 'VERSICHERUNG', 'MIETER', 'GESELLSCHAFTER', 'SONSTIGE');
+
+-- AlterTable
+ALTER TABLE "Dokument" ADD COLUMN     "absenderArt" "AbsenderArt",
+ADD COLUMN     "absenderName" TEXT;

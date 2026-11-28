@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Formular } from "@/components/formular";
 import type { Texte } from "@/i18n";
-import { DOKUMENT_KATEGORIEN, einheitlicherName, type ObjektArt } from "@/lib/dokument-vorschlag";
+import { ABSENDER_ARTEN, DOKUMENT_KATEGORIEN, einheitlicherName, type ObjektArt } from "@/lib/dokument-vorschlag";
 import type { AktionsErgebnis } from "@/lib/formular";
 
 const EINGABE = "mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm";
@@ -16,11 +16,13 @@ export function BestaetigenFormular({
   aktion,
   objekte,
   start,
+  absenden,
 }: {
   td: Texte["dateien"];
   aktion: (vorher: AktionsErgebnis, fd: FormData) => Promise<AktionsErgebnis>;
   objekte: Objekt[];
-  start: { titel: string; kategorie: string | null; jahr: number | null; datum: string | null; zuordnung: string | null };
+  start: { titel: string; kategorie: string | null; jahr: number | null; datum: string | null; zuordnung: string | null; absenderArt: string | null; absenderName: string | null };
+  absenden?: string;
 }) {
   const [kategorie, setKategorie] = useState(start.kategorie ?? "");
   const [jahr, setJahr] = useState(start.jahr ? String(start.jahr) : "");
@@ -40,7 +42,7 @@ export function BestaetigenFormular({
 
   const gruppen: ObjektArt[] = ["gesellschaft", "haus", "kredit"];
   return (
-    <Formular aktion={aktion} absenden={td.speichern}>
+    <Formular aktion={aktion} absenden={absenden ?? td.speichern}>
       <label className="block text-sm">
         <span className="font-medium text-slate-700">{td.name}</span>
         <input name="titel" value={titel} onChange={(e) => setManuell(e.target.value)} required maxLength={300} className={EINGABE} />
@@ -90,6 +92,22 @@ export function BestaetigenFormular({
         <label className="block text-sm">
           <span className="font-medium text-slate-700">{td.datum}</span>
           <input name="dokumentDatum" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} className={EINGABE} />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">{td.absender}</span>
+          <select name="absenderArt" defaultValue={start.absenderArt ?? ""} className={EINGABE}>
+            <option value="">{td.keinAbsender}</option>
+            {ABSENDER_ARTEN.map((a) => (
+              <option key={a} value={a}>
+                {td.absenderArten[a]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">{td.absenderName}</span>
+          <input name="absenderName" defaultValue={start.absenderName ?? ""} maxLength={200} className={EINGABE} />
+          <span className="mt-1 block text-xs text-slate-500">{td.absenderNameHinweis}</span>
         </label>
       </div>
     </Formular>

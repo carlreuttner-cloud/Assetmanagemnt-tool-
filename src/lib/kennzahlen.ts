@@ -6,6 +6,9 @@
  * - Eine Einheit ist am Stichtag vermietet, wenn ein Mietverhältnis begonnen hat und nicht beendet ist.
  * - Restschuld und Kapitaldienst eines Hauses: Kredite anteilig nach `anteilProzent`.
  * - Gesellschaft und Portfolio: Summe der Häuser plus Summe der eigenen Kredite (zu 100 %).
+ * - Nutzungsarten: `nachArt` hält Anzahl, Fläche, Leerstand und Mieten je Wohnen, Gewerbe und
+ *   Stellplätze. Fläche und Leerstandsquote umfassen nur Wohnen und Gewerbe (m²); Stellplätze
+ *   zählen in Stück. Mieten und Einheitenzahlen umfassen alle Nutzungsarten.
  * - DSCR vereinfacht: Ist-Jahresnettokaltmiete / Kapitaldienst (ohne Bewirtschaftungskosten).
  * - Fehlende Werte (Verkehrswert, Kaufpreis, belegte Restschuld, Kapitaldienst, erwartete Miete)
  *   werden nie als 0 gezählt: `luecken` hält je Größe fest, wie viele Teile bekannt sind und
@@ -16,6 +19,7 @@ import { dezimal, type Decimal } from "./geld";
 import type { IsoDatum } from "./datum";
 import { kapitaldienstJahr, restschuld, restschuldNachweis, type KreditDaten, type ReferenzWert } from "./kredit";
 import { jahresNettokaltmiete } from "./miete";
+import { inFlaeche, NUTZUNGSARTEN, type Nutzungsart } from "./nutzungsart";
 
 export interface MietverhaeltnisDaten {
   beginn: IsoDatum;
@@ -27,7 +31,8 @@ export interface MietverhaeltnisDaten {
 
 export interface EinheitDaten {
   id: string;
-  art: "WOHNUNG" | "GEWERBE";
+  art: Nutzungsart;
+  /** Fläche in m²; bei Stellplätzen nur informativ (nicht in Flächensummen) */
   flaeche: Decimal;
   erwarteteMiete: Decimal | null;
   mietverhaeltnisse: MietverhaeltnisDaten[];
@@ -72,12 +77,28 @@ export const vollstaendig = (v: Vollstaendigkeit) => v.fehlend === 0;
 /** Summe für die Anzeige: null (unbekannt), wenn kein Teil bekannt ist, aber welche fehlen. */
 export const summeOderUnbekannt = (wert: Decimal, v: Vollstaendigkeit): Decimal | null => (v.bekannt === 0 && v.fehlend > 0 ? null : wert);
 
-export interface Summen {
-  haeuser: number;
+/** Werte einer Nutzungsart. Fläche nur für Wohnen und Gewerbe (bei Stellplätzen 0, sie zählen in Stück). */
+export interface ArtSummen {
   einheiten: number;
   leereEinheiten: number;
   flaeche: Decimal;
   leerFlaeche: Decimal;
+  sollMonat: Decimal;
+  istMonat: Decimal;
+  erwartetLeerMonat: Decimal;
+}
+
+export interface Summen {
+  haeuser: number;
+  /** alle Einheiten (Wohnen, Gewerbe, Stellplätze) */
+  einheiten: number;
+  leereEinheiten: number;
+  /** Wohn- und Gewerbefläche in m² (ohne Stellplätze) */
+  flaeche: Decimal;
+  /** leere Wohn- und Gewerbefläche in m² */
+  leerFlaeche: Decimal;
+  /** Aufteilung nach Nutzungsart */
+  nachArt: Record<Nutzungsart, ArtSummen>;
   verkehrswert: Decimal;
   kaufpreis: Decimal;
   /** Soll-Nettokaltmiete pro Monat der vermieteten Einheiten */
@@ -113,15 +134,32 @@ export interface Kennzahlen extends Summen {
   kaufpreisfaktor: Decimal | null;
   /** Soll-Jahresmiete / Verkehrswert in Prozent */
   mietrendite: Decimal | null;
-  /** Soll-Miete pro m² vermietete Fläche und Monat */
+  /** Soll-Miete (Wohnen und Gewerbe) pro m² vermietete Fläche und Monat; ohne Stellplatzmieten */
   sollProM2: Decimal | null;
+  /** Leerstand je Nutzungsart in Prozent: Wohnen/Gewerbe nach Fläche, Stellplätze nach Stück */
+  leerstandQuoteNachArt: Record<Nutzungsart, Decimal | null>;
 }
 
 const NULL = dezimal(0);
 
+const leereArt = (): ArtSummen => ({ einheiten: 0, leereEinheiten: 0, flaeche: NULL, leerFlaeche: NULL, sollMonat: NULL, istMonat: NULL, erwartetLeerMonat: NULL });
+const leereArten = () => Object.fromEntries(NUTZUNGSARTEN.map((a) => [a, leereArt()])) as Record<Nutzungsart, ArtSummen>;
+
+function addiereArt(a: ArtSummen, b: ArtSummen): ArtSummen {
+  return {
+    einheiten: a.einheiten + b.einheiten,
+    leereEinheiten: a.leereEinheiten + b.leereEinheiten,
+    flaeche: a.flaeche.plus(b.flaeche),
+    leerFlaeche: a.leerFlaeche.plus(b.leerFlaeche),
+    sollMonat: a.sollMonat.plus(b.sollMonat),
+    istMonat: a.istMonat.plus(b.istMonat),
+    erwartetLeerMonat: a.erwartetLeerMonat.plus(b.erwartetLeerMonat),
+  };
+}
+
 export function leereSummen(): Summen {
   return {
-    haeuser: 0, einheiten: 0, leereEinheiten: 0, flaeche: NULL, leerFlaeche: NULL, verkehrswert: NULL, kaufpreis: NULL,
+    haeuser: 0, einheiten: 0, leereEinheiten: 0, flaeche: NULL, leerFlaeche: NULL, nachArt: leereArten(), verkehrswert: NULL, kaufpreis: NULL,
     sollMonat: NULL, istMonat: NULL, erwartetLeerMonat: NULL, rueckstand: NULL, restschuld: NULL, zinsenJahr: NULL, tilgungJahr: NULL,
     luecken: { verkehrswert: leer(), kaufpreis: leer(), restschuld: leer(), kapitaldienst: leer(), erwarteteMiete: leer() },
   };
@@ -134,6 +172,7 @@ export function addiere(a: Summen, b: Summen): Summen {
     leereEinheiten: a.leereEinheiten + b.leereEinheiten,
     flaeche: a.flaeche.plus(b.flaeche),
     leerFlaeche: a.leerFlaeche.plus(b.leerFlaeche),
+    nachArt: Object.fromEntries(NUTZUNGSARTEN.map((x) => [x, addiereArt(a.nachArt[x], b.nachArt[x])])) as Record<Nutzungsart, ArtSummen>,
     verkehrswert: a.verkehrswert.plus(b.verkehrswert),
     kaufpreis: a.kaufpreis.plus(b.kaufpreis),
     sollMonat: a.sollMonat.plus(b.sollMonat),
@@ -179,18 +218,27 @@ export function hausSummen(h: HausDaten, stichtag: IsoDatum): Summen {
   s.kaufpreis = h.kaufpreis ?? NULL;
   s.luecken.kaufpreis = teil(h.kaufpreis !== null);
   for (const e of h.einheiten) {
+    const art = s.nachArt[e.art];
+    const flaeche = inFlaeche(e.art) ? e.flaeche : NULL;
     s.einheiten++;
-    s.flaeche = s.flaeche.plus(e.flaeche);
+    art.einheiten++;
+    s.flaeche = s.flaeche.plus(flaeche);
+    art.flaeche = art.flaeche.plus(flaeche);
     const aktiv = e.mietverhaeltnisse.filter((m) => istAktiv(m, stichtag));
     if (aktiv.length === 0) {
       s.leereEinheiten++;
-      s.leerFlaeche = s.leerFlaeche.plus(e.flaeche);
+      art.leereEinheiten++;
+      s.leerFlaeche = s.leerFlaeche.plus(flaeche);
+      art.leerFlaeche = art.leerFlaeche.plus(flaeche);
       s.erwartetLeerMonat = s.erwartetLeerMonat.plus(e.erwarteteMiete ?? 0);
+      art.erwartetLeerMonat = art.erwartetLeerMonat.plus(e.erwarteteMiete ?? 0);
       s.luecken.erwarteteMiete = verbinde(s.luecken.erwarteteMiete, teil(e.erwarteteMiete !== null));
     }
     for (const m of aktiv) {
       s.sollMonat = s.sollMonat.plus(m.sollMiete);
       s.istMonat = s.istMonat.plus(m.istMiete);
+      art.sollMonat = art.sollMonat.plus(m.sollMiete);
+      art.istMonat = art.istMonat.plus(m.istMiete);
     }
     // Rückstände auch aus beendeten Mietverhältnissen zählen, solange sie offen sind.
     for (const m of e.mietverhaeltnisse) s.rueckstand = s.rueckstand.plus(m.rueckstand);
@@ -234,8 +282,15 @@ export function kennzahlenAus(s: Summen): Kennzahlen {
     bruttoanfangsrendite: quote(sollJahr, s.kaufpreis, 100, "kaufpreis"),
     kaufpreisfaktor: quote(s.kaufpreis, sollJahr, 1, "kaufpreis"),
     mietrendite: quote(sollJahr, s.verkehrswert, 100, "verkehrswert"),
-    sollProM2: quote(s.sollMonat, vermieteteFlaeche),
+    sollProM2: quote(s.nachArt.WOHNUNG.sollMonat.plus(s.nachArt.GEWERBE.sollMonat), vermieteteFlaeche),
+    leerstandQuoteNachArt: Object.fromEntries(NUTZUNGSARTEN.map((a) => [a, leerstandQuoteArt(a, s.nachArt[a])])) as Record<Nutzungsart, Decimal | null>,
   };
+}
+
+/** Leerstand einer Nutzungsart in Prozent: nach Fläche (Wohnen, Gewerbe) bzw. nach Stück (Stellplätze). */
+export function leerstandQuoteArt(art: Nutzungsart, a: ArtSummen): Decimal | null {
+  if (inFlaeche(art)) return a.flaeche.isZero() ? null : a.leerFlaeche.times(100).dividedBy(a.flaeche);
+  return a.einheiten === 0 ? null : dezimal(a.leereEinheiten).times(100).dividedBy(a.einheiten);
 }
 
 /** Kennzahlen eines Hauses: eigene Werte plus anteilige Kredite. */

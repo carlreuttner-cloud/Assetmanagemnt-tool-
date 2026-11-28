@@ -5,6 +5,7 @@ import type { Texte } from "@/i18n";
 import type { IsoDatum } from "@/lib/datum";
 import type { Formatierer } from "@/lib/format";
 import type { Kennzahlen } from "@/lib/kennzahlen";
+import { LeerstandZelle } from "./nutzungsart";
 
 export type GesellschaftsZeile = {
   id: string;
@@ -86,7 +87,9 @@ export function GesellschaftenTabelle({
             <td className={rechts}>
               <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
             </td>
-            <td className={rechts}>{f.prozent(k.leerstandQuote, 1)}</td>
+            <td className={rechts}>
+              <LeerstandZelle quote={f.prozent(k.leerstandQuote, 1)} nachArt={k.nachArt} t={t} f={f} />
+            </td>
             <td className={rechts}>
               <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
             </td>
@@ -115,7 +118,9 @@ export function GesellschaftenTabelle({
             <td className={rechts}>
               <MieteZelle monat={f.betrag(summe.sollMonat)} jahr={f.betrag(summe.sollJahr)} />
             </td>
-            <td className={rechts}>{f.prozent(summe.leerstandQuote, 1)}</td>
+            <td className={rechts}>
+              <LeerstandZelle quote={f.prozent(summe.leerstandQuote, 1)} nachArt={summe.nachArt} t={t} f={f} />
+            </td>
             <td className={rechts}>
               <Kennzahl art="dscr" k={summe} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
             </td>

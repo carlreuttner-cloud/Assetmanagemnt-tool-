@@ -9,6 +9,8 @@ import type { Formatierer } from "@/lib/format";
 import type { Decimal } from "@/lib/geld";
 import { summeOderUnbekannt, vollstaendig, type Kennzahlen, type LueckenArt, type Vollstaendigkeit } from "@/lib/kennzahlen";
 import { aktiveSicherungen, gesicherterSatz, referenzzinsAm, restschuld, zinssatz, type Kapitaldienst, type KreditDaten, type ReferenzWert, type RestschuldNachweis } from "@/lib/kredit";
+import { NUTZUNGSARTEN } from "@/lib/nutzungsart";
+import { leerText } from "./nutzungsart";
 
 export interface HerleitungDaten {
   berechnung?: ReactNode;
@@ -296,6 +298,9 @@ export function Kennzahl({
           [th.leereFlaeche, f.flaeche(k.leerFlaeche)],
           [th.gesamtFlaeche, f.flaeche(k.flaeche)],
           [th.leereEinheiten, `${k.leereEinheiten} / ${k.einheiten}`],
+          ...NUTZUNGSARTEN.filter((a) => k.nachArt[a].einheiten > 0).map(
+            (a) => [`${t.nutzungsarten[a]} (${f.prozent(k.leerstandQuoteNachArt[a], 1)})`, leerText(a, k.nachArt[a], t, f)] as [string, string],
+          ),
         ],
         quelle: th.quellen.flaeche,
       });

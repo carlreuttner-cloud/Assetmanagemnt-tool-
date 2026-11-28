@@ -1,14 +1,19 @@
 import Link from "next/link";
+import { StandVergleich } from "@/components/mieterstand";
+import { LeerstandKreis, NutzungsartMarke, NutzungsartPunkt } from "@/components/nutzungsart";
 import { Kachel, Kacheln, KnopfLink, Leer, Marke, MieteZelle, Reiter, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { bereichsSicht } from "@/lib/auth/auswahl";
 import { heute, isoDatum } from "@/lib/datum";
+import { ladeHausverwaltungen, ladeZuordnungen, passtZuHv, verwaltungJeHaus } from "@/lib/daten/hausverwaltung";
+import { ladeStaende, standAnsicht } from "@/lib/daten/mieterstand";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
-import { istAktiv } from "@/lib/kennzahlen";
+import { istAktiv, type ArtSummen } from "@/lib/kennzahlen";
+import { inFlaeche, NUTZUNGSARTEN, nutzungsartAus, type Nutzungsart } from "@/lib/nutzungsart";
 import { mietStatus, monateSeitErhoehung } from "@/lib/mietverhaeltnis";
 
 const FILTER = ["aktiv", "rueckstand", "abweichung", "beendet", "alle", "leerstand"] as const;
@@ -19,6 +24,9 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const status: Filter = FILTER.find((x) => x === sp.status) ?? "aktiv";
   const hausFilter = typeof sp.haus === "string" && sp.haus ? sp.haus : undefined;
   const suche = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
+  const art = nutzungsartAus(sp.art);
+  const hv = typeof sp.hv === "string" && sp.hv ? sp.hv : undefined;
+  const sort = sp.sort === "hv" ? "hv" : undefined;
 
   const kontext = await pruefeZugriff("mieter");
   const t = texte(kontext.mandant.sprache);
@@ -28,17 +36,26 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const sicht = await bereichsSicht(kontext);
   const hausIds = erlaubt(sicht.hausIds, hausFilter);
 
-  const [haeuser, einheiten] = await Promise.all([
+  const [haeuser, alleEinheiten, staende, zuordnungen, verwaltungen] = await Promise.all([
     kontext.db.haus.findMany({ where: { id: erlaubt(sicht.hausIds) }, orderBy: { bezeichnung: "asc" }, select: { id: true, bezeichnung: true } }),
     kontext.db.einheit.findMany({
-      where: { hausId: hausIds },
+      where: { hausId: hausIds, art },
       orderBy: [{ haus: { bezeichnung: "asc" } }, { bezeichnung: "asc" }],
       include: {
         haus: { select: { id: true, bezeichnung: true } },
         mietverhaeltnisse: { include: { mieter: { select: { id: true, name: true, istFirma: true } } }, orderBy: { beginn: "desc" } },
       },
     }),
+    ladeStaende(kontext, hausIds),
+    ladeZuordnungen(kontext),
+    ladeHausverwaltungen(kontext),
   ]);
+  const hvJeHaus = verwaltungJeHaus(zuordnungen, stichtag);
+  const passtHv = (hausId: string) => passtZuHv(hv, hvJeHaus.get(hausId));
+  const einheiten = alleEinheiten.filter((e) => passtHv(e.hausId));
+  const hvName = (hausId: string) => hvJeHaus.get(hausId)?.name ?? "\uffff";
+  const ein = (w: string | string[] | undefined) => (typeof w === "string" ? w : undefined);
+  const staendeAnsicht = standAnsicht(staende, { stand: ein(sp.stand), vergleich: ein(sp.vergleich), art, filter: passtHv });
 
   const vertraege = einheiten.flatMap((e) =>
     e.mietverhaeltnisse.map((m) => {
@@ -78,7 +95,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
           return true;
       }
     })
-    .sort((a, b) => a.mieter.name.localeCompare(b.mieter.name, "de"));
+    .sort((a, b) => (sort === "hv" ? hvName(a.einheit.hausId).localeCompare(hvName(b.einheit.hausId), "de") : 0) || a.mieter.name.localeCompare(b.mieter.name, "de"));
 
   const aktive = vertraege.filter((v) => v.status === "aktiv");
   const summeSoll = aktive.reduce((s, v) => s.plus(v.soll), dezimal(0));
@@ -87,6 +104,21 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const leere = einheiten
     .filter((e) => !e.mietverhaeltnisse.some((m) => istAktiv({ beginn: isoDatum(m.beginn), ende: isoDatum(m.ende) }, stichtag)))
     .map((e) => ({ e, leerSeit: e.mietverhaeltnisse.map((m) => isoDatum(m.ende)).filter((x): x is string => !!x && x < stichtag).sort().at(-1) ?? null }));
+  if (sort === "hv") leere.sort((a, b) => hvName(a.e.hausId).localeCompare(hvName(b.e.hausId), "de"));
+  // Leerstand je Nutzungsart für das Kreisdiagramm (Fläche nur Wohnen und Gewerbe)
+  const leerNachArt = Object.fromEntries(
+    NUTZUNGSARTEN.map((a) => {
+      const alle = einheiten.filter((e) => e.art === a);
+      const leer = leere.filter((x) => x.e.art === a).map((x) => x.e);
+      const fl = (l: typeof alle) => l.reduce((s, e) => s.plus(inFlaeche(a) ? dezimal(e.flaeche) : 0), dezimal(0));
+      const werte: ArtSummen = {
+        einheiten: alle.length, leereEinheiten: leer.length, flaeche: fl(alle), leerFlaeche: fl(leer),
+        sollMonat: dezimal(0), istMonat: dezimal(0),
+        erwartetLeerMonat: leer.reduce((s, e) => s.plus(e.erwarteteMiete ? dezimal(e.erwarteteMiete) : 0), dezimal(0)),
+      };
+      return [a, werte];
+    }),
+  ) as Record<Nutzungsart, ArtSummen>;
   const summeLeer = leere.reduce((s, x) => s.plus(x.e.erwarteteMiete ? dezimal(x.e.erwarteteMiete) : 0), dezimal(0));
   const auswahlSoll = auswahl.reduce((s, v) => s.plus(v.soll), dezimal(0));
   const auswahlIst = auswahl.reduce((s, v) => s.plus(v.ist), dezimal(0));
@@ -94,7 +126,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const schreiben = darf(kontext.rolle, "mieter", "schreiben");
   const link = (werte: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const alle = { status, haus: hausFilter, q: suche || undefined, ...werte };
+    const alle = { status, haus: hausFilter, art, q: suche || undefined, hv, sort, ...werte };
     for (const [k, v] of Object.entries(alle)) if (v) p.set(k, v);
     return `/mieter?${p.toString()}`;
   };
@@ -106,6 +138,16 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
         titel={tm.titel}
         beschreibung={t.seiten.mieter}
         aktionen={schreiben && <KnopfLink href="/mieter/neu" art="primaer">{tm.neuesMietverhaeltnis}</KnopfLink>}
+      />
+
+      <StandVergleich
+        ansicht={staendeAnsicht}
+        t={t}
+        f={f}
+        pfad="/mieter"
+        erhalten={{ status, haus: hausFilter, art, q: suche || undefined, hv, sort }}
+        nurAenderungen={sp.nur === "1"}
+        offen={!!(sp.stand || sp.vergleich || sp.nur)}
       />
 
       <Kacheln>
@@ -120,7 +162,14 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
         <Kachel
           titel={tm.leerstand}
           wert={`${leere.length} ${tk.einheiten}`}
-          unter={`${tk.erwartetLeer}: ${f.betrag(summeLeer)} / ${f.jahresmiete(summeLeer)}`}
+          unter={
+            <>
+              {`${tk.erwartetLeer}: ${f.betrag(summeLeer)} / ${f.jahresmiete(summeLeer)}`}
+              <div className="mt-2">
+                <LeerstandKreis nachArt={leerNachArt} t={t} f={f} groesse={40} legende />
+              </div>
+            </>
+          }
           ton={leere.length > 0 ? "warnung" : undefined}
         />
       </Kacheln>
@@ -133,8 +182,24 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
             aktiv: status === x,
           }))}
         />
+        <Reiter
+          eintraege={[
+            { href: link({ art: undefined }), text: t.nutzung.alle, aktiv: !art },
+            ...NUTZUNGSARTEN.map((a) => ({
+              href: link({ art: a }),
+              text: (
+                <span className="inline-flex items-center gap-1.5">
+                  <NutzungsartPunkt art={a} />
+                  {t.nutzungsarten[a]}
+                </span>
+              ),
+              aktiv: art === a,
+            })),
+          ]}
+        />
         <form className="mb-4 flex flex-wrap items-end gap-2 text-sm" action="/mieter">
           <input type="hidden" name="status" value={status} />
+          {art && <input type="hidden" name="art" value={art} />}
           <select name="haus" defaultValue={hausFilter ?? ""} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
             <option value="">{tm.alleHaeuser}</option>
             {haeuser.map((h) => (
@@ -143,6 +208,23 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
               </option>
             ))}
           </select>
+          {verwaltungen.length > 0 && (
+            <>
+              <select name="hv" defaultValue={hv ?? ""} aria-label={t.hausverwaltungen.filter} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+                <option value="">{t.hausverwaltungen.alle}</option>
+                {verwaltungen.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+                <option value="ohne">{t.hausverwaltungen.ohne}</option>
+              </select>
+              <select name="sort" defaultValue={sort ?? ""} aria-label={t.hausverwaltungen.sortierung} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+                <option value="">{t.hausverwaltungen.sortStandardMieter}</option>
+                <option value="hv">{t.hausverwaltungen.sortHv}</option>
+              </select>
+            </>
+          )}
           {status !== "leerstand" && (
             <input name="q" defaultValue={suche} placeholder={tm.suche} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5" />
           )}
@@ -175,11 +257,15 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
                         <Link href={`/haeuser/${e.haus.id}`} className="hover:underline">
                           {e.haus.bezeichnung}
                         </Link>
+                        {hvJeHaus.get(e.hausId) && <div className="text-xs text-slate-500">{t.hausverwaltungen.kurz}: {hvJeHaus.get(e.hausId)!.name}</div>}
                       </td>
                       <td>
                         {e.bezeichnung} <span className="text-xs text-slate-500">{e.lage}</span>
+                        <div className="mt-0.5">
+                          <NutzungsartMarke art={e.art} t={t} />
+                        </div>
                       </td>
-                      <td className={rechts}>{f.zahl(e.flaeche, 1)} m²</td>
+                      <td className={rechts}>{inFlaeche(e.art) ? `${f.zahl(e.flaeche, 1)} m²` : `1 ${t.nutzung.stueck}`}</td>
                       <td>{f.datum(leerSeit)}</td>
                       <td className={rechts}>
                         {e.erwarteteMiete ? <MieteZelle monat={f.betrag(e.erwarteteMiete)} jahr={f.jahresmiete(e.erwarteteMiete)} /> : "–"}
@@ -241,8 +327,9 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
                     </td>
                     <td>
                       {v.einheit.haus.bezeichnung}
-                      <div className="text-xs text-slate-500">
-                        {v.einheit.bezeichnung} · {t.einheitArten[v.einheit.art]}
+                      {hvJeHaus.get(v.einheit.hausId) && <div className="text-xs text-slate-500">{t.hausverwaltungen.kurz}: {hvJeHaus.get(v.einheit.hausId)!.name}</div>}
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                        {v.einheit.bezeichnung} <NutzungsartMarke art={v.einheit.art} t={t} />
                       </div>
                     </td>
                     <td className="tabular-nums">

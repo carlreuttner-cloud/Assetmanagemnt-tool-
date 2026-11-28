@@ -8,6 +8,7 @@ import { erlaubt } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
 import { ImportReiter } from "./import-reiter";
 import { KreditImport } from "./kredit-import";
+import { LeerstandImport } from "./leerstand-import";
 import { MieterImport } from "./mieter-import";
 
 export default async function ImportSeite({ searchParams }: PageProps<"/import">) {
@@ -19,7 +20,7 @@ export default async function ImportSeite({ searchParams }: PageProps<"/import">
   const sicht = await sichtbarkeit(kontext);
   const schreiben = darf(kontext.rolle, "import", "schreiben");
   const kreditImport = schreiben && darf(kontext.rolle, "gesellschaften", "schreiben");
-  const reiter = kreditImport && sp.art === "kredite" ? "kredite" : "mieter";
+  const reiter = kreditImport && sp.art === "kredite" ? "kredite" : sp.art === "leerstand" ? "leerstand" : "mieter";
   const hausVorwahl = typeof sp.haus === "string" ? sp.haus : null;
 
   const [haeuser, kredite] = await Promise.all([
@@ -61,6 +62,10 @@ export default async function ImportSeite({ searchParams }: PageProps<"/import">
             <MieterImport t={t} haeuser={haeuser} heute={heute()} mandant={mandant} hausVorwahl={hausVorwahl} />
           )}
         </Karte>
+      ) : reiter === "leerstand" ? (
+        <Karte titel={t.leerstandImport.titel}>
+          {haeuser.length === 0 ? <Leer>{ti.keineHaeuser}</Leer> : <LeerstandImport t={t} mandant={mandant} />}
+        </Karte>
       ) : (
         <Karte titel={ti.kreditbuchungen}>
           <KreditImport
@@ -89,7 +94,7 @@ export default async function ImportSeite({ searchParams }: PageProps<"/import">
             <tbody>
               {verlauf.map((v) => {
                 const zahlen = (v.ergebnis ?? {}) as Record<string, number>;
-                const namen: Record<string, string> = { ...ti.aktionen, dublette: ti.dublette };
+                const namen: Record<string, string> = { ...ti.aktionen, dublette: ti.dublette, ...t.leerstandImport.ergebnis };
                 return (
                   <tr key={v.id}>
                     <td className="whitespace-nowrap">

@@ -10,8 +10,9 @@ import { erlaubt } from "@/lib/daten/portfolio";
 import { BILD_TYPEN, bildTypAusInhalt, entferne, MAX_BILD_MB, speichere } from "@/lib/dateispeicher";
 import { zuText } from "@/lib/geld";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
+import { NUTZUNGSARTEN } from "@/lib/nutzungsart";
 
-const EINHEIT_ARTEN = ["WOHNUNG", "GEWERBE"] as const;
+const EINHEIT_ARTEN = NUTZUNGSARTEN;
 const VERFAHREN = ["ERTRAGSWERT", "SACHWERT", "VERGLEICHSWERT", "SONSTIGES"] as const;
 
 async function schreibKontext() {

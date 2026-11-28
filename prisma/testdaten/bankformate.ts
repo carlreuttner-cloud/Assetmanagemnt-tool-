@@ -111,7 +111,7 @@ export function csvDateien(p: TestPortfolio): CsvDatei[] {
     const h = haeuser.get(k.haus)!;
     return [
       k.haus, inhaber.get(h.gesellschaft)!, h.bezeichnung, `${h.plz} ${h.ort}`, de(k.verkehrswert, 0), de(k.kaufpreis, 0),
-      k.einheiten, k.gewerbe, de(k.flaeche, 1), de(k.leerstandProzent, 1), de(k.sollMonat), de(jahresNettokaltmiete(k.sollMonat)),
+      k.einheiten, k.gewerbe, k.stellplaetze, de(k.flaeche, 1), de(k.leerstandProzent, 1), de(k.sollMonat), de(jahresNettokaltmiete(k.sollMonat)),
       de(k.istMonat), de(jahresNettokaltmiete(k.istMonat)), de(k.erwartetLeerMonat), de(jahresNettokaltmiete(k.erwartetLeerMonat)), de(k.mieteProM2), de(k.faktor), de(k.bruttoanfangsrendite), de(k.restschuld), de(k.ltv), k.kredite,
     ].join(";");
   });
@@ -119,7 +119,7 @@ export function csvDateien(p: TestPortfolio): CsvDatei[] {
     pfad: "uebersicht-haeuser.csv",
     inhalt: Buffer.from(
       [
-        "Haus;Gesellschaft;Bezeichnung;Ort;Verkehrswert;Kaufpreis;Einheiten;davon Gewerbe;Fläche m²;Leerstand % (Fläche);Soll-Miete Monat;Soll-Miete Jahr;Ist-Miete Monat;Ist-Miete Jahr;Soll-Miete Leerstand Monat;Soll-Miete Leerstand Jahr;Soll €/m²;Kaufpreisfaktor;Bruttoanfangsrendite %;Restschuld anteilig " + datumDe(STICHTAG) + ";LTV %;Kredite",
+        "Haus;Gesellschaft;Bezeichnung;Ort;Verkehrswert;Kaufpreis;Einheiten (Wohnen + Gewerbe);davon Gewerbe;Stellplätze;Fläche m² (Wohnen + Gewerbe);Leerstand % (Fläche);Soll-Miete Monat;Soll-Miete Jahr;Ist-Miete Monat;Ist-Miete Jahr;Soll-Miete Leerstand Monat;Soll-Miete Leerstand Jahr;Soll €/m²;Kaufpreisfaktor;Bruttoanfangsrendite %;Restschuld anteilig " + datumDe(STICHTAG) + ";LTV %;Kredite",
         ...hausZeilen,
       ].join("\n") + "\n",
       "utf8",

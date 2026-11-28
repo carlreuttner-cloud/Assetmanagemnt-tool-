@@ -8,6 +8,7 @@ import { darf } from "@/lib/auth/rechte";
 import { ladePortfolioGruppen } from "@/lib/daten/gesellschaften";
 import { formatierer } from "@/lib/format";
 import { portfolioSpeichern } from "./aktionen";
+import { LeerstandZelle } from "@/components/nutzungsart";
 
 export default async function PortfoliosSeite() {
   const kontext = await pruefeZugriff("gesellschaften");
@@ -76,7 +77,7 @@ export default async function PortfoliosSeite() {
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(k.sollMonat)} jahr={f.betrag(k.sollJahr)} />
                   </td>
-                  <td className={rechts}>{gs.length > 0 ? f.prozent(k.leerstandQuote, 1) : t.allgemein.leer}</td>
+                  <td className={rechts}>{gs.length > 0 ? <LeerstandZelle quote={f.prozent(k.leerstandQuote, 1)} nachArt={k.nachArt} t={t} f={f} /> : t.allgemein.leer}</td>
                   <td className={rechts}>
                     <Kennzahl art="dscr" k={k} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
                   </td>
@@ -101,7 +102,9 @@ export default async function PortfoliosSeite() {
                   <td className={rechts}>
                     <MieteZelle monat={f.betrag(gesamt.sollMonat)} jahr={f.betrag(gesamt.sollJahr)} />
                   </td>
-                  <td className={rechts}>{f.prozent(gesamt.leerstandQuote, 1)}</td>
+                  <td className={rechts}>
+                    <LeerstandZelle quote={f.prozent(gesamt.leerstandQuote, 1)} nachArt={gesamt.nachArt} t={t} f={f} />
+                  </td>
                   <td className={rechts}>
                     <Kennzahl art="dscr" k={gesamt} t={t} f={f} stichtag={stichtag} ausrichtung="rechts" />
                   </td>
