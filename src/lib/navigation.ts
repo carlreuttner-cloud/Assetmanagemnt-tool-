@@ -77,6 +77,10 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "kiAssistent", pfad: "/ki-assistent", textSchluessel: "kiAssistent" },
     ],
   },
+  {
+    schluessel: "portal",
+    reiter: [{ bereich: "investorenportal", pfad: "/portal", textSchluessel: "portal" }],
+  },
 ];
 
 const passt = (pfad: string, praefix: string) => (praefix === "/" ? pfad === "/" : pfad === praefix || pfad.startsWith(`${praefix}/`));

@@ -16,6 +16,7 @@ export const BEREICHE = [
   "kiAssistent",
   "suche",
   "benutzerverwaltung",
+  "investorenportal",
 ] as const;
 export type Bereich = (typeof BEREICHE)[number];
 export type Aktion = "lesen" | "schreiben";
@@ -36,22 +37,17 @@ const RECHTE: Record<Rolle, Partial<Record<Bereich, Aktion[]>>> = {
     import: ALLES,
     kiAssistent: ALLES,
     suche: LESEN,
+    // Vorschau des Portals aus Sicht eines Investors
+    investorenportal: LESEN,
   },
   // Darf ausschließlich Mieterlisten für die ihr zugewiesenen Häuser hochladen.
   HAUSVERWALTUNG: {
     import: ALLES,
   },
-  // Nur lesen, und nur die ihm zugewiesenen Gesellschaften (siehe sichtbarkeit.ts).
+  // Investorenportal: nur eigene Kapitalkonten, freigegebene Berichte und ausdrücklich freigegebene
+  // Dokumente der zugewiesenen Gesellschaften (siehe sichtbarkeit.ts und daten/portal.ts).
   INVESTOR: {
-    uebersicht: LESEN,
-    gesellschaften: LESEN,
-    haeuser: LESEN,
-    mieter: LESEN,
-    dokumente: LESEN,
-    szenarien: LESEN,
-    berichte: LESEN,
-    kiAssistent: LESEN,
-    suche: LESEN,
+    investorenportal: LESEN,
   },
 };
 
@@ -61,13 +57,13 @@ export function darf(rolle: Rolle, bereich: Bereich, aktion: Aktion = "lesen"): 
 
 /** Die Seite, auf der eine Rolle nach der Anmeldung landet. */
 export function startseite(rolle: Rolle): string {
-  return rolle === "HAUSVERWALTUNG" ? "/import" : "/";
+  return rolle === "HAUSVERWALTUNG" ? "/import" : rolle === "INVESTOR" ? "/portal" : "/";
 }
 
 /**
  * Ob die Rolle nur einen Ausschnitt des Mandanten sieht.
  * - HAUSVERWALTUNG: nur zugewiesene Häuser
- * - INVESTOR: nur zugewiesene Gesellschaften (und deren Häuser, Kredite, Mieter)
+ * - INVESTOR: nur zugewiesene Gesellschaften, und dort nur das Investorenportal
  */
 export function istEingeschraenkt(rolle: Rolle): boolean {
   return rolle === "HAUSVERWALTUNG" || rolle === "INVESTOR";

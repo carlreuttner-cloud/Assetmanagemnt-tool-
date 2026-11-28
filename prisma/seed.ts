@@ -20,6 +20,7 @@ import { baueNachrangdarlehen } from "./testdaten/nachrang";
 import { baueKapitalabrufe } from "./testdaten/kapitalabruf";
 import { bauePlanIst } from "./testdaten/plan-ist";
 import { baueDatenraumDokumente } from "./testdaten/datenraum";
+import { bauePortal } from "./testdaten/portal";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
 import { baueZinssicherungen } from "./testdaten/zinssicherungen";
@@ -81,6 +82,7 @@ async function main() {
   await baueKapitalabrufe(db, mandantId);
   await bauePlanIst(db, mandantId);
   await baueDatenraumDokumente(db, mandantId, admin.id);
+  await bauePortal(db, mandantId, mInvestor.id);
 
   // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
   await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });

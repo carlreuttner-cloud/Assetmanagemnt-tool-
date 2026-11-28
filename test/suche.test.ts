@@ -20,10 +20,9 @@ describe("Globale Suche", () => {
     expect(ibanLesbar("DE06999900202020000468")).toBe("DE06 9999 0020 2020 0004 68");
   });
 
-  it("ist für Hausverwaltung gesperrt, für Investoren nur lesend", () => {
+  it("ist für Hausverwaltung und Investoren gesperrt", () => {
     expect(darf("HAUSVERWALTUNG", "suche")).toBe(false);
-    expect(darf("INVESTOR", "suche")).toBe(true);
-    expect(darf("INVESTOR", "suche", "schreiben")).toBe(false);
+    expect(darf("INVESTOR", "suche")).toBe(false);
     expect(darf("MITARBEITER", "suche")).toBe(true);
   });
 });
