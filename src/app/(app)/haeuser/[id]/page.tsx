@@ -29,6 +29,8 @@ import {
 } from "../aktionen";
 import { FlaechenJeArt, LeerstandKreis, NutzungsartMarke } from "@/components/nutzungsart";
 import { inFlaeche } from "@/lib/nutzungsart";
+import { ladeZuordnungen } from "@/lib/daten/hausverwaltung";
+import { zuordnungAm } from "@/lib/hausverwaltung";
 
 export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) {
   const { id } = await params;
@@ -38,6 +40,8 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
   const stichtag = heute();
   const th = t.haeuser;
   const tk = t.kennzahlen;
+  const verwaltungen = (await ladeZuordnungen(kontext)).filter((z) => z.hausId === id).reverse();
+  const aktuelleHv = zuordnungAm(verwaltungen, id, stichtag);
 
   const grundlage = await ladeRechengrundlage(kontext);
   const haus = await kontext.db.haus.findFirst({
@@ -483,6 +487,23 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
             [t.allgemein.notiz, haus.notiz],
           ]}
         />
+        <div className="mt-4 text-sm" data-haus-hv>
+          <div className="text-xs font-medium text-slate-500">{t.hausverwaltungen.hausVerwaltung}</div>
+          {verwaltungen.length === 0 ? (
+            <p className="text-slate-500">{t.hausverwaltungen.hausVerwaltungKeine}</p>
+          ) : (
+            <ul className="mt-1 space-y-0.5">
+              {verwaltungen.map((z) => (
+                <li key={z.id} className={z.id === aktuelleHv?.id ? "font-medium" : "text-slate-500"}>
+                  <Link href={`/hausverwaltungen/${z.hausverwaltungId}`} className="hover:underline">
+                    {z.name}
+                  </Link>{" "}
+                  · {f.datum(z.von)} – {z.bis ? f.datum(z.bis) : t.hausverwaltungen.laeuft}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Karte>
 
       <Glossar begriffe={["Restschuld", "LTV", "DSCR", "JNKM", "NKM", "Leerstand", "BAR", "Kaufpreisfaktor", "Zinsbindung"]} t={t} />

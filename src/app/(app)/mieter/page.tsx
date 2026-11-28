@@ -7,6 +7,7 @@ import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { bereichsSicht } from "@/lib/auth/auswahl";
 import { heute, isoDatum } from "@/lib/datum";
+import { ladeHausverwaltungen, ladeZuordnungen, passtZuHv, verwaltungJeHaus } from "@/lib/daten/hausverwaltung";
 import { ladeStaende, standAnsicht } from "@/lib/daten/mieterstand";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
@@ -24,6 +25,8 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const hausFilter = typeof sp.haus === "string" && sp.haus ? sp.haus : undefined;
   const suche = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const art = nutzungsartAus(sp.art);
+  const hv = typeof sp.hv === "string" && sp.hv ? sp.hv : undefined;
+  const sort = sp.sort === "hv" ? "hv" : undefined;
 
   const kontext = await pruefeZugriff("mieter");
   const t = texte(kontext.mandant.sprache);
@@ -33,7 +36,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const sicht = await bereichsSicht(kontext);
   const hausIds = erlaubt(sicht.hausIds, hausFilter);
 
-  const [haeuser, einheiten, staende] = await Promise.all([
+  const [haeuser, alleEinheiten, staende, zuordnungen, verwaltungen] = await Promise.all([
     kontext.db.haus.findMany({ where: { id: erlaubt(sicht.hausIds) }, orderBy: { bezeichnung: "asc" }, select: { id: true, bezeichnung: true } }),
     kontext.db.einheit.findMany({
       where: { hausId: hausIds, art },
@@ -44,9 +47,15 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
       },
     }),
     ladeStaende(kontext, hausIds),
+    ladeZuordnungen(kontext),
+    ladeHausverwaltungen(kontext),
   ]);
+  const hvJeHaus = verwaltungJeHaus(zuordnungen, stichtag);
+  const passtHv = (hausId: string) => passtZuHv(hv, hvJeHaus.get(hausId));
+  const einheiten = alleEinheiten.filter((e) => passtHv(e.hausId));
+  const hvName = (hausId: string) => hvJeHaus.get(hausId)?.name ?? "\uffff";
   const ein = (w: string | string[] | undefined) => (typeof w === "string" ? w : undefined);
-  const staendeAnsicht = standAnsicht(staende, { stand: ein(sp.stand), vergleich: ein(sp.vergleich), art });
+  const staendeAnsicht = standAnsicht(staende, { stand: ein(sp.stand), vergleich: ein(sp.vergleich), art, filter: passtHv });
 
   const vertraege = einheiten.flatMap((e) =>
     e.mietverhaeltnisse.map((m) => {
@@ -86,7 +95,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
           return true;
       }
     })
-    .sort((a, b) => a.mieter.name.localeCompare(b.mieter.name, "de"));
+    .sort((a, b) => (sort === "hv" ? hvName(a.einheit.hausId).localeCompare(hvName(b.einheit.hausId), "de") : 0) || a.mieter.name.localeCompare(b.mieter.name, "de"));
 
   const aktive = vertraege.filter((v) => v.status === "aktiv");
   const summeSoll = aktive.reduce((s, v) => s.plus(v.soll), dezimal(0));
@@ -95,6 +104,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const leere = einheiten
     .filter((e) => !e.mietverhaeltnisse.some((m) => istAktiv({ beginn: isoDatum(m.beginn), ende: isoDatum(m.ende) }, stichtag)))
     .map((e) => ({ e, leerSeit: e.mietverhaeltnisse.map((m) => isoDatum(m.ende)).filter((x): x is string => !!x && x < stichtag).sort().at(-1) ?? null }));
+  if (sort === "hv") leere.sort((a, b) => hvName(a.e.hausId).localeCompare(hvName(b.e.hausId), "de"));
   // Leerstand je Nutzungsart für das Kreisdiagramm (Fläche nur Wohnen und Gewerbe)
   const leerNachArt = Object.fromEntries(
     NUTZUNGSARTEN.map((a) => {
@@ -116,7 +126,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
   const schreiben = darf(kontext.rolle, "mieter", "schreiben");
   const link = (werte: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const alle = { status, haus: hausFilter, art, q: suche || undefined, ...werte };
+    const alle = { status, haus: hausFilter, art, q: suche || undefined, hv, sort, ...werte };
     for (const [k, v] of Object.entries(alle)) if (v) p.set(k, v);
     return `/mieter?${p.toString()}`;
   };
@@ -135,7 +145,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
         t={t}
         f={f}
         pfad="/mieter"
-        erhalten={{ status, haus: hausFilter, art, q: suche || undefined }}
+        erhalten={{ status, haus: hausFilter, art, q: suche || undefined, hv, sort }}
         nurAenderungen={sp.nur === "1"}
         offen={!!(sp.stand || sp.vergleich || sp.nur)}
       />
@@ -198,6 +208,23 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
               </option>
             ))}
           </select>
+          {verwaltungen.length > 0 && (
+            <>
+              <select name="hv" defaultValue={hv ?? ""} aria-label={t.hausverwaltungen.filter} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+                <option value="">{t.hausverwaltungen.alle}</option>
+                {verwaltungen.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+                <option value="ohne">{t.hausverwaltungen.ohne}</option>
+              </select>
+              <select name="sort" defaultValue={sort ?? ""} aria-label={t.hausverwaltungen.sortierung} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+                <option value="">{t.hausverwaltungen.sortStandardMieter}</option>
+                <option value="hv">{t.hausverwaltungen.sortHv}</option>
+              </select>
+            </>
+          )}
           {status !== "leerstand" && (
             <input name="q" defaultValue={suche} placeholder={tm.suche} className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5" />
           )}
@@ -230,6 +257,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
                         <Link href={`/haeuser/${e.haus.id}`} className="hover:underline">
                           {e.haus.bezeichnung}
                         </Link>
+                        {hvJeHaus.get(e.hausId) && <div className="text-xs text-slate-500">{t.hausverwaltungen.kurz}: {hvJeHaus.get(e.hausId)!.name}</div>}
                       </td>
                       <td>
                         {e.bezeichnung} <span className="text-xs text-slate-500">{e.lage}</span>
@@ -299,6 +327,7 @@ export default async function MieterSeite({ searchParams }: PageProps<"/mieter">
                     </td>
                     <td>
                       {v.einheit.haus.bezeichnung}
+                      {hvJeHaus.get(v.einheit.hausId) && <div className="text-xs text-slate-500">{t.hausverwaltungen.kurz}: {hvJeHaus.get(v.einheit.hausId)!.name}</div>}
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
                         {v.einheit.bezeichnung} <NutzungsartMarke art={v.einheit.art} t={t} />
                       </div>

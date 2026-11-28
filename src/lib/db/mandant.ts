@@ -52,6 +52,7 @@ const FREMDSCHLUESSEL: Record<string, string> = {
   abrufPositionId: "kapitalabrufPosition",
   planjahrId: "planjahr",
   standId: "mieterstand",
+  hausverwaltungId: "hausverwaltung",
   importvorgangId: "importvorgang",
 };
 /** Gleiche Prüfung für die Relationsschreibweise `haus: { connect: { id } }`. */
