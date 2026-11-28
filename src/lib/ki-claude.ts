@@ -4,6 +4,7 @@ import { fuelle, type Texte } from "@/i18n";
 import { ERGEBNIS_SCHEMA, datenpaketAlsText, pruefeErgebnis, type Datenpaket, type GeprueftesErgebnis } from "./ki-analyse";
 import { ANTWORT_SCHEMA, PLAN_SCHEMA, ergebnisseAlsText, katalogAlsText, pruefeAntwort, pruefePlan, type FrageDaten, type GepruefteAntwort, type Objekte, type PlanEintrag } from "./ki-antwort";
 import type { Formatierer } from "./format";
+import { EINGANG_KI_SCHEMA, type KiErkennung } from "./eingang";
 import type { IsoDatum } from "./datum";
 import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
 
@@ -232,4 +233,50 @@ export async function waehleKiAbfragen(frage: string, stichtag: IsoDatum, objekt
 export async function waehleKiBausteine(frage: string, daten: FrageDaten, t: Texte, f: Formatierer) {
   const { json, ...rest } = await frageClaude(ANWEISUNG_ANTWORT, ergebnisseAlsText(frage, daten, t, f), ANTWORT_SCHEMA, t, "medium");
   return { antwort: geprueft(() => pruefeAntwort(json, daten, t.kiFragen.pruefung), t), ...rest };
+}
+
+// ---------------------------------------------------------------------------
+// Posteingang: Dokument lesen und Zuordnung vorschlagen
+// ---------------------------------------------------------------------------
+
+const ANWEISUNG_EINGANG = `Du liest ein eingegangenes Dokument für eine deutsche Immobilien-Asset-Management-Software und schlägst vor, was es ist und wozu es gehört. Ein Mensch prüft deinen Vorschlag; übernommen wird nichts automatisch.
+
+Felder:
+- kategorie: eine der erlaubten Kategorien oder "" (leer), wenn keine passt.
+- absenderArt und absenderName: wer das Dokument ausgestellt oder geschickt hat (Briefkopf, Unterschrift). "" wenn nicht erkennbar. Das Registergericht im Briefkopf einer Firma ist nicht der Absender.
+- datum: Datum des Dokuments (ausgestellt am, Stand, Stichtag) als JJJJ-MM-TT, nur wenn es so im Text steht; sonst "".
+- jahr: Geschäftsjahr bzw. Bezugsjahr als JJJJ bei jahresbezogenen Dokumenten (Jahresabschluss, BWA, Saldenbestätigung), sonst "".
+- objekt: Kürzel (O1, O2 …) des Objekts aus der Liste, zu dem das Dokument gehört, oder "" wenn unklar. Bevorzuge eindeutige Kennungen (IBAN, Darlehensnummer) vor Adressen und Namen. Bei mehreren gleich guten Möglichkeiten: "".
+- beleg: die Textstelle, auf die sich die Zuordnung stützt, WÖRTLICH aus dem Dokument kopiert (höchstens 160 Zeichen). Ohne passende Stelle: "".
+- begruendung: ein Satz, warum (z. B. „Die IBAN im Kontoauszug gehört zum Kredit O7.“).
+
+Regeln: Erfinde nichts. Rate nicht. Lieber leer lassen als unsicher zuordnen.`;
+
+export async function fuehreEingangsErkennungDurch(
+  text: string,
+  dateiname: string,
+  kandidaten: Array<{ art: string; name: string; ibans: string[]; kennungen: string[]; adressen: string[] }>,
+  t: Texte,
+): Promise<{ erkennung: KiErkennung; modell: string }> {
+  const liste = kandidaten.map((k, i) => {
+    const kennungen = [...k.ibans, ...k.kennungen, ...k.adressen].filter(Boolean).join("; ");
+    return `- O${i + 1} (${t.eingang.objektArten[k.art as keyof typeof t.eingang.objektArten]}): ${k.name}${kennungen ? ` – ${kennungen}` : ""}`;
+  });
+  const nachricht = [
+    `# ${t.eingang.ki.dateiname}`,
+    dateiname,
+    "",
+    `# ${t.eingang.ki.objekte}`,
+    ...liste,
+    "",
+    `# ${t.eingang.ki.text}`,
+    text.slice(0, 15000),
+  ].join("\n");
+  const { json, modell } = await frageClaude(ANWEISUNG_EINGANG, nachricht, EINGANG_KI_SCHEMA, t, "low");
+  const e = geprueft(() => {
+    const r = json as Record<string, unknown>;
+    const s = (k: string) => (typeof r[k] === "string" ? (r[k] as string) : "");
+    return { kategorie: s("kategorie"), absenderArt: s("absenderArt"), absenderName: s("absenderName"), datum: s("datum"), jahr: s("jahr"), objekt: s("objekt"), beleg: s("beleg"), begruendung: s("begruendung") };
+  }, t);
+  return { erkennung: e, modell };
 }

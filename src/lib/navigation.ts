@@ -50,6 +50,7 @@ export const NAVIGATION: NavGruppe[] = [
   {
     schluessel: "dokumente",
     reiter: [
+      { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang" },
       { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
       { bereich: "import", pfad: "/import", textSchluessel: "import" },
     ],

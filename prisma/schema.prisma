@@ -64,6 +64,8 @@ model Mandant {
   exitrechnungen          Exitrechnung[]
   planpositionen          Planposition[]
   dokumente               Dokument[]
+  eingaenge               Eingang[]
+  zuordnungsregeln        Zuordnungsregel[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
@@ -191,6 +193,7 @@ model Gesellschaft {
   haeuser           Haus[]
   kredite           Kredit[]
   dokumente         Dokument[]
+  zuordnungsregeln  Zuordnungsregel[]
   zuweisungen       GesellschaftZuweisung[]
   szenarien         Szenario[]
   abschluesse       Geschaeftsjahr[]
@@ -232,6 +235,7 @@ model Haus {
   exitrechnungen    Exitrechnung[]
   kiVorschlaege     KiVorschlag[]
   dokumente         Dokument[]
+  zuordnungsregeln  Zuordnungsregel[]
   zuweisungen       HausZuweisung[]
   importe           Importvorgang[]
   dokumentnachweise Dokumentnachweis[]
@@ -502,6 +506,7 @@ model Kredit {
   salden            Kreditsaldo[]
   tilgungsplaene    Tilgungsplan[]
   dokumente         Dokument[]
+  zuordnungsregeln  Zuordnungsregel[]
   importe           Importvorgang[]
   dokumentnachweise Dokumentnachweis[]
   zinssicherungen   Zinssicherung[]
@@ -836,6 +841,7 @@ model Dokument {
   kredit          Kredit?          @relation(fields: [kreditId], references: [id], onDelete: SetNull)
   seiten          DokumentSeite[]
 
+  eingang           Eingang?
   @@index([mandantId])
   @@index([mandantId, bestaetigt])
 }
@@ -1340,4 +1346,97 @@ model KiFrage {
   benutzer Benutzer @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
 
   @@index([mandantId, benutzerId])
+}
+
+/// Woher ein Eintrag im Posteingang kommt.
+enum EingangQuelle {
+  HOCHLADEN
+  UPLOAD_LINK
+  EMAIL
+}
+
+enum EingangStatus {
+  /// Vorschlag mit sicherer Zuordnung, wartet auf Bestätigung
+  ZU_PRUEFEN
+  /// Zuordnung unsicher oder unbekannt: nur mit vollständiger Prüfung übernehmen
+  UNSICHER
+  /// Mail von unbekanntem Absender: erst freigeben, dann prüfen
+  QUARANTAENE
+  UEBERNOMMEN
+  ABGELEHNT
+}
+
+/// Posteingang je Mandant: jede eingehende Datei (Hochladen, Upload-Link, E-Mail) landet hier
+/// zuerst, mit Vorschlag und Begründung. Erst nach Bestätigung wird daraus ein Dokument.
+model Eingang {
+  id              String              @id @default(cuid())
+  mandantId       String
+  quelle          EingangQuelle
+  status          EingangStatus
+  dateiname       String
+  mimeType        String
+  groesseBytes    Int
+  speicherPfad    String
+  pruefsumme      String
+  /// Erkannter Text je Seite (Liste von Texten)
+  seiten          Json?
+  textQuelle      DokumentTextQuelle?
+  textHinweis     String?
+  seitenAnzahl    Int?
+  /// E-Mail-Adresse des Absenders (bei Mails)
+  absenderAdresse String?
+  /// z. B. Name des Upload-Links oder der hochladenden Person
+  absenderHinweis String?
+  betreff         String?
+  mailtext        String?
+  /// Vorschlag mit Begründungen (siehe src/lib/eingang.ts)
+  vorschlag       Json?
+  hochgeladenVonId String?
+  dokumentId      String?             @unique
+  bearbeitetVonId String?
+  bearbeitetAm    DateTime?
+  erstelltAm      DateTime            @default(now())
+
+  mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  dokument Dokument? @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId, status])
+  @@index([mandantId, pruefsumme])
+}
+
+enum RegelMerkmal {
+  /// IBAN im Text
+  IBAN
+  /// Darlehens-, Konto- oder Vertragsnummer im Text
+  KENNUNG
+  /// E-Mail-Adresse des Absenders
+  ABSENDER_ADRESSE
+  /// Name des Absenders im Briefkopf
+  ABSENDER_NAME
+}
+
+/// Gelernte Zuordnung aus Korrekturen im Posteingang: Merkmal (z. B. IBAN) → Objekt und/oder Absender.
+model Zuordnungsregel {
+  id             String       @id @default(cuid())
+  mandantId      String
+  merkmal        RegelMerkmal
+  /// Normalisierter Wert (ohne Leerzeichen, klein)
+  wert           String
+  gesellschaftId String?
+  hausId         String?
+  kreditId       String?
+  absenderArt    AbsenderArt?
+  absenderName   String?
+  /// Wie oft die Regel bestätigt wurde
+  anzahl         Int          @default(1)
+  erstelltVonId  String?
+  erstelltAm     DateTime     @default(now())
+  geaendertAm    DateTime     @updatedAt
+
+  mandant      Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft? @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  haus         Haus?         @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  kredit       Kredit?       @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@unique([mandantId, merkmal, wert])
 }

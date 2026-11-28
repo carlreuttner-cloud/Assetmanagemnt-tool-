@@ -1,18 +1,15 @@
 import Link from "next/link";
-import { Formular } from "@/components/formular";
-import { Feld, Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
+import { Karte, Leer, Marke, Seitenkopf, Tabelle, knopfKlasse, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
-import { DOKUMENT_TYPEN, MAX_DOKUMENT_MB } from "@/lib/dateispeicher";
 import { dokumentFilter, sucheDokumente } from "@/lib/daten/dateien";
 import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { ABSENDER_ARTEN } from "@/lib/dokument-vorschlag";
 import { ImportReiter } from "../import-reiter";
-import { dokumentHochladen } from "./aktionen";
 
 export default async function DokumenteSeite({ searchParams }: PageProps<"/import/dokumente">) {
   const kontext = await pruefeZugriff("dokumente");
@@ -169,16 +166,12 @@ export default async function DokumenteSeite({ searchParams }: PageProps<"/impor
 
       {schreiben && (
         <Karte titel={td.hochladen}>
-          <Formular aktion={dokumentHochladen} absenden={td.hochladenKnopf} laeuftText={td.laeuft}>
-            <Feld
-              name="datei"
-              typ="file"
-              label={td.datei}
-              hinweis={fuelle(td.dateiHinweis, { mb: MAX_DOKUMENT_MB })}
-              accept={Object.keys(DOKUMENT_TYPEN).join(",")}
-              pflicht
-            />
-          </Formular>
+          <p className="text-sm text-slate-600">
+            {t.eingang.zumImport}{" "}
+            <Link href="/posteingang" className="font-medium text-sky-700 hover:underline">
+              {t.eingang.zumPosteingang} →
+            </Link>
+          </p>
         </Karte>
       )}
 
