@@ -2064,6 +2064,8 @@ model Briefserie {
   text           String
   /// Erhöhung in Prozent (nur Mieterhöhung)
   prozent        Decimal?        @db.Decimal(6, 2)
+  /// Erhöhung in € je Monat (nur Mieterhöhung, statt Prozent)
+  betrag         Decimal?        @db.Decimal(12, 2)
   erstelltVon    String?
   erstelltAm     DateTime        @default(now())
 

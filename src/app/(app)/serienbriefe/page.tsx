@@ -72,6 +72,7 @@ export default async function SerienbriefeSeite({ searchParams }: PageProps<"/se
               <Auswahl name="gesellschaft" label={ts.gesellschaft} optionen={gesellschaften.map(([id, name]) => ({ wert: id, text: name }))} leerText={ts.alleGesellschaften} />
               <Auswahl name="haus" label={ts.haus} optionen={haeuser.map((h) => ({ wert: h.id, text: `${h.bezeichnung} (${h.gesellschaft.name})` }))} leerText={ts.alleHaeuser} />
               <Feld name="prozent" label={ts.prozent} inputMode="decimal" hinweis={ts.prozentHinweis} />
+              <Feld name="betrag" label={ts.betrag} inputMode="decimal" />
             </Felder>
             <button type="submit" className={knopfKlasse("primaer")}>
               {ts.zurVorschau}
@@ -161,7 +162,8 @@ export default async function SerienbriefeSeite({ searchParams }: PageProps<"/se
                     <span className="font-medium">{s.titel}</span>
                     <div className="text-xs text-slate-500">
                       {ts.arten[s.art]}
-                      {s.prozent && ` · ${f.prozent(s.prozent, 2)}`} · {f.datum(isoDatum(s.datum))} · {s.erstelltVon ?? "–"}
+                      {s.prozent && ` · ${f.prozent(s.prozent, 2)}`}
+                      {s.betrag && ` · +${f.betrag(s.betrag)}`} · {f.datum(isoDatum(s.datum))} · {s.erstelltVon ?? "–"}
                     </div>
                   </td>
                   <td>

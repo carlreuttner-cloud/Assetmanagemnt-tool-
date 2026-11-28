@@ -6,7 +6,7 @@ import { alsDbDatum, isoDatum, type IsoDatum } from "@/lib/datum";
 import type { Formatierer } from "@/lib/format";
 import { dezimal, type Decimal } from "@/lib/geld";
 import { jahresNettokaltmiete } from "@/lib/miete";
-import { erhoehungMoeglich, fuelleVorlage, prozentAusText, rechneErhoehung, wirksamAb, type EmpfaengerGrund, type Erhoehung, type Platzhalter } from "@/lib/serienbrief";
+import { betragAusText, erhoehungMoeglich, fuelleVorlage, prozentAusText, rechneErhoehung, wirksamAb, type EmpfaengerGrund, type Erhoehung, type Platzhalter } from "@/lib/serienbrief";
 
 export interface Empfaenger {
   mietverhaeltnisId: string;
@@ -38,6 +38,8 @@ export interface SerienParameter {
   text: string;
   datum: IsoDatum;
   prozent: Decimal | null;
+  /** Erhöhung in € je Monat (statt Prozent) */
+  betrag: Decimal | null;
   hausId?: string;
   gesellschaftId?: string;
   /** nur diese Mietverhältnisse */
@@ -84,7 +86,8 @@ export async function ladeEmpfaenger(kontext: Kontext, p: SerienParameter, f: Fo
     if (p.art === "MIETERHOEHUNG") {
       const mo = erhoehungMoeglich({ einheitArt: e.art, beginn, letzteMieterhoehung: letzte }, stichtag);
       if (!mo.moeglich) ausgeschlossen = mo.grund;
-      if (p.prozent && mo.ergebnis.art === "moeglich") erhoehung = { ...rechneErhoehung(miete, p.prozent), verlangenAb: mo.ergebnis.verlangenAb, wirksamAb: wirksamAb(mo.ergebnis.wirksamAb, stichtag), basis: mo.ergebnis.basis };
+      const vorgabe = p.prozent ? { prozent: p.prozent } : p.betrag ? { betrag: p.betrag } : null;
+      if (vorgabe && mo.ergebnis.art === "moeglich") erhoehung = { ...rechneErhoehung(miete, vorgabe), verlangenAb: mo.ergebnis.verlangenAb, wirksamAb: wirksamAb(mo.ergebnis.wirksamAb, stichtag), basis: mo.ergebnis.basis };
     }
     const anschrift = h.strasse && h.plz && h.ort ? [m.mieter.name, `${h.strasse}${e.lage ? `, ${e.lage}` : ""}`, `${h.plz} ${h.ort}`] : null;
     const flaeche = dezimal(e.flaeche.toString());
@@ -108,7 +111,7 @@ export async function ladeEmpfaenger(kontext: Kontext, p: SerienParameter, f: Fo
             neueMiete: f.betrag(erhoehung.neueMiete),
             neueJahresmiete: f.betrag(jahresNettokaltmiete(erhoehung.neueMiete)),
             erhoehungBetrag: f.betrag(erhoehung.betrag),
-            erhoehungProzent: f.prozent(p.prozent!, 2),
+            erhoehungProzent: erhoehung.prozent === null ? null : f.prozent(erhoehung.prozent, 2),
           }
         : {}),
     };
@@ -146,10 +149,11 @@ export interface SerienAnfrage {
   haus?: string | null;
   gesellschaft?: string | null;
   prozent?: string | null;
+  betrag?: string | null;
   datum?: string | null;
 }
 
-export type SerienFehler = "vorlage" | "prozent" | "datum";
+export type SerienFehler = "vorlage" | "erhoehung" | "datum";
 
 /** Liest Vorlage und Parameter einer Serie (aus der Adresszeile oder dem Formular). */
 export async function leseSerie(kontext: Kontext, q: SerienAnfrage, heute: IsoDatum) {
@@ -158,13 +162,17 @@ export async function leseSerie(kontext: Kontext, q: SerienAnfrage, heute: IsoDa
   const datum = q.datum && /^\d{4}-\d{2}-\d{2}$/.test(q.datum) ? q.datum : heute;
   if (datum < heute) return { fehler: "datum" as SerienFehler, vorlage, parameter: null };
   const prozent = prozentAusText(q.prozent);
-  if (vorlage.art === "MIETERHOEHUNG" && !prozent) return { fehler: "prozent" as SerienFehler, vorlage, parameter: null };
+  const betrag = betragAusText(q.betrag);
+  // genau eine Vorgabe: Prozent oder Betrag; ungültige Eingaben gelten als Fehler
+  const eingegeben = [q.prozent?.trim(), q.betrag?.trim()].filter(Boolean).length;
+  if (vorlage.art === "MIETERHOEHUNG" && (eingegeben !== 1 || (!prozent && !betrag))) return { fehler: "erhoehung" as SerienFehler, vorlage, parameter: null };
   const parameter: SerienParameter = {
     art: vorlage.art,
     betreff: vorlage.betreff,
     text: vorlage.text,
     datum,
     prozent: vorlage.art === "MIETERHOEHUNG" ? prozent : null,
+    betrag: vorlage.art === "MIETERHOEHUNG" ? betrag : null,
     hausId: q.haus || undefined,
     gesellschaftId: q.gesellschaft || undefined,
   };

@@ -12,7 +12,7 @@ export async function GET(anfrage: Request) {
   const t = texte(kontext.mandant.sprache);
   const ts = t.serienbriefe;
   const q = new URL(anfrage.url).searchParams;
-  const { fehler, vorlage, parameter } = await leseSerie(kontext, { vorlage: q.get("vorlage"), haus: q.get("haus"), gesellschaft: q.get("gesellschaft"), prozent: q.get("prozent"), datum: q.get("datum") }, heute());
+  const { fehler, vorlage, parameter } = await leseSerie(kontext, { vorlage: q.get("vorlage"), haus: q.get("haus"), gesellschaft: q.get("gesellschaft"), prozent: q.get("prozent"), betrag: q.get("betrag"), datum: q.get("datum") }, heute());
   if (fehler || !vorlage || !parameter) return new Response(ts.fehler[fehler ?? "vorlage"], { status: 400 });
   const f = formatierer(kontext.mandant);
   const nur = q.getAll("mv");

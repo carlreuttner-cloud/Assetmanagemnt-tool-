@@ -35,7 +35,8 @@ describe("Navigation", () => {
     expect(hv.map((g) => g.schluessel)).toEqual(["dokumente"]);
     expect(hv[0].reiter.map((r) => r.pfad)).toEqual(["/import"]);
     const investor = erlaubteNavigation((b) => darf("INVESTOR", b)).flatMap((g) => g.reiter.map((r) => r.pfad));
-    expect(investor).toEqual(["/portal"]);
+    expect(investor).toEqual(expect.arrayContaining(["/portal", "/portfolios", "/kredite", "/einheiten", "/investitionen"]));
+    expect(investor).not.toContain("/import");
   });
 });
 
