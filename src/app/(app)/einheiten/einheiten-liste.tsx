@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 import { Begriff } from "@/components/herleitung";
+import { StandVergleich } from "@/components/mieterstand";
 import { LeerstandKreis, NutzungsartMarke, NutzungsartPunkt } from "@/components/nutzungsart";
 import { Kachel, Kacheln, Leer, Marke, MieteZelle, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
@@ -12,6 +13,9 @@ import { bereichsSicht } from "@/lib/auth/auswahl";
 import type { Kontext } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { heute, isoDatum } from "@/lib/datum";
+import { ladeHausverwaltungen, ladeZuordnungen, passtZuHv, verwaltungJeHaus } from "@/lib/daten/hausverwaltung";
+import { ladeStaende, standAnsicht } from "@/lib/daten/mieterstand";
+import { hvOptionen } from "../hausverwaltungen/ton";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { einParam, filterHref } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
@@ -43,11 +47,11 @@ export async function EinheitenListe({
   const tn = t.nutzung;
   const stichtag = heute();
   const art = festeArt ?? nutzungsartAus(sp.art);
-  const filter = { g: einParam(sp.g), h: einParam(sp.h), status: einParam(sp.status), art: festeArt ? undefined : art };
+  const filter = { g: einParam(sp.g), h: einParam(sp.h), status: einParam(sp.status), art: festeArt ? undefined : art, hv: einParam(sp.hv), sort: sp.sort === "hv" ? "hv" : undefined };
   const sicht = await bereichsSicht(kontext);
   const darfMieter = darf(kontext.rolle, "mieter");
 
-  const [haeuser, einheiten] = await Promise.all([
+  const [haeuser, einheiten, staende, zuordnungen, verwaltungen] = await Promise.all([
     kontext.db.haus.findMany({
       where: { id: erlaubt(sicht.hausIds), gesellschaftId: filter.g },
       orderBy: { bezeichnung: "asc" },
@@ -61,18 +65,26 @@ export async function EinheitenListe({
         mietverhaeltnisse: { include: { mieter: { select: { name: true } } } },
       },
     }),
+    ladeStaende(kontext, erlaubt(sicht.hausIds, filter.h), filter.g),
+    ladeZuordnungen(kontext),
+    ladeHausverwaltungen(kontext),
   ]);
+  const hvJeHaus = verwaltungJeHaus(zuordnungen, stichtag);
+  const passtHv = (hausId: string) => passtZuHv(filter.hv, hvJeHaus.get(hausId));
+  const staendeAnsicht = standAnsicht(staende, { stand: einParam(sp.stand), vergleich: einParam(sp.vergleich), art, filter: passtHv });
   const alleGesellschaften = await kontext.db.gesellschaft.findMany({
     where: { id: erlaubt(sicht.gesellschaftIds), haeuser: { some: { id: erlaubt(sicht.hausIds) } } },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
 
-  const alleZeilen = einheiten.map((e) => {
+  const alleZeilen = einheiten.filter((e) => passtHv(e.hausId)).map((e) => {
     const aktiv = e.mietverhaeltnisse.filter((m) => istAktiv({ beginn: isoDatum(m.beginn), ende: isoDatum(m.ende) }, stichtag));
     return { e, aktiv, soll: aktiv.reduce((s, m) => s.plus(dezimal(m.sollMiete)), dezimal(0)), leer: aktiv.length === 0 };
   });
-  const zeilen = filter.status === "leer" ? alleZeilen.filter((z) => z.leer) : alleZeilen;
+  const zeilen = filter.status === "leer" ? alleZeilen.filter((z) => z.leer) : [...alleZeilen];
+  // Sortierung nach Hausverwaltung (ohne zuletzt), innerhalb wie bisher
+  if (filter.sort === "hv") zeilen.sort((a, b) => (hvJeHaus.get(a.e.hausId)?.name ?? "\uffff").localeCompare(hvJeHaus.get(b.e.hausId)?.name ?? "\uffff", "de"));
   const sollVermietet = zeilen.filter((z) => !z.leer).reduce((s, z) => s.plus(z.soll), dezimal(0));
   const leere = zeilen.filter((z) => z.leer);
   const erwartet = leere.reduce((s, z) => (z.e.erwarteteMiete ? s.plus(dezimal(z.e.erwarteteMiete)) : s), dezimal(0));
@@ -113,6 +125,16 @@ export async function EinheitenListe({
     <div className="space-y-4">
       <Seitenkopf titel={titel} beschreibung={beschreibung} />
 
+      <StandVergleich
+        ansicht={staendeAnsicht}
+        t={t}
+        f={f}
+        pfad={pfad}
+        erhalten={{ ...filter }}
+        nurAenderungen={sp.nur === "1"}
+        offen={!!(sp.stand || sp.vergleich || sp.nur)}
+      />
+
       <Kacheln>
         {(festeArt ? [festeArt] : sichtbareArten).map((a) => {
           const x = nachArt[a];
@@ -146,6 +168,19 @@ export async function EinheitenListe({
       <FilterZeile>
         {alleGesellschaften.length > 1 && <AuswahlFilter name="g" label={t.navigation.gesellschaften} optionen={optionenGesellschaft} />}
         {haeuser.length > 1 && <AuswahlFilter name="h" label={t.navigation.haeuser} optionen={optionenHaus} />}
+        {verwaltungen.length > 0 && (
+          <>
+            <AuswahlFilter name="hv" label={t.hausverwaltungen.filter} optionen={hvOptionen(verwaltungen, filter.hv, (w) => filterHref(pfad, filter, "hv", w), t)} />
+            <AuswahlFilter
+              name="sort"
+              label={t.hausverwaltungen.sortierung}
+              optionen={[
+                { href: filterHref(pfad, filter, "sort", undefined), text: t.hausverwaltungen.sortStandard, aktiv: !filter.sort },
+                { href: filterHref(pfad, filter, "sort", "hv"), text: t.hausverwaltungen.sortHv, aktiv: filter.sort === "hv" },
+              ]}
+            />
+          </>
+        )}
       </FilterZeile>
       {!festeArt && (
         <Reiter
@@ -205,6 +240,7 @@ export async function EinheitenListe({
                       {e.haus.bezeichnung}
                     </Link>
                     <div className="text-xs text-slate-500">{e.haus.gesellschaft.name}</div>
+                    {hvJeHaus.get(e.hausId) && <div className="text-xs text-slate-500">{t.hausverwaltungen.kurz}: {hvJeHaus.get(e.hausId)!.name}</div>}
                   </td>
                   <td>{e.lage}</td>
                   {mitFlaeche && (
