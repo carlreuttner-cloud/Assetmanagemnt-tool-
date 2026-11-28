@@ -7,6 +7,7 @@ import type { Formatierer } from "./format";
 import { ANGEBOT_KI_SCHEMA } from "@/lib/bankangebot";
 import { EINGANG_KI_SCHEMA, type KiErkennung } from "./eingang";
 import type { IsoDatum } from "./datum";
+import { LEERSTAND_KI_SCHEMA, pruefeKiZuordnung, type HausKandidat, type Zuordnungen } from "./import/leerstandsliste";
 import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
 
 /** Modell für die Analyse; über KI_MODELL änderbar. */
@@ -303,4 +304,20 @@ export async function fuehreAngebotsErkennungDurch(text: string, t: Texte): Prom
       .map((x) => ({ feld: String(x.feld ?? ""), wert: String(x.wert ?? ""), beleg: String(x.beleg ?? "") }));
   }, t);
   return { felder, modell };
+}
+
+const ANWEISUNG_LEERSTAND = `Du ordnest Zeilen einer alten Leerstandsliste einer Hausverwaltung den Häusern und Einheiten eines Bestands zu.
+Die Nachricht enthält (1) die Häuser des Bestands mit ID, Bezeichnung, Straße und ihren Einheiten (ID und Bezeichnung) und (2) die offenen Texte aus der Liste: Hausangaben ohne Zuordnung und Einheitenangaben je Haus ohne Zuordnung.
+
+Regeln:
+- Ordne nur zu, wenn die Angabe eindeutig zu genau einem Haus bzw. einer Einheit passt (z. B. andere Schreibweise, Abkürzung, Straße mit Ort, „Whg. 3“ = „WE 03“). Sonst null.
+- Verwende ausschließlich IDs aus der Nachricht. Erfinde nichts, schätze nichts, rechne nichts.
+- Gib jede offene Angabe genau einmal zurück, mit dem Text wörtlich wie in der Nachricht.`;
+
+/** Schlägt Zuordnungen für offene Haus- und Einheitenangaben vor; die Prüfung erfolgt im Code. */
+export async function fuehreLeerstandZuordnungDurch(offen: { haeuser: string[]; einheiten: Array<{ hausId: string; text: string }> }, haeuser: HausKandidat[], t: Texte): Promise<{ zuordnungen: Zuordnungen; modell: string }> {
+  const bestand = haeuser.map((h) => ({ id: h.id, bezeichnung: h.bezeichnung, strasse: h.strasse, einheiten: h.einheiten.map((e) => ({ id: e.id, bezeichnung: e.bezeichnung })) }));
+  const nachricht = JSON.stringify({ bestand, offen }).slice(0, 150000);
+  const { json, modell } = await frageClaude(ANWEISUNG_LEERSTAND, nachricht, LEERSTAND_KI_SCHEMA, t, "low");
+  return { zuordnungen: geprueft(() => pruefeKiZuordnung(json, offen, haeuser), t), modell };
 }

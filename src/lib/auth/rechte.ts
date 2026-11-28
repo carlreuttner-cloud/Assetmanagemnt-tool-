@@ -44,11 +44,21 @@ const RECHTE: Record<Rolle, Partial<Record<Bereich, Aktion[]>>> = {
   HAUSVERWALTUNG: {
     import: ALLES,
   },
-  // Investorenportal: nur eigene Kapitalkonten, freigegebene Berichte und ausdrücklich freigegebene
-  // Dokumente der zugewiesenen Gesellschaften (siehe sichtbarkeit.ts und daten/portal.ts).
+  // Nur lesen, und nur die zugewiesenen Gesellschaften (siehe sichtbarkeit.ts); dazu das
+  // Investorenportal mit eigenen Kapitalkonten und freigegebenen Berichten/Dokumenten.
   INVESTOR: {
+    uebersicht: LESEN,
+    gesellschaften: LESEN,
+    haeuser: LESEN,
+    mieter: LESEN,
+    dokumente: LESEN,
+    szenarien: LESEN,
+    berichte: LESEN,
+    kiAssistent: LESEN,
+    suche: LESEN,
     investorenportal: LESEN,
   },
+
 };
 
 export function darf(rolle: Rolle, bereich: Bereich, aktion: Aktion = "lesen"): boolean {
