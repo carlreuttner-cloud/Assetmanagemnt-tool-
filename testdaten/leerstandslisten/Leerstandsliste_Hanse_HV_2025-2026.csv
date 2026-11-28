@@ -1,0 +1,25 @@
+Leerstandsliste Hanse Hausverwaltung GmbH (Testdaten, erfunden);;;;;;;
+Erstellt für: Demo Immobilien GmbH;;;;;;;
+;;;;;;;
+Objekt;Stichtag;Einheit;Nutzung;Fläche m²;leer seit;Zielmiete €;Bemerkung
+Alsterblick 27, 20099 Hamburg;31.12.2025;Stpl. 7;Stellplatz;;01.10.2025;85,00;
+Alsterblick 27, 20099 Hamburg;31.12.2025;Stpl. 13;Stellplatz;;01.12.2025;85,00;Kündigung Mieter
+Am Auenwald 3, Leipzig;31.12.2025;Whg. 1;Wohnung;69,2;01.07.2025;790,00;Sanierung Bad
+Am Auenwald 3, Leipzig;31.12.2025;Whg. 9;Wohnung;37,5;01.04.2025;385,00;
+Am Auenwald 3, Leipzig;31.12.2025;Whg. 17;Wohnung;76,4;01.11.2025;920,00;
+Am Kastanienhof 3, Berlin;31.12.2025;WE 3;Wohnung;92,2;01.09.2025;1.050,00;
+Am Kastanienhof 3, Berlin;31.12.2025;WE 15;Wohnung;78,1;01.12.2025;850,00;
+Lindenstraße 99, Bremen;31.12.2025;Whg. 2;Wohnung;55;01.06.2025;600,00;Objekt nicht im Bestand (Test)
+Alsterblick 27, 20099 Hamburg;03/2026;Stpl. 13;Stellplatz;;01.12.2025;85,00;
+Am Auenwald 3, Leipzig;03/2026;Whg. 1;Wohnung;69,2;01.07.2025;790,00;
+Am Auenwald 3, Leipzig;03/2026;Whg. 9;Wohnung;37,5;01.04.2025;385,00;
+Am Auenwald 3, Leipzig;03/2026;Whg. 17;Wohnung;76,4;01.11.2025;920,00;
+Am Auenwald 3, Leipzig;03/2026;Whg. 29;Wohnung;55,6;01.02.2026;620,00;
+Am Auenwald 3, Leipzig;03/2026;Whg. 77;Wohnung;40;01.01.2026;450,00;Einheit unbekannt (Test)
+Am Kastanienhof 3, Berlin;03/2026;WE 15;Wohnung;78,1;01.12.2025;850,00;
+Am Kastanienhof 3, Berlin;03/2026;WE 27;Wohnung;78,8;01.03.2026;870,00;
+Alsterblick 27, 20099 Hamburg;30.04.2026;Stpl. 13;Stellplatz;;01.12.2025;85,00;
+Am Auenwald 3, Leipzig;30.04.2026;Whg. 1;Wohnung;69,2;01.07.2025;790,00;
+Am Auenwald 3, Leipzig;30.04.2026;Whg. 17;Wohnung;76,4;01.11.2025;920,00;
+Am Auenwald 3, Leipzig;30.04.2026;Whg. 29;Wohnung;55,6;01.02.2026;620,00;
+Am Kastanienhof 3, Berlin;30.04.2026;WE 27;Wohnung;78,8;01.03.2026;870,00;

@@ -4,7 +4,10 @@ import { fuelle, type Texte } from "@/i18n";
 import { ERGEBNIS_SCHEMA, datenpaketAlsText, pruefeErgebnis, type Datenpaket, type GeprueftesErgebnis } from "./ki-analyse";
 import { ANTWORT_SCHEMA, PLAN_SCHEMA, ergebnisseAlsText, katalogAlsText, pruefeAntwort, pruefePlan, type FrageDaten, type GepruefteAntwort, type Objekte, type PlanEintrag } from "./ki-antwort";
 import type { Formatierer } from "./format";
+import { ANGEBOT_KI_SCHEMA } from "@/lib/bankangebot";
+import { EINGANG_KI_SCHEMA, type KiErkennung } from "./eingang";
 import type { IsoDatum } from "./datum";
+import { LEERSTAND_KI_SCHEMA, pruefeKiZuordnung, type HausKandidat, type Zuordnungen } from "./import/leerstandsliste";
 import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
 
 /** Modell für die Analyse; über KI_MODELL änderbar. */
@@ -232,4 +235,89 @@ export async function waehleKiAbfragen(frage: string, stichtag: IsoDatum, objekt
 export async function waehleKiBausteine(frage: string, daten: FrageDaten, t: Texte, f: Formatierer) {
   const { json, ...rest } = await frageClaude(ANWEISUNG_ANTWORT, ergebnisseAlsText(frage, daten, t, f), ANTWORT_SCHEMA, t, "medium");
   return { antwort: geprueft(() => pruefeAntwort(json, daten, t.kiFragen.pruefung), t), ...rest };
+}
+
+// ---------------------------------------------------------------------------
+// Posteingang: Dokument lesen und Zuordnung vorschlagen
+// ---------------------------------------------------------------------------
+
+const ANWEISUNG_EINGANG = `Du liest ein eingegangenes Dokument für eine deutsche Immobilien-Asset-Management-Software und schlägst vor, was es ist und wozu es gehört. Ein Mensch prüft deinen Vorschlag; übernommen wird nichts automatisch.
+
+Felder:
+- kategorie: eine der erlaubten Kategorien oder "" (leer), wenn keine passt.
+- absenderArt und absenderName: wer das Dokument ausgestellt oder geschickt hat (Briefkopf, Unterschrift). "" wenn nicht erkennbar. Das Registergericht im Briefkopf einer Firma ist nicht der Absender.
+- datum: Datum des Dokuments (ausgestellt am, Stand, Stichtag) als JJJJ-MM-TT, nur wenn es so im Text steht; sonst "".
+- jahr: Geschäftsjahr bzw. Bezugsjahr als JJJJ bei jahresbezogenen Dokumenten (Jahresabschluss, BWA, Saldenbestätigung), sonst "".
+- objekt: Kürzel (O1, O2 …) des Objekts aus der Liste, zu dem das Dokument gehört, oder "" wenn unklar. Bevorzuge eindeutige Kennungen (IBAN, Darlehensnummer) vor Adressen und Namen. Bei mehreren gleich guten Möglichkeiten: "".
+- beleg: die Textstelle, auf die sich die Zuordnung stützt, WÖRTLICH aus dem Dokument kopiert (höchstens 160 Zeichen). Ohne passende Stelle: "".
+- begruendung: ein Satz, warum (z. B. „Die IBAN im Kontoauszug gehört zum Kredit O7.“).
+
+Regeln: Erfinde nichts. Rate nicht. Lieber leer lassen als unsicher zuordnen.`;
+
+export async function fuehreEingangsErkennungDurch(
+  text: string,
+  dateiname: string,
+  kandidaten: Array<{ art: string; name: string; ibans: string[]; kennungen: string[]; adressen: string[] }>,
+  t: Texte,
+): Promise<{ erkennung: KiErkennung; modell: string }> {
+  const liste = kandidaten.map((k, i) => {
+    const kennungen = [...k.ibans, ...k.kennungen, ...k.adressen].filter(Boolean).join("; ");
+    return `- O${i + 1} (${t.eingang.objektArten[k.art as keyof typeof t.eingang.objektArten]}): ${k.name}${kennungen ? ` – ${kennungen}` : ""}`;
+  });
+  const nachricht = [
+    `# ${t.eingang.ki.dateiname}`,
+    dateiname,
+    "",
+    `# ${t.eingang.ki.objekte}`,
+    ...liste,
+    "",
+    `# ${t.eingang.ki.text}`,
+    text.slice(0, 15000),
+  ].join("\n");
+  const { json, modell } = await frageClaude(ANWEISUNG_EINGANG, nachricht, EINGANG_KI_SCHEMA, t, "low");
+  const e = geprueft(() => {
+    const r = json as Record<string, unknown>;
+    const s = (k: string) => (typeof r[k] === "string" ? (r[k] as string) : "");
+    return { kategorie: s("kategorie"), absenderArt: s("absenderArt"), absenderName: s("absenderName"), datum: s("datum"), jahr: s("jahr"), objekt: s("objekt"), beleg: s("beleg"), begruendung: s("begruendung") };
+  }, t);
+  return { erkennung: e, modell };
+}
+
+const ANWEISUNG_ANGEBOT = `Du liest das Finanzierungsangebot (Term Sheet) einer Bank für eine deutsche Immobilien-Asset-Management-Software und gibst die Konditionen als Textstellen zurück. Ein Mensch prüft alles; gerechnet wird nur in der Software.
+
+Gib je gefundenem Feld einen Eintrag {feld, wert, beleg} zurück:
+- wert: so wie im Dokument, Zahlen mit Punkt als Dezimaltrennzeichen und ohne Tausenderpunkte (z. B. "3.85", "2500000"); Datum als JJJJ-MM-TT; zinsArt "FEST" oder "VARIABEL"; referenzzins z. B. "3M-EURIBOR"; zinsbindungMonate und laufzeitMonate als ganze Monate (10 Jahre = "120").
+- Prozentwerte als Prozentpunkte (3,85 % = "3.85"); bearbeitungsgebuehr und sonstigeKosten nur in Euro, nicht in Prozent; auszahlungProzent ist der Auszahlungskurs (100 = ohne Disagio); bereitstellungszins in Prozent je Monat.
+- covenants und sicherheiten: kurze Aufzählung der Textstellen.
+- beleg: die Textstelle WÖRTLICH aus dem Dokument kopiert (höchstens 200 Zeichen), in der der Wert steht.
+
+Regeln: Erfinde nichts, rechne nichts aus, schätze nichts. Felder, die nicht im Dokument stehen, lässt du weg.`;
+
+/** Liest Konditionen eines Term Sheets per KI aus (nur Textstellen; Prüfung im Code). */
+export async function fuehreAngebotsErkennungDurch(text: string, t: Texte): Promise<{ felder: Array<{ feld: string; wert: string; beleg: string }>; modell: string }> {
+  const { json, modell } = await frageClaude(ANWEISUNG_ANGEBOT, text.slice(0, 20000), ANGEBOT_KI_SCHEMA, t, "low");
+  const felder = geprueft(() => {
+    const r = json as { felder?: unknown };
+    if (!Array.isArray(r.felder)) throw new Error("felder fehlt");
+    return r.felder
+      .filter((x): x is Record<string, unknown> => typeof x === "object" && x !== null)
+      .map((x) => ({ feld: String(x.feld ?? ""), wert: String(x.wert ?? ""), beleg: String(x.beleg ?? "") }));
+  }, t);
+  return { felder, modell };
+}
+
+const ANWEISUNG_LEERSTAND = `Du ordnest Zeilen einer alten Leerstandsliste einer Hausverwaltung den Häusern und Einheiten eines Bestands zu.
+Die Nachricht enthält (1) die Häuser des Bestands mit ID, Bezeichnung, Straße und ihren Einheiten (ID und Bezeichnung) und (2) die offenen Texte aus der Liste: Hausangaben ohne Zuordnung und Einheitenangaben je Haus ohne Zuordnung.
+
+Regeln:
+- Ordne nur zu, wenn die Angabe eindeutig zu genau einem Haus bzw. einer Einheit passt (z. B. andere Schreibweise, Abkürzung, Straße mit Ort, „Whg. 3“ = „WE 03“). Sonst null.
+- Verwende ausschließlich IDs aus der Nachricht. Erfinde nichts, schätze nichts, rechne nichts.
+- Gib jede offene Angabe genau einmal zurück, mit dem Text wörtlich wie in der Nachricht.`;
+
+/** Schlägt Zuordnungen für offene Haus- und Einheitenangaben vor; die Prüfung erfolgt im Code. */
+export async function fuehreLeerstandZuordnungDurch(offen: { haeuser: string[]; einheiten: Array<{ hausId: string; text: string }> }, haeuser: HausKandidat[], t: Texte): Promise<{ zuordnungen: Zuordnungen; modell: string }> {
+  const bestand = haeuser.map((h) => ({ id: h.id, bezeichnung: h.bezeichnung, strasse: h.strasse, einheiten: h.einheiten.map((e) => ({ id: e.id, bezeichnung: e.bezeichnung })) }));
+  const nachricht = JSON.stringify({ bestand, offen }).slice(0, 150000);
+  const { json, modell } = await frageClaude(ANWEISUNG_LEERSTAND, nachricht, LEERSTAND_KI_SCHEMA, t, "low");
+  return { zuordnungen: geprueft(() => pruefeKiZuordnung(json, offen, haeuser), t), modell };
 }

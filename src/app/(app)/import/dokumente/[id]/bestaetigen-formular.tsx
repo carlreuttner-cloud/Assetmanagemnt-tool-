@@ -16,11 +16,13 @@ export function BestaetigenFormular({
   aktion,
   objekte,
   start,
+  absenden,
 }: {
   td: Texte["dateien"];
   aktion: (vorher: AktionsErgebnis, fd: FormData) => Promise<AktionsErgebnis>;
   objekte: Objekt[];
   start: { titel: string; kategorie: string | null; jahr: number | null; datum: string | null; zuordnung: string | null; absenderArt: string | null; absenderName: string | null };
+  absenden?: string;
 }) {
   const [kategorie, setKategorie] = useState(start.kategorie ?? "");
   const [jahr, setJahr] = useState(start.jahr ? String(start.jahr) : "");
@@ -40,7 +42,7 @@ export function BestaetigenFormular({
 
   const gruppen: ObjektArt[] = ["gesellschaft", "haus", "kredit"];
   return (
-    <Formular aktion={aktion} absenden={td.speichern}>
+    <Formular aktion={aktion} absenden={absenden ?? td.speichern}>
       <label className="block text-sm">
         <span className="font-medium text-slate-700">{td.name}</span>
         <input name="titel" value={titel} onChange={(e) => setManuell(e.target.value)} required maxLength={300} className={EINGABE} />

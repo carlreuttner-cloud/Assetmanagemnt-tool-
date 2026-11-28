@@ -38,6 +38,8 @@ describe("Fristen-Kalender", () => {
     const { fristen, luecken } = sammleFristen(e, "2026-11-27", "2027-11-27", t, datum);
     expect(fristen.map((f) => `${f.art}:${f.titel}:${f.datum}`)).toEqual([
       "mieterhoehung:WE 3 · H:2019-01-01",
+      // Refinanzierung vorbereiten: 24 Monate vor dem Zinsbindungsende, schon fällig
+      "refinanzierung:K1:2025-03-14",
       "zinsbindung:K1:2027-03-14",
       "mietende:GE 1 · H:2027-06-30",
       "mieterhoehung:WE 1 · H:2027-06-01",
@@ -49,7 +51,7 @@ describe("Fristen-Kalender", () => {
   it("trennt Fälliges von kommenden Monaten", () => {
     const { fristen } = sammleFristen(e, "2026-11-27", null, t, datum);
     const { faellig, monate } = nachMonat(fristen, "2026-11-27");
-    expect(faellig.map((f) => f.titel)).toEqual(["WE 3 · H"]);
+    expect(faellig.map((f) => f.titel)).toEqual(["WE 3 · H", "K1"]);
     expect(monate.map(([m]) => m)).toEqual(["2027-03", "2027-06", "2035-12"]);
   });
 });
