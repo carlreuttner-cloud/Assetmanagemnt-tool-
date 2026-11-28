@@ -95,6 +95,8 @@ model Mandant {
   kapitalabrufPositionen  KapitalabrufPosition[]
   planjahre               Planjahr[]
   planerklaerungen        Planerklaerung[]
+  energieausweise         Energieausweis[]
+  energieverbraeuche      Energieverbrauch[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -243,23 +245,25 @@ model Haus {
   erstelltAm     DateTime  @default(now())
   geaendertAm    DateTime  @updatedAt
 
-  mandant           Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschaft      Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
-  verkehrswerte     Verkehrswert[]
-  gutachten         Gutachten[]
-  fotos             Foto[]
-  einheiten         Einheit[]
-  kredite           KreditHaus[]
-  investitionen     Investition[]
-  massnahmen        Massnahme[]
-  exitrechnungen    Exitrechnung[]
-  kiVorschlaege     KiVorschlag[]
-  dokumente         Dokument[]
-  zuordnungsregeln  Zuordnungsregel[]
-  zuweisungen       HausZuweisung[]
-  importe           Importvorgang[]
-  dokumentnachweise Dokumentnachweis[]
-  sicherheiten      SicherheitHaus[]
+  mandant            Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft       Gesellschaft       @relation(fields: [gesellschaftId], references: [id], onDelete: Restrict)
+  verkehrswerte      Verkehrswert[]
+  gutachten          Gutachten[]
+  fotos              Foto[]
+  einheiten          Einheit[]
+  kredite            KreditHaus[]
+  investitionen      Investition[]
+  massnahmen         Massnahme[]
+  exitrechnungen     Exitrechnung[]
+  kiVorschlaege      KiVorschlag[]
+  dokumente          Dokument[]
+  zuordnungsregeln   Zuordnungsregel[]
+  zuweisungen        HausZuweisung[]
+  importe            Importvorgang[]
+  dokumentnachweise  Dokumentnachweis[]
+  sicherheiten       SicherheitHaus[]
+  energieausweise    Energieausweis[]
+  energieverbraeuche Energieverbrauch[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -1902,5 +1906,68 @@ model Planerklaerung {
   planjahr Planjahr @relation(fields: [planjahrId], references: [id], onDelete: Cascade)
 
   @@unique([planjahrId, zeile])
+  @@index([mandantId])
+}
+
+enum EnergieausweisArt {
+  BEDARF
+  VERBRAUCH
+}
+
+/// Energieausweis eines Hauses; mehrere je Haus möglich (Verlauf), maßgeblich ist der zuletzt gültige.
+model Energieausweis {
+  id               String            @id @default(cuid())
+  mandantId        String
+  hausId           String
+  art              EnergieausweisArt
+  /// A+ bis H laut Ausweis; null = nicht angegeben
+  energieklasse    String?
+  /// Endenergie in kWh/(m²·a) laut Ausweis
+  endenergie       Decimal?          @db.Decimal(9, 2)
+  /// Primärenergie in kWh/(m²·a) laut Ausweis
+  primaerenergie   Decimal?          @db.Decimal(9, 2)
+  /// wesentlicher Energieträger, z. B. Erdgas, Fernwärme
+  energietraeger   String?
+  ausgestelltAm    DateTime?         @db.Date
+  gueltigBis       DateTime?         @db.Date
+  registriernummer String?
+  quelle           String?
+  notiz            String?
+  erstelltVon      String?
+  erstelltAm       DateTime          @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([hausId])
+}
+
+enum Energiemedium {
+  WAERME
+  STROM
+  WASSER
+}
+
+/// Verbrauch eines Hauses je Kalenderjahr und Medium (Wärme und Strom in kWh, Wasser in m³) mit Quelle.
+model Energieverbrauch {
+  id             String        @id @default(cuid())
+  mandantId      String
+  hausId         String
+  jahr           Int
+  medium         Energiemedium
+  menge          Decimal       @db.Decimal(14, 2)
+  kosten         Decimal?      @db.Decimal(14, 2)
+  /// CO₂-Emissionen in kg laut Quelle (z. B. Heizkostenabrechnung nach CO2KostAufG); null = nicht angegeben
+  co2Kg          Decimal?      @db.Decimal(14, 2)
+  energietraeger String?
+  quelle         String
+  notiz          String?
+  erstelltAm     DateTime      @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus    Haus    @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@unique([hausId, jahr, medium])
   @@index([mandantId])
 }

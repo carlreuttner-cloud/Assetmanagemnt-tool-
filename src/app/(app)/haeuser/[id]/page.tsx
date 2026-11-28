@@ -94,6 +94,7 @@ export default async function HausSeite({ params }: PageProps<"/haeuser/[id]">) 
           <>
             <Merken kontext={kontext} t={t} art="haus" pfad={`/haeuser/${id}`} titel={haus.bezeichnung} />
             {darf(kontext.rolle, "szenarien") && <KnopfLink href={`/exit?h=${id}`}>{t.exit.exitLink}</KnopfLink>}
+            <KnopfLink href={`/energie/${id}`}>{t.navigation.energie}</KnopfLink>
             {schreiben && (
               <>
                 <KnopfLink href={`/haeuser/${id}/bearbeiten`}>{t.allgemein.bearbeiten}</KnopfLink>
