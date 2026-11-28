@@ -97,6 +97,7 @@ model Mandant {
   planerklaerungen        Planerklaerung[]
   energieausweise         Energieausweis[]
   energieverbraeuche      Energieverbrauch[]
+  bauteile                Bauteil[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -264,6 +265,7 @@ model Haus {
   sicherheiten       SicherheitHaus[]
   energieausweise    Energieausweis[]
   energieverbraeuche Energieverbrauch[]
+  bauteile           Bauteil[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -1365,14 +1367,18 @@ model Planposition {
   betrag         Decimal         @db.Decimal(14, 2)
   bezeichnung    String
   quelle         String?
+  /// Bauteil des Instandhaltungsplans, aus dem die Position übernommen wurde
+  bauteilId      String?
   erstelltAm     DateTime        @default(now())
   geaendertAm    DateTime        @updatedAt
 
   mandant      Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft Gesellschaft @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  bauteil      Bauteil?     @relation(fields: [bauteilId], references: [id], onDelete: SetNull)
 
   @@index([mandantId])
   @@index([gesellschaftId])
+  @@index([bauteilId])
 }
 
 /// Gespeicherte Exit-Kalkulation eines Hauses (Annahmen; gerechnet wird immer neu im Code).
@@ -1970,4 +1976,48 @@ model Energieverbrauch {
 
   @@unique([hausId, jahr, medium])
   @@index([mandantId])
+}
+
+enum BauteilArt {
+  DACH
+  FASSADE
+  FENSTER
+  HEIZUNG
+  AUFZUG
+  LEITUNGEN
+  ELEKTRO
+  TREPPENHAUS
+  AUSSENANLAGEN
+  SONSTIGES
+}
+
+/// Bauteil eines Hauses im Instandhaltungsplan: nächste Erneuerung = letzte Erneuerung + Zyklus.
+/// Fehlen Jahr oder Zyklus, ist die Fälligkeit unbekannt (keine Annahme).
+model Bauteil {
+  id                String     @id @default(cuid())
+  mandantId         String
+  hausId            String
+  art               BauteilArt
+  bezeichnung       String
+  /// Erneuerungszyklus in Jahren; null = unbekannt
+  zyklusJahre       Int?
+  /// Jahr der letzten Erneuerung (oder Baujahr); null = unbekannt
+  letzteErneuerung  Int?
+  /// geplante Kosten der nächsten Erneuerung; null = unbekannt
+  geplanteKosten    Decimal?   @db.Decimal(14, 2)
+  /// Herkunft der Kosten, z. B. "Angebot Dachdecker Müller"
+  kostenQuelle      String?
+  /// Stand der Kostenangabe
+  kostenStand       DateTime?  @db.Date
+  notiz             String?
+  erstelltVon       String?
+  erstelltAm        DateTime   @default(now())
+  geaendertAm       DateTime   @updatedAt
+
+  mandant         Mandant        @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  haus            Haus           @relation(fields: [hausId], references: [id], onDelete: Cascade)
+  planpositionen  Planposition[]
+
+  @@index([mandantId])
+  @@index([hausId])
 }
