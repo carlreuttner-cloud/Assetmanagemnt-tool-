@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dezimal } from "../src/lib/geld";
-import { wirksamAb, erhoehungMoeglich, fuelleVorlage, prozentAusText, rechneErhoehung, unbekanntePlatzhalter } from "../src/lib/serienbrief";
+import { betragAusText, wirksamAb, erhoehungMoeglich, fuelleVorlage, prozentAusText, rechneErhoehung, unbekanntePlatzhalter } from "../src/lib/serienbrief";
 
 describe("Serienbriefe", () => {
   it("füllt Platzhalter und markiert fehlende Werte", () => {
@@ -11,11 +11,16 @@ describe("Serienbriefe", () => {
   });
 
   it("rechnet die neue Miete auf Cent und prüft die Kappungsgrenze", () => {
-    const e = rechneErhoehung(dezimal("812.37"), dezimal(10));
+    const e = rechneErhoehung(dezimal("812.37"), { prozent: dezimal(10) });
     expect(e.neueMiete.toString()).toBe("893.61");
     expect(e.betrag.toString()).toBe("81.24");
     expect(e.ueberKappung).toBe(false);
-    expect(rechneErhoehung(dezimal(500), dezimal("20.5")).ueberKappung).toBe(true);
+    expect(rechneErhoehung(dezimal(500), { prozent: dezimal("20.5") }).ueberKappung).toBe(true);
+    const b = rechneErhoehung(dezimal(800), { betrag: dezimal(50) });
+    expect(b.neueMiete.toString()).toBe("850");
+    expect(b.prozent?.toString()).toBe("6.25");
+    expect(rechneErhoehung(dezimal(200), { betrag: dezimal(50) }).ueberKappung).toBe(true);
+    expect(rechneErhoehung(dezimal(0), { betrag: dezimal(50) }).prozent).toBeNull();
   });
 
   it("prüft, ob eine Erhöhung jetzt verlangt werden kann", () => {
@@ -34,5 +39,8 @@ describe("Serienbriefe", () => {
     expect(prozentAusText("0")).toBeNull();
     expect(prozentAusText("abc")).toBeNull();
     expect(prozentAusText("")).toBeNull();
+    expect(betragAusText("1.234,50")?.toString()).toBe("1234.5");
+    expect(betragAusText("0")).toBeNull();
+    expect(betragAusText("x")).toBeNull();
   });
 });

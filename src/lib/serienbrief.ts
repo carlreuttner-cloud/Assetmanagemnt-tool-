@@ -1,10 +1,11 @@
 /**
  * Serienbriefe an Mieter: Vorlagen mit Platzhaltern {{name}}, die je Empfänger aus den erfassten Daten
  * gefüllt werden. Fehlt ein Wert, wird er nicht ergänzt, sondern als Lücke markiert; ein Brief mit
- * Lücken wird nicht erstellt. Bei Mieterhöhungen wird die neue Miete im Code gerechnet
- * (aktuelle Nettokaltmiete × (1 + Prozent / 100), auf Cent gerundet). Reine Funktionen.
+ * Lücken wird nicht erstellt. Bei Mieterhöhungen wird die neue Miete im Code gerechnet: entweder
+ * aktuelle Nettokaltmiete × (1 + Prozent / 100), auf Cent gerundet, oder aktuelle Nettokaltmiete +
+ * Betrag je Monat. Reine Funktionen.
  */
-import { aufCent, dezimal, type Decimal } from "./geld";
+import { aufCent, dezimal, parseBetrag, type Decimal } from "./geld";
 import { naechsteMieterhoehung } from "./fristen";
 import { plusMonate, type IsoDatum } from "./datum";
 import type { Nutzungsart } from "./nutzungsart";
@@ -70,12 +71,19 @@ export function fuelleVorlage(text: string, werte: Partial<Record<Platzhalter, s
 export interface Erhoehung {
   neueMiete: Decimal;
   betrag: Decimal;
+  /** Erhöhung in Prozent der aktuellen Miete; null, wenn die aktuelle Miete 0 ist */
+  prozent: Decimal | null;
   ueberKappung: boolean;
 }
 
-export function rechneErhoehung(aktuell: Decimal, prozent: Decimal): Erhoehung {
-  const neueMiete = aufCent(aktuell.times(prozent.dividedBy(100).plus(1)));
-  return { neueMiete, betrag: neueMiete.minus(aktuell), ueberKappung: prozent.greaterThan(KAPPUNGSGRENZE_PROZENT) };
+/** Erhöhung je Serie: in Prozent oder als Betrag in € je Monat (genau eines davon). */
+export type ErhoehungVorgabe = { prozent: Decimal; betrag?: null } | { betrag: Decimal; prozent?: null };
+
+export function rechneErhoehung(aktuell: Decimal, vorgabe: ErhoehungVorgabe): Erhoehung {
+  const neueMiete = vorgabe.prozent ? aufCent(aktuell.times(vorgabe.prozent.dividedBy(100).plus(1))) : aufCent(aktuell.plus(vorgabe.betrag!));
+  const betrag = neueMiete.minus(aktuell);
+  const prozent = vorgabe.prozent ?? (aktuell.isZero() ? null : betrag.dividedBy(aktuell).times(100).toDecimalPlaces(2));
+  return { neueMiete, betrag, prozent, ueberKappung: prozent !== null && prozent.greaterThan(KAPPUNGSGRENZE_PROZENT) };
 }
 
 export type EmpfaengerGrund = "keinWohnraum" | "nochNicht" | null;
@@ -95,6 +103,17 @@ export function prozentAusText(text: string | null | undefined): Decimal | null 
   if (!/^\d+(\.\d+)?$/.test(t)) return null;
   const p = dezimal(t);
   return p.greaterThan(0) && p.lessThanOrEqualTo(100) ? p : null;
+}
+
+/** Betrag in € aus der Eingabe (größer 0) oder null. */
+export function betragAusText(text: string | null | undefined): Decimal | null {
+  if (!text?.trim()) return null;
+  try {
+    const b = parseBetrag(text);
+    return b.greaterThan(0) ? b : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -62,7 +62,7 @@ export async function serieErstellen(_v: AktionsErgebnis, fd: FormData): Promise
     if (!darf(kontext.rolle, "dokumente", "schreiben")) throw new EingabeFehler(ts.keinRechtDokumente);
     const f = formularLeser(fd, kontext.mandant.sprache);
     const fmt = formatierer(kontext.mandant);
-    const { fehler, vorlage, parameter } = await leseSerie(kontext, { vorlage: f.text("vorlage"), haus: f.text("haus"), gesellschaft: f.text("gesellschaft"), prozent: f.text("prozent"), datum: f.text("datum") }, heute());
+    const { fehler, vorlage, parameter } = await leseSerie(kontext, { vorlage: f.text("vorlage"), haus: f.text("haus"), gesellschaft: f.text("gesellschaft"), prozent: f.text("prozent"), betrag: f.text("betrag"), datum: f.text("datum") }, heute());
     if (fehler || !vorlage || !parameter) throw new EingabeFehler(ts.fehler[fehler ?? "vorlage"]);
     const auswahl = fd.getAll("mv").map(String);
     if (auswahl.length === 0) throw new EingabeFehler(ts.keineAuswahl);
@@ -77,6 +77,7 @@ export async function serieErstellen(_v: AktionsErgebnis, fd: FormData): Promise
         betreff: vorlage.betreff,
         text: vorlage.text,
         prozent: zuText(parameter.prozent),
+        betrag: zuText(parameter.betrag),
         erstelltVon: kontext.benutzer.name,
       } as never,
     });

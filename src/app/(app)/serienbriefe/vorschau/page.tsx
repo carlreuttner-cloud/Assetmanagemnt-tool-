@@ -20,7 +20,7 @@ export default async function SerienbriefVorschau({ searchParams }: PageProps<"/
   const ts = t.serienbriefe;
   const f = formatierer(kontext.mandant);
   const sp = await searchParams;
-  const anfrage = { vorlage: ein(sp.vorlage), haus: ein(sp.haus), gesellschaft: ein(sp.gesellschaft), prozent: ein(sp.prozent), datum: ein(sp.datum) };
+  const anfrage = { vorlage: ein(sp.vorlage), haus: ein(sp.haus), gesellschaft: ein(sp.gesellschaft), prozent: ein(sp.prozent), betrag: ein(sp.betrag), datum: ein(sp.datum) };
   const { fehler, vorlage, parameter } = await leseSerie(kontext, anfrage, heute());
   const kopf = <Seitenkopf titel={ts.vorschau} beschreibung={vorlage ? `${vorlage.name} · ${ts.arten[vorlage.art]}` : undefined} zurueck={{ href: "/serienbriefe", text: ts.zurUebersicht }} />;
   if (fehler || !vorlage || !parameter) {
@@ -37,7 +37,7 @@ export default async function SerienbriefVorschau({ searchParams }: PageProps<"/
   const bereit = empfaenger.filter(istBereit);
   const ausgeschlossen = empfaenger.filter((e) => e.ausgeschlossen !== null);
   const luecken = empfaenger.filter((e) => e.ausgeschlossen === null && !istBereit(e));
-  const ueberKappung = erhoehung && parameter.prozent!.greaterThan(KAPPUNGSGRENZE_PROZENT);
+  const ueberKappung = empfaenger.filter((e) => e.ausgeschlossen === null && e.erhoehung?.ueberKappung).length;
   const darfAblegen = darf(kontext.rolle, "mieter", "schreiben") && darf(kontext.rolle, "dokumente", "schreiben");
   const pdfQuery = new URLSearchParams(Object.entries(anfrage).filter((e): e is [string, string] => !!e[1]));
   const kategorie = erhoehung ? ts.kategorieMieterhoehung : ts.kategorieSchreiben;
@@ -96,10 +96,10 @@ export default async function SerienbriefVorschau({ searchParams }: PageProps<"/
                     <MitHerleitung
                       wert={<MieteZelle monat={f.betrag(e.erhoehung.neueMiete)} jahr={f.betrag(jahresNettokaltmiete(e.erhoehung.neueMiete))} />}
                       herleitung={{
-                        berechnung: ts.neueMieteHerleitung,
+                        berechnung: parameter.prozent ? ts.neueMieteHerleitung : ts.neueMieteHerleitungBetrag,
                         werte: [
                           [ts.spalten.miete, f.betrag(e.miete)],
-                          [ts.prozent, f.prozent(parameter.prozent!, 2)],
+                          [ts.platzhalter.erhoehungProzent, e.erhoehung.prozent === null ? t.allgemein.unbekannt : f.prozent(e.erhoehung.prozent, 2)],
                           [ts.platzhalter.erhoehungBetrag, f.betrag(e.erhoehung.betrag)],
                         ],
                         stichtag: f.datum(parameter.datum),
@@ -145,9 +145,9 @@ export default async function SerienbriefVorschau({ searchParams }: PageProps<"/
         <Kachel titel={ts.kacheln.empfaenger} wert={empfaenger.length} />
         <Kachel titel={ts.kacheln.bereit} wert={bereit.length} ton={bereit.length > 0 ? "gut" : undefined} />
         <Kachel titel={ts.kacheln.luecken} wert={luecken.length} ton={luecken.length > 0 ? "warnung" : undefined} />
-        {erhoehung && <Kachel titel={ts.kacheln.ausgeschlossen} wert={ausgeschlossen.length} unter={ueberKappung ? ts.kappungKachel : undefined} ton={ueberKappung ? "schlecht" : undefined} />}
+        {erhoehung && <Kachel titel={ts.kacheln.ausgeschlossen} wert={ausgeschlossen.length} unter={ueberKappung > 0 ? `${ueberKappung} ${ts.kappungKachel}` : undefined} ton={ueberKappung > 0 ? "schlecht" : undefined} />}
       </Kacheln>
-      {ueberKappung && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-800">{fuelle(ts.kappung, { grenze: KAPPUNGSGRENZE_PROZENT })}</p>}
+      {ueberKappung > 0 && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-800">{fuelle(ts.kappungAnzahl, { anzahl: ueberKappung, grenze: KAPPUNGSGRENZE_PROZENT })}</p>}
       <Karte titel={vorlage.name} aktionen={bereit.length > 0 ? <KnopfLink href={`/api/serienbriefe?${pdfQuery}`}>{ts.vorschauPdf}</KnopfLink> : undefined}>
         {erhoehung && <p className="mb-3 text-xs text-slate-500">{ts.hinweisAusgeschlossen}</p>}
         {empfaenger.length === 0 ? (
