@@ -95,6 +95,9 @@ type KreditZeile = {
   id: string;
   gesellschaftId: string;
   bezeichnung: string;
+  kreditart?: NonNullable<KreditDaten["kreditart"]>;
+  rang?: number | null;
+  gesellschafterId?: string | null;
   zinsArt: "FEST" | "VARIABEL";
   sollzins: { toFixed(): string } | null;
   referenzzins: string | null;
@@ -142,6 +145,9 @@ export function alsKreditDaten(k: KreditZeile): KreditDaten {
     id: k.id,
     gesellschaftId: k.gesellschaftId,
     bezeichnung: k.bezeichnung,
+    kreditart: k.kreditart ?? "BANK",
+    rang: k.rang ?? null,
+    gesellschafterId: k.gesellschafterId ?? null,
     zinsArt: k.zinsArt,
     sollzins: d(k.sollzins),
     referenzzins: k.referenzzins,

@@ -10,7 +10,7 @@ import { FRIST_ARTEN, nachMonat, sammleFristen, type Frist, type FristArt } from
 import { AuswahlFilter, FilterZeile } from "@/components/auswahl-filter";
 
 const ZEITRAEUME = ["12", "24", "36", "alle"] as const;
-const TON: Record<FristArt, Ton> = { refinanzierung: "warnung", zinsbindung: "schlecht", kreditende: "warnung", sicherungsende: "warnung", covenanttest: "neutral", mietende: "warnung", mieterhoehung: "gut" };
+const TON: Record<FristArt, Ton> = { refinanzierung: "warnung", kapitalabruf: "warnung", sondertilgung: "gut", zinsbindung: "schlecht", kreditende: "warnung", sicherungsende: "warnung", covenanttest: "neutral", mietende: "warnung", mieterhoehung: "gut", energieausweis: "warnung" };
 
 export default async function FristenSeite({ searchParams }: PageProps<"/fristen">) {
   const sp = await searchParams;
