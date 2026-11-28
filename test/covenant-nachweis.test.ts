@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { erstelleNachweis, gesamtErgebnis, letzterTesttermin, testTermine } from "@/lib/covenant-nachweis";
-import { pdfText } from "@/lib/pdf/covenant-nachweis";
+import { pdfText } from "@/lib/pdf/schreiber";
 import { dezimal } from "@/lib/geld";
 import type { HausDaten } from "@/lib/kennzahlen";
 import type { KreditDaten } from "@/lib/kredit";

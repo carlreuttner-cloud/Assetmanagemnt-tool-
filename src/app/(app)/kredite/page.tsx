@@ -2,7 +2,7 @@ import Link from "next/link";
 import { RestschuldWert, ZinssatzWert } from "@/components/herleitung";
 import { aktiveSicherungen } from "@/lib/kredit";
 import { ZinsbindungMarke } from "@/components/kredit-marken";
-import { KnopfLink, Leer, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
+import { KnopfLink, Leer, Marke, Reiter, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
@@ -40,6 +40,7 @@ export default async function KrediteSeite({ searchParams }: PageProps<"/kredite
         kreditnummer: true,
         iban: true,
         zinsArt: true,
+        kreditart: true,
         referenzzins: true,
         ursprungsbetrag: true,
         gesellschaft: { select: { id: true, name: true } },
@@ -104,6 +105,7 @@ export default async function KrediteSeite({ searchParams }: PageProps<"/kredite
                         {k.bezeichnung}
                       </Link>
                       {k.kreditnummer && <div className="text-xs text-slate-500">{k.kreditnummer}</div>}
+                      {k.kreditart !== "BANK" && <Marke ton="warnung">{t.kreditarten[k.kreditart]}</Marke>}
                     </td>
                     <td>
                       <Link href={`/gesellschaften/${k.gesellschaft.id}`} className="hover:underline">
