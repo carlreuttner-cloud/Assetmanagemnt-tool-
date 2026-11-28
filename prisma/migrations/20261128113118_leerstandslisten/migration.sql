@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ImportArt" ADD VALUE 'LEERSTANDSLISTE';
