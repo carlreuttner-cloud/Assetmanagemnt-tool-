@@ -184,11 +184,14 @@ export default async function FinanzenSeite({ params }: PageProps<"/gesellschaft
         beschreibung={`${g.name} · ${tf.beschreibung}`}
         zurueck={{ href: `/gesellschaften/${id}`, text: g.name }}
         aktionen={
-          schreiben && (
-            <KnopfLink href={`/gesellschaften/${id}/finanzen/neu`} art="primaer">
-              {tf.neu}
-            </KnopfLink>
-          )
+          <>
+            <KnopfLink href={`/plan-ist?gesellschaft=${id}`}>{t.navigation.planIst}</KnopfLink>
+            {schreiben && (
+              <KnopfLink href={`/gesellschaften/${id}/finanzen/neu`} art="primaer">
+                {tf.neu}
+              </KnopfLink>
+            )}
+          </>
         }
       />
 

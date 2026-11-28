@@ -1,117 +1,16 @@
 /**
  * PDF des Covenant-Nachweises aus dem eingefrorenen Inhalt (`NachweisInhalt`).
- * Erzeugt mit pdf-lib (MIT-Lizenz, als Abhängigkeit); Layout und Text sind eigener Code.
  */
 import "server-only";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { DUNKEL, GRUEN, ROT, GRAU, fusszeilen, neuesPdf } from "./schreiber";
 import { fuelle, type Texte } from "@/i18n";
 import { alsDezimal, gesamtErgebnis, type NachweisInhalt } from "@/lib/covenant-nachweis";
 import type { Formatierer } from "@/lib/format";
 import { dezimal } from "@/lib/geld";
 
-const A4 = { breite: 595.28, hoehe: 841.89 };
-const RAND = 48;
-const GRAU = rgb(0.4, 0.45, 0.5);
-const DUNKEL = rgb(0.1, 0.12, 0.16);
-const ROT = rgb(0.7, 0.1, 0.1);
-const GRUEN = rgb(0.05, 0.45, 0.25);
-
-/** Standardschriften kennen nur WinAnsi: Zeichen außerhalb ersetzen. */
-export function pdfText(text: string): string {
-  return text
-    .replace(/[   ]/g, " ")
-    .replace(/−/g, "-")
-    .replace(/≤/g, "<=")
-    .replace(/≥/g, ">=")
-    .replace(/[^\n\x20-\x7e\xa0-\xff€–—‘’‚“”„†‡•…‰‹›ŒœŠšŸŽžƒˆ˜™]/g, "?");
-}
-
-type Spalte = { titel: string; breite: number; rechts?: boolean };
-
-class Schreiber {
-  seiten: PDFPage[] = [];
-  seite!: PDFPage;
-  y = 0;
-  constructor(
-    private doc: PDFDocument,
-    private normal: PDFFont,
-    private fett: PDFFont,
-  ) {
-    this.neueSeite();
-  }
-  neueSeite() {
-    this.seite = this.doc.addPage([A4.breite, A4.hoehe]);
-    this.seiten.push(this.seite);
-    this.y = A4.hoehe - RAND;
-  }
-  platz(hoehe: number) {
-    if (this.y - hoehe < RAND + 8) this.neueSeite();
-  }
-  zeilen(text: string, groesse: number, breite: number, font: PDFFont): string[] {
-    const ergebnis: string[] = [];
-    for (const absatz of pdfText(text).split("\n")) {
-      let zeile = "";
-      for (const wort of absatz.split(" ")) {
-        const probe = zeile ? `${zeile} ${wort}` : wort;
-        if (font.widthOfTextAtSize(probe, groesse) > breite && zeile) {
-          ergebnis.push(zeile);
-          zeile = wort;
-        } else zeile = probe;
-      }
-      ergebnis.push(zeile);
-    }
-    return ergebnis;
-  }
-  text(text: string, o: { groesse?: number; fett?: boolean; farbe?: ReturnType<typeof rgb>; abstand?: number } = {}) {
-    const groesse = o.groesse ?? 9.5;
-    const font = o.fett ? this.fett : this.normal;
-    for (const z of this.zeilen(text, groesse, A4.breite - 2 * RAND, font)) {
-      this.platz(groesse * 1.4);
-      this.seite.drawText(z, { x: RAND, y: this.y - groesse, size: groesse, font, color: o.farbe ?? DUNKEL });
-      this.y -= groesse * 1.4;
-    }
-    this.y -= o.abstand ?? 2;
-  }
-  ueberschrift(text: string) {
-    this.platz(40);
-    this.y -= 6;
-    this.text(text, { groesse: 12, fett: true, abstand: 4 });
-  }
-  tabelle(spalten: Spalte[], zeilen: Array<Array<{ text: string; farbe?: ReturnType<typeof rgb>; fett?: boolean }>>) {
-    const groesse = 8.5;
-    const gesamt = spalten.reduce((s, c) => s + c.breite, 0);
-    const faktor = (A4.breite - 2 * RAND) / gesamt;
-    const breiten = spalten.map((c) => c.breite * faktor);
-    const zeile = (zellen: Array<{ text: string; farbe?: ReturnType<typeof rgb>; fett?: boolean }>, kopf: boolean) => {
-      const umbrochen = zellen.map((c, i) => this.zeilen(c.text, groesse, breiten[i] - 6, kopf || c.fett ? this.fett : this.normal));
-      const hoehe = Math.max(...umbrochen.map((u) => u.length)) * groesse * 1.3 + 4;
-      this.platz(hoehe);
-      let x = RAND;
-      umbrochen.forEach((u, i) => {
-        const font = kopf || zellen[i].fett ? this.fett : this.normal;
-        u.forEach((t, j) => {
-          const w = font.widthOfTextAtSize(t, groesse);
-          const tx = spalten[i].rechts ? x + breiten[i] - 3 - w : x + 3;
-          this.seite.drawText(t, { x: tx, y: this.y - groesse - 2 - j * groesse * 1.3, size: groesse, font, color: kopf ? GRAU : (zellen[i].farbe ?? DUNKEL) });
-        });
-        x += breiten[i];
-      });
-      this.y -= hoehe;
-      this.seite.drawLine({ start: { x: RAND, y: this.y }, end: { x: A4.breite - RAND, y: this.y }, thickness: kopf ? 0.8 : 0.3, color: rgb(0.8, 0.82, 0.85) });
-    };
-    zeile(spalten.map((s) => ({ text: s.titel })), true);
-    for (const z of zeilen) zeile(z, false);
-    this.y -= 6;
-  }
-}
-
 export async function covenantNachweisPdf(inhalt: NachweisInhalt, t: Texte, f: Formatierer): Promise<Uint8Array> {
   const tp = t.covenantNachweis.pdf;
-  const doc = await PDFDocument.create();
-  doc.setTitle(pdfText(`${t.covenantNachweis.titel} ${inhalt.kredit.bezeichnung} ${f.datum(inhalt.stichtag)}`));
-  doc.setCreator("Immobilien-Portfolio");
-  doc.setCreationDate(new Date(inhalt.erstelltAm));
-  const s = new Schreiber(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold));
+  const { doc, s, normal } = await neuesPdf(`${t.covenantNachweis.titel} ${inhalt.kredit.bezeichnung} ${f.datum(inhalt.stichtag)}`, new Date(inhalt.erstelltAm));
   const unbekannt = tp.unbekannt;
   const betrag = (x: string | null) => (x === null ? unbekannt : f.betrag(dezimal(x)));
   const istProzent = (k: string) => k.trim().toUpperCase() === "LTV";
@@ -227,10 +126,6 @@ export async function covenantNachweisPdf(inhalt: NachweisInhalt, t: Texte, f: F
   s.y -= 8;
   s.text(tp.hinweis, { groesse: 8.5, farbe: GRAU });
 
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  s.seiten.forEach((p, i) => {
-    const text = pdfText(`${t.covenantNachweis.titel} · ${inhalt.kredit.bezeichnung} · ${f.datum(inhalt.stichtag)}    ${fuelle(tp.seite, { seite: i + 1, seiten: s.seiten.length })}`);
-    p.drawText(text, { x: RAND, y: RAND - 20, size: 7.5, font, color: GRAU });
-  });
+  fusszeilen(s, normal, (seite, seiten) => `${t.covenantNachweis.titel} · ${inhalt.kredit.bezeichnung} · ${f.datum(inhalt.stichtag)}    ${fuelle(tp.seite, { seite, seiten })}`);
   return doc.save();
 }
