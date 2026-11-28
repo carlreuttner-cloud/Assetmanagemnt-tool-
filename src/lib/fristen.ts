@@ -9,9 +9,10 @@
  */
 import { testTermine } from "./covenant-nachweis";
 import { plusMonate, type IsoDatum } from "./datum";
+import { DRINGEND_MONATE, refinanzierungsEreignis, vorbereitungAb } from "./refinanzierung";
 import type { Nutzungsart } from "./nutzungsart";
 
-export const FRIST_ARTEN = ["zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
+export const FRIST_ARTEN = ["refinanzierung", "zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
 
 /** Ohne Zeitraumgrenze werden Covenant-Tests so weit im Voraus gezeigt. */
 export const COVENANT_VORLAUF_MONATE = 24;
@@ -54,6 +55,9 @@ export type FristTexte = {
   grundCovenanttest?: string;
   /** mit {kennzahl} */
   covenantOhneTermin?: string;
+  /** mit {ereignis}, {datum}, {monate}, {dringend} */
+  grundRefinanzierung?: string;
+  ereignisse?: { zinsbindung: string; kreditende: string };
   basisLetzte: string;
   basisBeginn: string;
   gewerbe: string;
@@ -95,6 +99,18 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
     }
     if (k.laufzeitBis && imRahmen(k.laufzeitBis)) {
       fristen.push({ art: "kreditende", datum: k.laufzeitBis, titel: k.bezeichnung, unter: k.gesellschaft, href, gesellschaftId: k.gesellschaftId, grundlage: t.grundKreditende });
+    }
+    const e = refinanzierungsEreignis(k);
+    if (e && e.datum >= stichtag && t.grundRefinanzierung && imRahmen(vorbereitungAb(e))) {
+      fristen.push({
+        art: "refinanzierung",
+        datum: vorbereitungAb(e),
+        titel: k.bezeichnung,
+        unter: k.gesellschaft,
+        href: `/refinanzierung/${k.id}`,
+        gesellschaftId: k.gesellschaftId,
+        grundlage: fuelle(t.grundRefinanzierung, { ereignis: t.ereignisse?.[e.art] ?? e.art, datum: datum(e.datum), monate: "24", dringend: String(DRINGEND_MONATE) }),
+      });
     }
     for (const c of k.covenants ?? []) {
       if (!c.ersterTest || !c.intervallMonate) {
