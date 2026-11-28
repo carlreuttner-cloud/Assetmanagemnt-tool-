@@ -7,6 +7,8 @@ export type NavReiter = {
   textSchluessel: keyof Texte["navigation"];
   /** weitere Pfade, die zu diesem Reiter gehören (z. B. Detailseiten an anderer Stelle) */
   auch?: string[];
+  /** Nur zeigen, wenn die Rolle im Bereich schreiben darf (z. B. Posteingang, Bankangebote) */
+  aktion?: "schreiben";
 };
 
 export type NavGruppe = { schluessel: keyof Texte["navigationGruppen"]; reiter: NavReiter[] };
@@ -39,6 +41,7 @@ export const NAVIGATION: NavGruppe[] = [
     schluessel: "finanzierung",
     reiter: [
       { bereich: "gesellschaften", pfad: "/kredite", textSchluessel: "kredite", auch: ["/gesellschaften/kredite"] },
+      { bereich: "gesellschaften", pfad: "/kredite/angebote", textSchluessel: "bankangebote", aktion: "schreiben" },
       { bereich: "gesellschaften", pfad: "/tilgungsplaene", textSchluessel: "tilgungsplaene" },
       { bereich: "gesellschaften", pfad: "/liquiditaet", textSchluessel: "liquiditaet" },
       { bereich: "gesellschaften", pfad: "/gesellschaften/referenzzinsen", textSchluessel: "referenzzinsen" },
@@ -50,7 +53,7 @@ export const NAVIGATION: NavGruppe[] = [
   {
     schluessel: "dokumente",
     reiter: [
-      { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang" },
+      { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang", aktion: "schreiben" },
       { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
       { bereich: "import", pfad: "/import", textSchluessel: "import" },
     ],
@@ -67,8 +70,8 @@ export const NAVIGATION: NavGruppe[] = [
 const passt = (pfad: string, praefix: string) => (praefix === "/" ? pfad === "/" : pfad === praefix || pfad.startsWith(`${praefix}/`));
 
 /** Gruppen mit den Reitern, die die Rolle sehen darf (leere Gruppen entfallen). */
-export function erlaubteNavigation(darf: (bereich: NavReiter["bereich"]) => boolean): NavGruppe[] {
-  return NAVIGATION.map((g) => ({ ...g, reiter: g.reiter.filter((r) => darf(r.bereich)) })).filter((g) => g.reiter.length > 0);
+export function erlaubteNavigation(darf: (bereich: NavReiter["bereich"], aktion?: "schreiben") => boolean): NavGruppe[] {
+  return NAVIGATION.map((g) => ({ ...g, reiter: g.reiter.filter((r) => darf(r.bereich, r.aktion)) })).filter((g) => g.reiter.length > 0);
 }
 
 /** Aktive Gruppe und aktiver Reiter zu einem Pfad: der längste passende Pfad gewinnt. */

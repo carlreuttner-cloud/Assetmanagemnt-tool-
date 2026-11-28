@@ -4,6 +4,7 @@ import { fuelle, type Texte } from "@/i18n";
 import { ERGEBNIS_SCHEMA, datenpaketAlsText, pruefeErgebnis, type Datenpaket, type GeprueftesErgebnis } from "./ki-analyse";
 import { ANTWORT_SCHEMA, PLAN_SCHEMA, ergebnisseAlsText, katalogAlsText, pruefeAntwort, pruefePlan, type FrageDaten, type GepruefteAntwort, type Objekte, type PlanEintrag } from "./ki-antwort";
 import type { Formatierer } from "./format";
+import { ANGEBOT_KI_SCHEMA } from "@/lib/bankangebot";
 import { EINGANG_KI_SCHEMA, type KiErkennung } from "./eingang";
 import type { IsoDatum } from "./datum";
 import { VORSCHLAG_SCHEMA, pruefeVorschlag, vorschlagPaketAlsText, type GepruefterVorschlag, type VorschlagPaket } from "./ki-vorschlag";
@@ -279,4 +280,27 @@ export async function fuehreEingangsErkennungDurch(
     return { kategorie: s("kategorie"), absenderArt: s("absenderArt"), absenderName: s("absenderName"), datum: s("datum"), jahr: s("jahr"), objekt: s("objekt"), beleg: s("beleg"), begruendung: s("begruendung") };
   }, t);
   return { erkennung: e, modell };
+}
+
+const ANWEISUNG_ANGEBOT = `Du liest das Finanzierungsangebot (Term Sheet) einer Bank für eine deutsche Immobilien-Asset-Management-Software und gibst die Konditionen als Textstellen zurück. Ein Mensch prüft alles; gerechnet wird nur in der Software.
+
+Gib je gefundenem Feld einen Eintrag {feld, wert, beleg} zurück:
+- wert: so wie im Dokument, Zahlen mit Punkt als Dezimaltrennzeichen und ohne Tausenderpunkte (z. B. "3.85", "2500000"); Datum als JJJJ-MM-TT; zinsArt "FEST" oder "VARIABEL"; referenzzins z. B. "3M-EURIBOR"; zinsbindungMonate und laufzeitMonate als ganze Monate (10 Jahre = "120").
+- Prozentwerte als Prozentpunkte (3,85 % = "3.85"); bearbeitungsgebuehr und sonstigeKosten nur in Euro, nicht in Prozent; auszahlungProzent ist der Auszahlungskurs (100 = ohne Disagio); bereitstellungszins in Prozent je Monat.
+- covenants und sicherheiten: kurze Aufzählung der Textstellen.
+- beleg: die Textstelle WÖRTLICH aus dem Dokument kopiert (höchstens 200 Zeichen), in der der Wert steht.
+
+Regeln: Erfinde nichts, rechne nichts aus, schätze nichts. Felder, die nicht im Dokument stehen, lässt du weg.`;
+
+/** Liest Konditionen eines Term Sheets per KI aus (nur Textstellen; Prüfung im Code). */
+export async function fuehreAngebotsErkennungDurch(text: string, t: Texte): Promise<{ felder: Array<{ feld: string; wert: string; beleg: string }>; modell: string }> {
+  const { json, modell } = await frageClaude(ANWEISUNG_ANGEBOT, text.slice(0, 20000), ANGEBOT_KI_SCHEMA, t, "low");
+  const felder = geprueft(() => {
+    const r = json as { felder?: unknown };
+    if (!Array.isArray(r.felder)) throw new Error("felder fehlt");
+    return r.felder
+      .filter((x): x is Record<string, unknown> => typeof x === "object" && x !== null)
+      .map((x) => ({ feld: String(x.feld ?? ""), wert: String(x.wert ?? ""), beleg: String(x.beleg ?? "") }));
+  }, t);
+  return { felder, modell };
 }

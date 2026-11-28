@@ -70,6 +70,7 @@ model Mandant {
   mailPostfach            MailPostfach?
   mailAbsender            MailAbsender[]
   eingangMails            EingangMail[]
+  bankangebote            Bankangebot[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
@@ -207,6 +208,7 @@ model Gesellschaft {
   kiAnalysen        KiAnalyse[]
   kontostaende      Bankkontostand[]
   planpositionen    Planposition[]
+  bankangebote      Bankangebot[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -514,6 +516,7 @@ model Kredit {
   importe           Importvorgang[]
   dokumentnachweise Dokumentnachweis[]
   zinssicherungen   Zinssicherung[]
+  bankangebote      Bankangebot[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -848,6 +851,7 @@ model Dokument {
   eingang           Eingang?
   @@index([mandantId])
   @@index([mandantId, bestaetigt])
+  bankangebote    Bankangebot[]
 }
 
 enum DokumentTextQuelle {
@@ -1500,6 +1504,66 @@ model EingangMail {
   eingaenge Eingang[]
 
   @@index([mandantId, empfangenAm])
+}
+
+enum AngebotStatus {
+  /// Ausgelesen oder angelegt, noch nicht bestätigt
+  ENTWURF
+  /// Werte geprüft und bestätigt; nur diese kommen in den Vergleich
+  BESTAETIGT
+}
+
+/// Finanzierungsangebot einer Bank (Term Sheet). Werte in Prozent sind Prozentpunkte p. a.
+model Bankangebot {
+  id                        String        @id @default(cuid())
+  mandantId                 String
+  bank                      String
+  bezeichnung               String?
+  gesellschaftId            String?
+  /// Kredit, der abgelöst bzw. refinanziert werden soll
+  kreditId                  String?
+  /// Term Sheet in der Dateiablage
+  dokumentId                String?
+  angebotVom                DateTime?     @db.Date
+  gueltigBis                DateTime?     @db.Date
+  betrag                    Decimal?      @db.Decimal(14, 2)
+  zinsArt                   ZinsArt       @default(FEST)
+  sollzins                  Decimal?      @db.Decimal(9, 6)
+  referenzzins              String?
+  marge                     Decimal?      @db.Decimal(9, 6)
+  zinsbindungMonate         Int?
+  laufzeitMonate            Int?
+  zahlweise                 Zahlweise     @default(MONATLICH)
+  tilgungsart               Tilgungsart   @default(ANNUITAET)
+  tilgungProzent            Decimal?      @db.Decimal(9, 6)
+  /// 100 = volle Auszahlung, darunter Disagio
+  auszahlungProzent         Decimal?      @db.Decimal(9, 6)
+  bearbeitungsgebuehr       Decimal?      @db.Decimal(14, 2)
+  sonstigeKosten            Decimal?      @db.Decimal(14, 2)
+  /// Bereitstellungszins in Prozent je Monat (nicht in den Gesamtkosten, hängt vom Abruf ab)
+  bereitstellungszins       Decimal?      @db.Decimal(9, 6)
+  bereitstellungsfreiMonate Int?
+  /// Sondertilgungsrecht in Prozent des Darlehensbetrags je Jahr
+  sondertilgungProzent      Decimal?      @db.Decimal(9, 6)
+  covenants                 String?
+  sicherheiten              String?
+  notiz                     String?
+  status                    AngebotStatus @default(ENTWURF)
+  /// Ausgelesene Werte mit Beleg und Herkunft (Regel, KI, berechnet), siehe src/lib/bankangebot.ts
+  vorschlag                 Json?
+  kiModell                  String?
+  erstelltVonId             String?
+  bestaetigtVonId           String?
+  bestaetigtAm              DateTime?
+  erstelltAm                DateTime      @default(now())
+  geaendertAm               DateTime      @updatedAt
+
+  mandant      Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft? @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
+  kredit       Kredit?       @relation(fields: [kreditId], references: [id], onDelete: SetNull)
+  dokument     Dokument?     @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
+
+  @@index([mandantId, status])
 }
 
 enum RegelMerkmal {

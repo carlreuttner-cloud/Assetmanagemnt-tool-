@@ -20,7 +20,7 @@ import { QUELLEN_COOKIE } from "@/lib/quellen";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const kontext = await getKontext();
   const t = texte(kontext.mandant.sprache);
-  const gruppen: NavGruppeMitText[] = erlaubteNavigation((b) => darf(kontext.rolle, b)).map((g) => ({
+  const gruppen: NavGruppeMitText[] = erlaubteNavigation((b, aktion) => darf(kontext.rolle, b, aktion)).map((g) => ({
     ...g,
     text: t.navigationGruppen[g.schluessel],
     reiterTexte: Object.fromEntries(g.reiter.map((r) => [r.pfad, t.navigation[r.textSchluessel]])),
