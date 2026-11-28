@@ -1,5 +1,6 @@
 import { fuelle, texte } from "@/i18n";
-import { pruefeZugriff } from "@/lib/auth/kontext";
+import { getKontext, pruefeZugriff } from "@/lib/auth/kontext";
+import { darf } from "@/lib/auth/rechte";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { berichtFilter } from "@/lib/daten/quartalsbericht";
 import { formatierer } from "@/lib/format";
@@ -9,7 +10,8 @@ import type { QuartalsberichtInhalt } from "@/lib/quartalsbericht";
 /** Quartalsbericht als PDF aus dem eingefrorenen Inhalt (Investoren nur freigegebene Berichte). */
 export async function GET(_anfrage: Request, { params }: RouteContext<"/api/quartalsbericht/[id]">) {
   const { id } = await params;
-  const kontext = await pruefeZugriff("berichte");
+  // Mitarbeiter über die Berichte, Investoren über das Investorenportal (nur freigegebene, siehe berichtFilter)
+  const kontext = await pruefeZugriff(darf((await getKontext()).rolle, "berichte") ? "berichte" : "investorenportal");
   const sicht = await sichtbarkeit(kontext);
   const b = await kontext.db.quartalsbericht.findFirst({ where: { id, ...berichtFilter(kontext.rolle, sicht.gesellschaftIds) }, select: { inhalt: true, status: true, kommentar: true, freigegebenVonName: true, freigegebenAm: true } });
   if (!b) return new Response(null, { status: 404 });

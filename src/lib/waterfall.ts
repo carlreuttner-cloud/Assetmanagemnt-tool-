@@ -163,7 +163,7 @@ export function verzinsung(betrag: Decimal, von: IsoDatum, bis: IsoDatum, satzPr
 }
 
 /** Verteilt einen Betrag anteilig nach Gewichten; die Rundungsdifferenz geht an den größten Anteil. */
-function verteile(betrag: Decimal, gewichte: Decimal[]): Decimal[] {
+export function verteile(betrag: Decimal, gewichte: Decimal[]): Decimal[] {
   const gesamt = summe(gewichte);
   if (gesamt.isZero()) return gewichte.map(() => null0());
   const teile = gewichte.map((g) => aufCent(betrag.times(g).dividedBy(gesamt)));

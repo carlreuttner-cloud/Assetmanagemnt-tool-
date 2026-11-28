@@ -83,13 +83,16 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 - [x] **Phase 43 (B8): Ankaufsprüfung.** Neues Objekt mit Kaufpreis und Finanzierung durchrechnen, mit Auswirkung auf die Kennzahlen von Gesellschaft und Portfolio.
 - [x] **Phase 44 (C4): Gesellschafter- und Nachrangdarlehen.** Eigene Kreditart mit Rang, fließt in den Waterfall ein.
 - [x] **Phase 45 (C1): Investorenrenditen.** IRR, Eigenkapital-Multiple und Cash-on-Cash je Investor und Gesellschaft, nur aus datierten Zahlungen.
-- [ ] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
-- [ ] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
-- [ ] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
-- [ ] **Phase 49 (C8): Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
-- [ ] **Phase 50 (D3): Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
-- [ ] **Phase 51 (D2): Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
-- [ ] **Phase 52 (D1): Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
+- [x] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
+- [x] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
+- [x] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
+- [x] **Phase 49 (C8): Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
+- [x] **Phase 50 (D3): Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
+- [x] **Phase 51 (D2): Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
+- [x] **Phase 52 (D1): Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
+- [x] **Phase 53: Stände der Mieterliste.** Jede übernommene Mieterliste bleibt als eigener Stand mit Stichtag und Quelle; Auswahl „Stand vom“ und „Vergleichen mit“ in Einheiten- und Mieteransicht, farbige Änderungen je Feld und Summe mit Pfeil und Tooltip, Zusammenfassung, Schalter „Nur Änderungen“.
+- [x] **Phase 54: Hausverwaltungen.** Hausverwaltung als eigener Datensatz, je Haus mit Zeitraum; Filter und Sortierung in allen Listen, Leerstand je Hausverwaltung, Leerstandsentwicklung als Diagramm.
+- [x] **Phase 55: Alte Leerstandslisten importieren.** Dateien mit mehreren Häusern und Stichtagen, Zuordnung mit Vorschau und Bestätigung, Stände „nur Leerstandsdaten“.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
 

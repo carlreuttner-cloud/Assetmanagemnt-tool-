@@ -491,11 +491,20 @@ export async function gesellschafterSpeichern(gesellschaftId: string, _v: Aktion
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, gesellschaftId, f.text("mitgliedschaftId"), t),
       } as never,
     });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });
+}
+
+/** Zugang zum Investorenportal: nur Investoren, die der Gesellschaft zugewiesen sind. */
+async function portalZugang(db: Awaited<ReturnType<typeof schreibKontext>>["db"], gesellschaftId: string, mitgliedschaftId: string | null, t: Texte): Promise<string | null> {
+  if (!mitgliedschaftId) return null;
+  const m = await db.mitgliedschaft.findFirst({ where: { id: mitgliedschaftId, rolle: "INVESTOR", gesellschaftZuweisungen: { some: { gesellschaftId } } }, select: { id: true } });
+  if (!m) throw new EingabeFehler(t.waterfall.portalUngueltig);
+  return m.id;
 }
 
 export async function gesellschafterAendern(ort: { id: string; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
@@ -513,6 +522,7 @@ export async function gesellschafterAendern(ort: { id: string; gesellschaftId: s
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, ort.gesellschaftId, f.text("mitgliedschaftId"), t),
       },
     });
     refresh();
