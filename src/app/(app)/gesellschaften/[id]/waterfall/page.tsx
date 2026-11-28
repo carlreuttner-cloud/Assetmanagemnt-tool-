@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Wasserfall, type WasserfallSchritt } from "@/components/diagramme";
 import { Begriff, Glossar, MitHerleitung, Unbekannt } from "@/components/herleitung";
-import { Karte, KnopfLink, Leer, Seitenkopf, Tabelle, rechts } from "@/components/ui";
+import { Karte, KnopfLink, Leer, Marke, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { heute, istIsoDatum, isoDatum, type IsoDatum } from "@/lib/datum";
@@ -75,10 +75,19 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
         annahmeText: vw ? fuelle(tw.preisAnnahme, { datum: f.datum(vw.stichtag), quelle: vw.quelle ?? "–" }) : null,
       };
     });
-  const kreditDaten = grundlage.kredite
+  // Nachrangige Darlehen ohne Hauszuordnung belasten die ganze Gesellschaft: abgelöst nur beim Verkauf aller Häuser.
+  const gesamtverkauf = g.haeuser.length > 0 && g.haeuser.every((h) => gewaehlt.has(h.id));
+  const alleKredite = grundlage.kredite
     .filter((k) => k.gesellschaftId === id)
-    .map((k) => ({ k, anteil: k.haeuser.filter((h) => gewaehlt.has(h.hausId)).reduce((s, h) => s.plus(h.anteilProzent), dezimal(0)) }))
-    .filter((x) => x.anteil.greaterThan(0));
+    .map((k) => ({
+      k,
+      anteil:
+        k.haeuser.length === 0 && (k.kreditart ?? "BANK") !== "BANK"
+          ? dezimal(gesamtverkauf ? 100 : 0)
+          : k.haeuser.filter((h) => gewaehlt.has(h.hausId)).reduce((s, h) => s.plus(h.anteilProzent), dezimal(0)),
+    }));
+  const kreditDaten = alleKredite.filter((x) => x.anteil.greaterThan(0));
+  const nichtAbgeloest = alleKredite.filter((x) => x.anteil.isZero() && x.k.haeuser.length === 0 && (x.k.kreditart ?? "BANK") !== "BANK");
   const kredite = kreditDaten.map(({ k, anteil }) => {
     const n = restschuldNachweis(k, stichtagSaldo);
     return {
@@ -88,6 +97,9 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
       restschuld: n?.betrag ?? null,
       restschuldStichtag: n?.stichtag ?? null,
       vorfaelligkeit: zahl(`vfe_${k.id}`, `${tw.vorfaelligkeit} ${k.bezeichnung}`),
+      art: k.kreditart ?? "BANK",
+      rang: k.rang ?? null,
+      gesellschafterId: k.gesellschafterId ?? null,
     };
   });
   const v = g.waterfallvertrag;
@@ -113,6 +125,7 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
     { k: "vorfaelligkeit", wert: e.vorfaelligkeit, art: "abzug" },
     { k: "steuern", wert: e.steuern, art: "abzug" },
     { k: "nettoErloes", wert: e.nettoErloes, art: "summe" },
+    ...(e.kredite.some((k) => k.nachrangig) ? [{ k: "nachrang" as const, wert: e.stufen.nachrang, art: "verteilung" as const }] : []),
     { k: "rueckzahlung", wert: e.stufen.rueckzahlung, art: "verteilung" },
     { k: "vorzugsrendite", wert: e.stufen.vorzugsrendite, art: "verteilung" },
     { k: "gewinn", wert: e.stufen.gewinn, art: "verteilung" },
@@ -219,7 +232,9 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
             unbekannt={t.allgemein.unbekannt}
           />
           {e.nettoErloes?.isNegative() && <p className="mt-2 text-sm text-red-700">{tw.negativ}</p>}
-          {e.unterdeckung && !e.nettoErloes?.isNegative() && <p className="mt-2 text-sm text-amber-700">{tw.unterdeckung}</p>}
+          {e.nachrangUnterdeckung && <p className="mt-2 text-sm text-red-700">{tw.nachrangUnterdeckung}</p>}
+          {e.unterdeckung && !e.nachrangUnterdeckung && !e.nettoErloes?.isNegative() && <p className="mt-2 text-sm text-amber-700">{tw.unterdeckung}</p>}
+          {nichtAbgeloest.length > 0 && <p className="mt-2 text-sm text-slate-600">{fuelle(tw.teilverkaufNachrang, { namen: nichtAbgeloest.map((x) => x.k.bezeichnung).join(", ") })}</p>}
         </Karte>
         <Karte titel={tw.stufenTitel}>
           <Tabelle>
@@ -258,10 +273,12 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
             <thead>
               <tr>
                 <th>{t.kredite.bezeichnung}</th>
+                <th>{t.kredite.kreditart}</th>
                 <th className={rechts}>{tw.anteil}</th>
                 <th className={rechts}>{tw.restschuld}</th>
                 <th className={rechts}>{tw.abloesung}</th>
                 <th className={rechts}>{tw.vorfaelligkeit}</th>
+                <th className={rechts}>{tw.gezahlt}</th>
               </tr>
             </thead>
             <tbody>
@@ -271,6 +288,10 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
                     <Link href={`/gesellschaften/kredite/${k.id}`} className="font-medium hover:underline">
                       {k.name}
                     </Link>
+                  </td>
+                  <td>
+                    <Marke ton={k.nachrangig ? "warnung" : "neutral"}>{t.kreditarten[k.art]}</Marke>
+                    {k.nachrangig && <div className="text-xs text-slate-500">{k.rang === null ? tw.ohneRang : fuelle(tw.rangWert, { rang: String(k.rang) })}</div>}
                   </td>
                   <td className={rechts}>{f.prozent(k.anteilProzent, 1)}</td>
                   <td className={rechts}>
@@ -285,6 +306,7 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
                   </td>
                   <td className={rechts}>{zeige(k.abloesung)}</td>
                   <td className={rechts}>{zeige(k.vorfaelligkeit)}</td>
+                  <td className={rechts}>{k.nachrangig ? zeige(k.gezahlt) : tw.vorNetto}</td>
                 </tr>
               ))}
             </tbody>
@@ -310,6 +332,8 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
                 <th className={rechts}>
                   <Begriff k="Multiple" t={t} />
                 </th>
+                <th className={rechts}>{tw.darlehen}</th>
+                <th className={rechts}>{tw.gesamt}</th>
               </tr>
             </thead>
             <tbody>
@@ -326,6 +350,8 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
                   <td className={rechts} title={tw.multipleHinweis}>
                     {gs.multiple ? `${f.faktor(gs.multiple, 2)}×` : <Unbekannt t={t} />}
                   </td>
+                  <td className={rechts}>{zeige(gs.darlehen)}</td>
+                  <td className={`${rechts} font-semibold`}>{zeige(gs.gesamt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -338,7 +364,7 @@ export default async function WaterfallSeite({ params, searchParams }: PageProps
         )}
       </Karte>
 
-      <Glossar begriffe={["Waterfall", "Vorzugsrendite", "Vorfaelligkeit", "Multiple", "Restschuld"]} t={t} />
+      <Glossar begriffe={["Waterfall", "Vorzugsrendite", "Vorfaelligkeit", "Multiple", "Restschuld", "Nachrangdarlehen", "Gesellschafterdarlehen"]} t={t} />
     </div>
   );
 }

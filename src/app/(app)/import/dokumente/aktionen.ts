@@ -170,3 +170,16 @@ export async function dokumentLoeschen(id: string): Promise<AktionsErgebnis> {
   if (ergebnis.fehler) return ergebnis;
   redirect("/import/dokumente");
 }
+
+/** Gibt ein Dokument für die Investoren der zugeordneten Gesellschaft frei bzw. nimmt die Freigabe zurück. */
+export async function investorFreigabeSetzen(id: string, freigeben: boolean): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { kontext, db, t } = await schreibKontext();
+    const d = await db.dokument.findFirst({ where: { id, ...dokumentFilter(await sichtbarkeit(kontext)) }, select: { bestaetigt: true, gesellschaftId: true, hausId: true, kreditId: true } });
+    if (!d) throw new EingabeFehler(t.fehler.unbekannt);
+    if (freigeben && (!d.bestaetigt || !(d.gesellschaftId || d.hausId || d.kreditId))) throw new EingabeFehler(t.dateien.investorNurBestaetigt);
+    await db.dokument.update({ where: { id }, data: freigeben ? { investorFreigabeAm: new Date(), investorFreigabeVon: kontext.benutzer.name } : { investorFreigabeAm: null, investorFreigabeVon: null } });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}

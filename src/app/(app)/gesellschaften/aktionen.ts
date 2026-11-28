@@ -12,7 +12,7 @@ import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, zuText } from "@/lib/geld";
 import { ALLE_POSTEN } from "@/lib/finanzen";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
-import { berechneTilgungsplan, restschuld, type TilgungsartArt, type ZahlweiseArt } from "@/lib/kredit";
+import { berechneTilgungsplan, KREDITARTEN, restschuld, type TilgungsartArt, type ZahlweiseArt } from "@/lib/kredit";
 
 const ZINSARTEN = ["FEST", "VARIABEL"] as const;
 const ZAHLWEISEN = ["MONATLICH", "QUARTALSWEISE", "HALBJAEHRLICH", "JAEHRLICH"] as const satisfies readonly ZahlweiseArt[];
@@ -83,10 +83,21 @@ export async function kreditSpeichern(id: string | null, _v: AktionsErgebnis, fd
     if (zinsArt === "FEST" && !sollzins) throw new EingabeFehler(k.sollzinsFehlt);
     if (zinsArt === "VARIABEL" && (!referenzzins || !marge)) throw new EingabeFehler(k.referenzFehlt);
 
+    const gesellschaftId = f.pflicht("gesellschaftId", k.gesellschaft);
+    const kreditart = f.auswahl("kreditart", k.kreditart, KREDITARTEN);
+    const rangText = f.text("rang");
+    const rang = kreditart === "BANK" || !rangText ? null : Number(rangText);
+    if (rang !== null && (!Number.isInteger(rang) || rang < 1)) throw new EingabeFehler(k.rangFehlt);
+    const gesellschafterWahl = kreditart === "GESELLSCHAFTERDARLEHEN" ? f.text("gesellschafterId") : null;
+    // Darlehensgeber nur aus derselben Gesellschaft
+    const gesellschafterId = gesellschafterWahl && (await db.gesellschafter.findFirst({ where: { id: gesellschafterWahl, gesellschaftId }, select: { id: true } })) ? gesellschafterWahl : null;
     const daten = {
-      gesellschaftId: f.pflicht("gesellschaftId", k.gesellschaft),
+      gesellschaftId,
       bezeichnung: f.pflicht("bezeichnung", k.bezeichnung),
       bank: f.text("bank"),
+      kreditart,
+      rang,
+      gesellschafterId,
       kreditnummer: f.text("kreditnummer"),
       iban: f.text("iban")?.replace(/\s/g, "").toUpperCase() ?? null,
       ursprungsbetrag: zuText(f.betrag("ursprungsbetrag", k.ursprungsbetrag))!,
@@ -480,11 +491,20 @@ export async function gesellschafterSpeichern(gesellschaftId: string, _v: Aktion
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, gesellschaftId, f.text("mitgliedschaftId"), t),
       } as never,
     });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });
+}
+
+/** Zugang zum Investorenportal: nur Investoren, die der Gesellschaft zugewiesen sind. */
+async function portalZugang(db: Awaited<ReturnType<typeof schreibKontext>>["db"], gesellschaftId: string, mitgliedschaftId: string | null, t: Texte): Promise<string | null> {
+  if (!mitgliedschaftId) return null;
+  const m = await db.mitgliedschaft.findFirst({ where: { id: mitgliedschaftId, rolle: "INVESTOR", gesellschaftZuweisungen: { some: { gesellschaftId } } }, select: { id: true } });
+  if (!m) throw new EingabeFehler(t.waterfall.portalUngueltig);
+  return m.id;
 }
 
 export async function gesellschafterAendern(ort: { id: string; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
@@ -502,6 +522,7 @@ export async function gesellschafterAendern(ort: { id: string; gesellschaftId: s
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, ort.gesellschaftId, f.text("mitgliedschaftId"), t),
       },
     });
     refresh();

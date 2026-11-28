@@ -12,7 +12,7 @@ import { MAX_OCR_SEITEN } from "@/lib/dokument-text";
 import { erkenneAbsender, erkenneDatum, erkenneJahr, erkenneKategorie, erkenneObjekt, jahrbezogen, markiere, ueblicheZuordnung } from "@/lib/dokument-vorschlag";
 import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
-import { dokumentBestaetigen, dokumentLoeschen, textNeuErkennen } from "../aktionen";
+import { dokumentBestaetigen, dokumentLoeschen, investorFreigabeSetzen, textNeuErkennen } from "../aktionen";
 import { BestaetigenFormular } from "./bestaetigen-formular";
 import { ZurFundstelle } from "./zur-fundstelle";
 
@@ -157,6 +157,24 @@ export default async function DokumentSeite({ params, searchParams }: PageProps<
               </>,
             ],
             [td.hochgeladen, `${f.datum(d.erstelltAm)}${d.hochgeladenVon ? ` ${fuelle(td.hochgeladenVon, { name: d.hochgeladenVon.name })}` : ""}`],
+            [
+              td.investorFreigabe,
+              <div key="freigabe" className="flex flex-wrap items-center gap-3" data-investor-freigabe>
+                {d.investorFreigabeAm ? (
+                  <Marke ton="gut">{fuelle(td.investorFreigegeben, { datum: f.datum(d.investorFreigabeAm), name: d.investorFreigabeVon ?? "–" })}</Marke>
+                ) : (
+                  <span className="text-sm text-slate-500">{td.investorNicht}</span>
+                )}
+                {schreiben &&
+                  (d.investorFreigabeAm ? (
+                    <Formular aktion={investorFreigabeSetzen.bind(null, d.id, false)} absenden={td.investorEntziehen} art="sekundaer" inline />
+                  ) : d.bestaetigt && (d.gesellschaftId || d.hausId || d.kreditId) ? (
+                    <Formular aktion={investorFreigabeSetzen.bind(null, d.id, true)} absenden={td.investorFreigeben} art="sekundaer" bestaetigen={td.investorFreigebenBestaetigen} inline />
+                  ) : (
+                    <span className="text-xs text-slate-500">{td.investorNurBestaetigt}</span>
+                  ))}
+              </div>,
+            ],
           ]}
         />
       </Karte>
