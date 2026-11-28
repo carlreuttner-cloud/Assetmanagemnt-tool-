@@ -7,10 +7,14 @@
  * wirksam wird die Erhöhung frühestens 15 Monate danach. Staffel- und Indexmieten sowie
  * Gewerbemieten folgen dem Vertrag; diese Regeln sind nicht erfasst und werden als Lücke gezeigt.
  */
+import { testTermine } from "./covenant-nachweis";
 import { plusMonate, type IsoDatum } from "./datum";
 import type { Nutzungsart } from "./nutzungsart";
 
-export const FRIST_ARTEN = ["zinsbindung", "kreditende", "sicherungsende", "mietende", "mieterhoehung"] as const;
+export const FRIST_ARTEN = ["zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
+
+/** Ohne Zeitraumgrenze werden Covenant-Tests so weit im Voraus gezeigt. */
+export const COVENANT_VORLAUF_MONATE = 24;
 export type FristArt = (typeof FRIST_ARTEN)[number];
 
 export type Frist = {
@@ -46,6 +50,10 @@ export type FristTexte = {
   grundSicherungsende?: string;
   grundMietende: string;
   grundMieterhoehung: string;
+  /** mit {kennzahl}, {vergleich}, {schwelle}, {monate}, {erster} */
+  grundCovenanttest?: string;
+  /** mit {kennzahl} */
+  covenantOhneTermin?: string;
   basisLetzte: string;
   basisBeginn: string;
   gewerbe: string;
@@ -54,7 +62,7 @@ export type FristTexte = {
 };
 
 export type FristEingabe = {
-  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }> }>;
+  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }>; covenants?: Array<{ kennzahl: string; bedingung: string; ersterTest: IsoDatum | null; intervallMonate: number | null }> }>;
   mietverhaeltnisse: Array<{
     id: string;
     mieter: string;
@@ -87,6 +95,24 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
     }
     if (k.laufzeitBis && imRahmen(k.laufzeitBis)) {
       fristen.push({ art: "kreditende", datum: k.laufzeitBis, titel: k.bezeichnung, unter: k.gesellschaft, href, gesellschaftId: k.gesellschaftId, grundlage: t.grundKreditende });
+    }
+    for (const c of k.covenants ?? []) {
+      if (!c.ersterTest || !c.intervallMonate) {
+        luecken.push({ art: "covenanttest", titel: k.bezeichnung, unter: k.gesellschaft, href, grund: fuelle(t.covenantOhneTermin ?? "", { kennzahl: c.kennzahl }) });
+        continue;
+      }
+      const ende = bis ?? plusMonate(stichtag, COVENANT_VORLAUF_MONATE);
+      for (const d of testTermine(c.ersterTest, c.intervallMonate, stichtag, ende)) {
+        fristen.push({
+          art: "covenanttest",
+          datum: d,
+          titel: `${k.bezeichnung} · ${c.kennzahl}`,
+          unter: k.gesellschaft,
+          href: `${href}#covenant-nachweis`,
+          gesellschaftId: k.gesellschaftId,
+          grundlage: fuelle(t.grundCovenanttest ?? "", { kennzahl: c.kennzahl, vergleich: c.bedingung, schwelle: "", monate: String(c.intervallMonate), erster: datum(c.ersterTest) }).replace(/\s+:/, ":"),
+        });
+      }
     }
     for (const s of k.sicherungen ?? []) {
       if (s.ende < stichtag || !imRahmen(s.ende)) continue; // abgelaufene Sicherungen sind keine Frist mehr

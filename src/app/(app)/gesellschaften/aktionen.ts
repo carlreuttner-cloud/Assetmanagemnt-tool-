@@ -5,7 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { fuelle, texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
-import { alsDbDatum, plusTage } from "@/lib/datum";
+import { TEST_INTERVALLE } from "@/lib/covenant-nachweis";
+import { alsDbDatum, heute, plusTage } from "@/lib/datum";
+import { baueCovenantNachweis } from "@/lib/daten/covenant-nachweis";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, zuText } from "@/lib/geld";
 import { ALLE_POSTEN } from "@/lib/finanzen";
@@ -166,12 +168,46 @@ export async function covenantHinzufuegen(kreditId: string, _v: AktionsErgebnis,
         vergleich: VERGLEICHE.find((v) => v === vergleich) ?? null,
         schwellenwert: zuText(f.zahlOptional("schwellenwert", t.kredite.schwellenwert)),
         pruefrhythmus: f.text("pruefrhythmus"),
+        ...testTermin(f, t),
         beschreibung: f.text("beschreibung"),
       } as never,
     });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });
+}
+
+/** Testtermine eines Covenants: erster Termin und Abstand in Monaten (beides oder nichts). */
+function testTermin(f: ReturnType<typeof formularLeser>, t: Texte) {
+  const erster = f.datumOptional("ersterTest", t.kredite.ersterTest);
+  const intervall = TEST_INTERVALLE.find((m) => String(m) === f.text("testIntervallMonate")) ?? null;
+  if ((erster === null) !== (intervall === null)) throw new EingabeFehler(t.kredite.testBeides);
+  return { ersterTest: erster ? alsDbDatum(erster) : null, testIntervallMonate: intervall };
+}
+
+export async function covenantTestSetzen(id: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db, t, sprache } = await schreibKontext();
+    await db.covenant.update({ where: { id }, data: testTermin(formularLeser(fd, sprache), t) });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+/** Friert den Nachweis zum Stichtag ein und öffnet das PDF. */
+export async function covenantNachweisErstellen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  const { kontext, db, t, sprache } = await schreibKontext();
+  const ergebnis = await fuehreAus(async () => {
+    const stichtag = formularLeser(fd, sprache).datumOptional("stichtag", t.covenantNachweis.stichtag);
+    if (!stichtag || stichtag > heute()) throw new EingabeFehler(t.covenantNachweis.stichtagUngueltig);
+    const inhalt = await baueCovenantNachweis(kontext, kreditId, stichtag);
+    if (!inhalt) notFound();
+    if (inhalt.covenants.length === 0) throw new EingabeFehler(t.covenantNachweis.keineCovenants);
+    const n = await db.covenantNachweis.create({ data: { kreditId, stichtag: alsDbDatum(stichtag), inhalt: inhalt as never, erstelltVon: kontext.benutzer.name } as never, select: { id: true } });
+    return { ok: n.id };
+  });
+  if (ergebnis.ok && !ergebnis.fehler) redirect(`/api/covenant-nachweis/${ergebnis.ok}`);
+  return ergebnis;
 }
 
 export async function covenantLoeschen(id: string): Promise<AktionsErgebnis> {

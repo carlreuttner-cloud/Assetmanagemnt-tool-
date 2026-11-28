@@ -72,6 +72,7 @@ model Mandant {
   eingangMails            EingangMail[]
   bankangebote            Bankangebot[]
   sicherheiten            Sicherheit[]
+  covenantNachweise       CovenantNachweis[]
   sicherheitHaeuser       SicherheitHaus[]
   sicherheitKredite       SicherheitKredit[]
   aenderungsprotokoll     Aenderungsprotokoll[]
@@ -523,6 +524,7 @@ model Kredit {
   zinssicherungen   Zinssicherung[]
   bankangebote      Bankangebot[]
   sicherheiten      SicherheitKredit[]
+  covenantNachweise CovenantNachweis[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -592,18 +594,21 @@ enum CovenantFolge {
 }
 
 model Covenant {
-  id            String             @id @default(cuid())
-  mandantId     String
-  kreditId      String
-  folge         CovenantFolge      @default(COVENANT)
+  id                  String             @id @default(cuid())
+  mandantId           String
+  kreditId            String
+  folge               CovenantFolge      @default(COVENANT)
   /// Kennzahl, z. B. "LTV", "DSCR", "ICR"
-  kennzahl      String
-  vergleich     CovenantVergleich?
-  schwellenwert Decimal?           @db.Decimal(14, 6)
-  pruefrhythmus String? // z. B. "jährlich zum 31.12."
-  beschreibung  String?
-  erstelltAm    DateTime           @default(now())
-  geaendertAm   DateTime           @updatedAt
+  kennzahl            String
+  vergleich           CovenantVergleich?
+  schwellenwert       Decimal?           @db.Decimal(14, 6)
+  pruefrhythmus       String? // z. B. "jährlich zum 31.12."
+  /// Testtermine: erster (oder ein bekannter) Termin und Abstand in Monaten; ohne beides keine Termine
+  ersterTest          DateTime?          @db.Date
+  testIntervallMonate Int?
+  beschreibung        String?
+  erstelltAm          DateTime           @default(now())
+  geaendertAm         DateTime           @updatedAt
 
   mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
@@ -854,11 +859,12 @@ model Dokument {
   kredit          Kredit?          @relation(fields: [kreditId], references: [id], onDelete: SetNull)
   seiten          DokumentSeite[]
 
-  eingang           Eingang?
+  eingang      Eingang?
+  bankangebote Bankangebot[]
+  sicherheiten Sicherheit[]
+
   @@index([mandantId])
   @@index([mandantId, bestaetigt])
-  bankangebote    Bankangebot[]
-  sicherheiten    Sicherheit[]
 }
 
 enum DokumentTextQuelle {
@@ -1384,39 +1390,39 @@ enum EingangStatus {
 /// Posteingang je Mandant: jede eingehende Datei (Hochladen, Upload-Link, E-Mail) landet hier
 /// zuerst, mit Vorschlag und Begründung. Erst nach Bestätigung wird daraus ein Dokument.
 model Eingang {
-  id              String              @id @default(cuid())
-  mandantId       String
-  quelle          EingangQuelle
-  status          EingangStatus
-  dateiname       String
-  mimeType        String
-  groesseBytes    Int
-  speicherPfad    String
-  pruefsumme      String
+  id               String              @id @default(cuid())
+  mandantId        String
+  quelle           EingangQuelle
+  status           EingangStatus
+  dateiname        String
+  mimeType         String
+  groesseBytes     Int
+  speicherPfad     String
+  pruefsumme       String
   /// Erkannter Text je Seite (Liste von Texten)
-  seiten          Json?
-  textQuelle      DokumentTextQuelle?
-  textHinweis     String?
-  seitenAnzahl    Int?
+  seiten           Json?
+  textQuelle       DokumentTextQuelle?
+  textHinweis      String?
+  seitenAnzahl     Int?
   /// E-Mail-Adresse des Absenders (bei Mails)
-  absenderAdresse String?
+  absenderAdresse  String?
   /// z. B. Name des Upload-Links oder der hochladenden Person
-  absenderHinweis String?
-  betreff         String?
-  mailtext        String?
+  absenderHinweis  String?
+  betreff          String?
+  mailtext         String?
   /// Vorschlag mit Begründungen (siehe src/lib/eingang.ts)
-  vorschlag       Json?
+  vorschlag        Json?
   hochgeladenVonId String?
-  uploadLinkId    String?
-  eingangMailId   String?
-  dokumentId      String?             @unique
-  bearbeitetVonId String?
-  bearbeitetAm    DateTime?
-  erstelltAm      DateTime            @default(now())
+  uploadLinkId     String?
+  eingangMailId    String?
+  dokumentId       String?             @unique
+  bearbeitetVonId  String?
+  bearbeitetAm     DateTime?
+  erstelltAm       DateTime            @default(now())
 
-  mandant  Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  dokument Dokument? @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
-  uploadLink UploadLink? @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
+  mandant     Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  dokument    Dokument?    @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
+  uploadLink  UploadLink?  @relation(fields: [uploadLinkId], references: [id], onDelete: SetNull)
   eingangMail EingangMail? @relation(fields: [eingangMailId], references: [id], onDelete: SetNull)
 
   @@index([mandantId, status])
@@ -1426,21 +1432,21 @@ model Eingang {
 /// Persönlicher, widerrufbarer Link zum Hochladen in den Posteingang (z. B. für Hausverwaltung,
 /// Bank oder Gutachter), ohne Zugriff auf den Rest der App. Gespeichert wird nur der Hash des Schlüssels.
 model UploadLink {
-  id              String    @id @default(cuid())
-  mandantId       String
+  id             String       @id @default(cuid())
+  mandantId      String
   /// Für wen der Link ist, z. B. „Hausverwaltung Müller“
-  name            String
-  absenderArt     AbsenderArt?
-  schluesselHash  String    @unique
+  name           String
+  absenderArt    AbsenderArt?
+  schluesselHash String       @unique
   /// Die letzten Zeichen des Schlüssels zum Wiedererkennen
-  schluesselEnde  String
-  gueltigBis      DateTime
-  widerrufenAm    DateTime?
-  zuletztGenutzt  DateTime?
-  anzahlDateien   Int       @default(0)
-  erstelltVonId   String?
-  erstelltAm      DateTime  @default(now())
-  geaendertAm     DateTime  @updatedAt
+  schluesselEnde String
+  gueltigBis     DateTime
+  widerrufenAm   DateTime?
+  zuletztGenutzt DateTime?
+  anzahlDateien  Int          @default(0)
+  erstelltVonId  String?
+  erstelltAm     DateTime     @default(now())
+  geaendertAm    DateTime     @updatedAt
 
   mandant   Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   eingaenge Eingang[]
@@ -1492,20 +1498,20 @@ enum MailErgebnis {
 
 /// Protokoll jeder empfangenen Mail an die Import-Adresse, auch wenn nichts aufgenommen wurde.
 model EingangMail {
-  id              String       @id @default(cuid())
-  mandantId       String
-  von             String
-  vonName         String?
-  betreff         String?
-  nachrichtId     String?
+  id             String       @id @default(cuid())
+  mandantId      String
+  von            String
+  vonName        String?
+  betreff        String?
+  nachrichtId    String?
   /// Ergebnis der Absenderprüfung des Mail-Dienstes (SPF/DKIM/DMARC), falls mitgeliefert
-  pruefung        String?
-  ergebnis        MailErgebnis
-  hinweis         String?
-  anzahlAnhaenge  Int          @default(0)
-  aufgenommen     Int          @default(0)
-  groesseBytes    Int          @default(0)
-  empfangenAm     DateTime     @default(now())
+  pruefung       String?
+  ergebnis       MailErgebnis
+  hinweis        String?
+  anzahlAnhaenge Int          @default(0)
+  aufgenommen    Int          @default(0)
+  groesseBytes   Int          @default(0)
+  empfangenAm    DateTime     @default(now())
 
   mandant   Mandant   @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   eingaenge Eingang[]
@@ -1534,31 +1540,31 @@ enum SicherheitQuelle {
 /// Kreditsicherheit: Grundschuld (je Haus, mit Rang), Bürgschaft, Abtretung usw.,
 /// mit Quelle und Stand. Gesamtgrundschulden lasten auf mehreren Häusern.
 model Sicherheit {
-  id             String            @id @default(cuid())
-  mandantId      String
-  art            SicherheitArt
+  id              String           @id @default(cuid())
+  mandantId       String
+  art             SicherheitArt
   /// Gläubiger, meist die Bank
-  glaeubiger     String
+  glaeubiger      String
   /// Nominalbetrag (Grundschuld, Bürgschaft); bei Abtretungen oft leer
-  betrag         Decimal?          @db.Decimal(14, 2)
+  betrag          Decimal?         @db.Decimal(14, 2)
   /// Rang in Abteilung III (1 = erstrangig)
-  rang           Int?
+  rang            Int?
   /// z. B. „Grundbuch von Lindenhof, Blatt 1234, Abt. III lfd. Nr. 2“
-  fundstelle     String?
+  fundstelle      String?
   /// Sicherungsgeber, z. B. bürgende Gesellschaft oder Person
   sicherungsgeber String?
-  gesellschaftId String?
-  eingetragenAm  DateTime?         @db.Date
-  gueltigBis     DateTime?         @db.Date
+  gesellschaftId  String?
+  eingetragenAm   DateTime?        @db.Date
+  gueltigBis      DateTime?        @db.Date
   /// Gelöscht bzw. freigegeben am (bleibt zur Nachvollziehbarkeit erhalten)
-  geloeschtAm    DateTime?         @db.Date
-  quelle         SicherheitQuelle  @default(SONSTIGE)
+  geloeschtAm     DateTime?        @db.Date
+  quelle          SicherheitQuelle @default(SONSTIGE)
   /// Stand der Angabe laut Quelle
-  stand          DateTime?         @db.Date
-  dokumentId     String?
-  notiz          String?
-  erstelltAm     DateTime          @default(now())
-  geaendertAm    DateTime          @updatedAt
+  stand           DateTime?        @db.Date
+  dokumentId      String?
+  notiz           String?
+  erstelltAm      DateTime         @default(now())
+  geaendertAm     DateTime         @updatedAt
 
   mandant      Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   gesellschaft Gesellschaft?      @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
@@ -1570,7 +1576,7 @@ model Sicherheit {
 }
 
 model SicherheitHaus {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   mandantId    String
   sicherheitId String
   hausId       String
@@ -1584,7 +1590,7 @@ model SicherheitHaus {
 
 /// Welche Kredite eine Sicherheit sichert (Zweckerklärung)
 model SicherheitKredit {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   mandantId    String
   sicherheitId String
   kreditId     String
@@ -1691,4 +1697,22 @@ model Zuordnungsregel {
   kredit       Kredit?       @relation(fields: [kreditId], references: [id], onDelete: Cascade)
 
   @@unique([mandantId, merkmal, wert])
+}
+
+/// Erstellter Covenant-Nachweis für die Bank: eingefrorener Stand aller Werte zum Stichtag (JSON),
+/// damit das PDF später genau so wieder erzeugt werden kann.
+model CovenantNachweis {
+  id          String   @id @default(cuid())
+  mandantId   String
+  kreditId    String
+  stichtag    DateTime @db.Date
+  inhalt      Json
+  erstelltVon String?
+  erstelltAm  DateTime @default(now())
+
+  mandant Mandant @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  kredit  Kredit  @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@index([mandantId])
+  @@index([kreditId, stichtag])
 }

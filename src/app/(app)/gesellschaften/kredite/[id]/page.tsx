@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { Formular } from "@/components/formular";
 import { CovenantMarke, PufferWert, SperrenMarke, ZinsbindungMarke } from "@/components/kredit-marken";
 import { covenantPuffer, sperrenStatus } from "@/lib/covenant";
+import { gesamtErgebnis, letzterTesttermin, testTermine, TEST_INTERVALLE, type NachweisInhalt } from "@/lib/covenant-nachweis";
 import { Jahressaeulen } from "@/components/diagramme";
 import { Begriff, Glossar, Hinweismarke, KapitaldienstWert, MitHerleitung, RestschuldWert, Unbekannt, ZinssatzWert, type GlossarBegriff } from "@/components/herleitung";
 import { Angaben, Auswahl, Feld, Felder, Kachel, Kacheln, Karte, KnopfLink, Leer, Marke, Seitenkopf, Tabelle, rechts } from "@/components/ui";
 import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
-import { heute, isoDatum, monatsanfang, monatsNummer } from "@/lib/datum";
+import { heute, isoDatum, monatsanfang, monatsNummer, plusMonate } from "@/lib/datum";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal } from "@/lib/geld";
 import { formatierer } from "@/lib/format";
@@ -34,6 +35,8 @@ import {
   buchungLoeschen,
   covenantHinzufuegen,
   covenantLoeschen,
+  covenantNachweisErstellen,
+  covenantTestSetzen,
   saldoHinzufuegen,
   saldoLoeschen,
   tilgungsplanBerechnen,
@@ -96,6 +99,12 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
   const gueltig = gueltigerTilgungsplan(daten, stichtag);
   const plan = kredit.tilgungsplaene.find((p) => String(p.version) === planParam) ?? kredit.tilgungsplaene.find((p) => p.version === gueltig?.version);
   const neuesteVersion = kredit.tilgungsplaene[0];
+
+  const termin = (c: (typeof kredit.covenants)[number]) => (c.ersterTest && c.testIntervallMonate ? { erster: isoDatum(c.ersterTest), monate: c.testIntervallMonate } : null);
+  const letzteTests = kredit.covenants.map((c) => termin(c)).flatMap((x) => (x ? [letzterTesttermin(x.erster, x.monate, stichtag)] : [])).filter((x): x is string => x !== null);
+  const nachweisVorgabe = letzteTests.sort().at(-1) ?? stichtag;
+  const nachweise = await kontext.db.covenantNachweis.findMany({ where: { kreditId: id }, orderBy: { erstelltAm: "desc" }, take: 20, select: { id: true, stichtag: true, erstelltAm: true, erstelltVon: true, inhalt: true } });
+  const intervallOptionen = TEST_INTERVALLE.map((m) => ({ wert: String(m), text: tk.intervalle[String(m)] }));
 
   return (
     <div className="space-y-6">
@@ -539,7 +548,33 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
                       {c.vergleich && schwelle !== null ? <PufferWert puffer={puffer} kennzahl={c.kennzahl} kz={werte} stichtag={stichtag} t={t} f={f} /> : "–"}
                     </td>
                     <td>{sperre ? <SperrenMarke status={sperrenStatus(puffer)} t={t} /> : <CovenantMarke eingehalten={p.eingehalten} t={t} />}</td>
-                    <td>{c.pruefrhythmus}</td>
+                    <td className="text-sm">
+                      {c.pruefrhythmus}
+                      {(() => {
+                        const x = termin(c);
+                        const naechster = x ? testTermine(x.erster, x.monate, stichtag, plusMonate(stichtag, x.monate))[0] : null;
+                        return x ? (
+                          <div className="text-xs text-slate-600" data-naechster-test>
+                            {tk.intervalle[String(x.monate)] ?? x.monate} · {tk.naechsterTest}: {naechster ? f.datum(naechster) : "–"}
+                          </div>
+                        ) : (
+                          <div className="text-xs italic text-slate-400">
+                            {tk.testtermine}: {tk.keinIntervall}
+                          </div>
+                        );
+                      })()}
+                      {schreiben && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-xs text-sky-700">{tk.testtermine}</summary>
+                          <Formular aktion={covenantTestSetzen.bind(null, c.id)} absenden={t.allgemein.speichern} className="mt-2">
+                            <Felder>
+                              <Feld name="ersterTest" label={tk.ersterTest} typ="date" wert={c.ersterTest ? isoDatum(c.ersterTest) : undefined} />
+                              <Auswahl name="testIntervallMonate" label={tk.testIntervall} wert={c.testIntervallMonate ? String(c.testIntervallMonate) : undefined} optionen={intervallOptionen} leerText="–" />
+                            </Felder>
+                          </Formular>
+                        </details>
+                      )}
+                    </td>
                     {schreiben && (
                       <td className="text-right">
                         <Formular aktion={covenantLoeschen.bind(null, c.id)} absenden={t.allgemein.loeschen} art="gefahr" bestaetigen={t.allgemein.loeschenBestaetigen} inline />
@@ -562,6 +597,8 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
                   <Auswahl name="vergleich" label={tk.vergleich} optionen={Object.entries(t.vergleiche).map(([wert, text]) => ({ wert, text }))} leerText="–" />
                   <Feld name="schwellenwert" label={tk.schwellenwert} inputMode="decimal" />
                   <Feld name="pruefrhythmus" label={tk.pruefrhythmus} />
+                  <Feld name="ersterTest" label={tk.ersterTest} typ="date" />
+                  <Auswahl name="testIntervallMonate" label={tk.testIntervall} optionen={intervallOptionen} leerText="–" />
                   <Feld name="beschreibung" label={tk.beschreibung} breit />
                 </Felder>
               </Formular>
@@ -569,6 +606,56 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
           </details>
         )}
       </Karte>
+
+      {kredit.covenants.length > 0 && (
+        <Karte titel={<span id="covenant-nachweis">{t.covenantNachweis.karte}</span>}>
+          <p className="mb-3 text-sm text-slate-600">{t.covenantNachweis.beschreibung}</p>
+          {schreiben && (
+            <Formular aktion={covenantNachweisErstellen.bind(null, id)} absenden={t.covenantNachweis.erstellen} laeuftText={t.covenantNachweis.laeuft}>
+              <Felder>
+                <Feld name="stichtag" label={t.covenantNachweis.stichtag} typ="date" wert={nachweisVorgabe} hinweis={t.covenantNachweis.stichtagHinweis} pflicht />
+              </Felder>
+            </Formular>
+          )}
+          <h3 className="mb-2 mt-4 text-sm font-semibold text-slate-800">{t.covenantNachweis.bisher}</h3>
+          {nachweise.length === 0 ? (
+            <Leer>{t.covenantNachweis.keine}</Leer>
+          ) : (
+            <Tabelle>
+              <thead>
+                <tr>
+                  <th>{t.covenantNachweis.stichtag}</th>
+                  <th>{t.covenantNachweis.pdf.ergebnis}</th>
+                  <th>{t.covenantNachweis.erstelltSpalte}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {nachweise.map((n) => {
+                  const e = gesamtErgebnis(n.inhalt as unknown as NachweisInhalt);
+                  return (
+                    <tr key={n.id} data-nachweis>
+                      <td>{f.datum(n.stichtag)}</td>
+                      <td>
+                        <Marke ton={e === "verletzt" ? "schlecht" : e === "eingehalten" ? "gut" : "warnung"}>{t.covenantNachweis.ergebnis[e]}</Marke>
+                      </td>
+                      <td className="text-sm">
+                        {f.datumZeit(n.erstelltAm)}
+                        {n.erstelltVon && ` · ${n.erstelltVon}`}
+                      </td>
+                      <td className="text-right">
+                        <a href={`/api/covenant-nachweis/${n.id}`} target="_blank" rel="noopener" className="text-sky-700 hover:underline">
+                          {t.covenantNachweis.oeffnen}
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Tabelle>
+          )}
+        </Karte>
+      )}
 
       <Karte titel={tk.buchungen}>
         {schreiben && (

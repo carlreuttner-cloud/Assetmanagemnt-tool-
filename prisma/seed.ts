@@ -212,6 +212,8 @@ async function legePortfolioAn(mandantId: string, p: TestPortfolio) {
     data: p.kredite.flatMap((k) => k.covenants.map((c) => ({
       mandantId, kreditId: kredit.get(k.schluessel)!, kennzahl: c.kennzahl, vergleich: c.vergleich,
       schwellenwert: c.schwellenwert, pruefrhythmus: c.pruefrhythmus, folge: c.folge ?? "COVENANT", beschreibung: c.beschreibung ?? null,
+      // Testtermine aus dem Rhythmus-Text; „jährlich“ ohne Datum bleibt offen (zeigt die Datenlücke).
+      ...(c.pruefrhythmus === "jährlich zum 31.12." ? { ersterTest: tag("2025-12-31"), testIntervallMonate: 12 } : c.pruefrhythmus === "halbjährlich" ? { ersterTest: tag("2025-06-30"), testIntervallMonate: 6 } : {}),
     }))),
   });
   await db.kreditbuchung.createMany({
