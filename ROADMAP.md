@@ -54,17 +54,42 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 
 ## Erweiterungen (ab 28.11.)
 
-Das Produkt wird verkauft: Ideen aus fremden Projekten werden nur nachgebaut, kein fremder Quellcode übernommen. Vorrang haben der KI-Assistent mit Diagrammen und der zentrale Eingang. Der Absender (Punkt 3) kommt direkt vor dem Eingang, weil der Eingang ihn erkennt und setzt.
+Das Produkt wird verkauft: Ideen aus fremden Projekten werden nur nachgebaut, kein fremder Quellcode übernommen. Regeln wie immer: jede Zahl mit Quelle und Stichtag, fehlende Werte bleiben unbekannt, die KI macht nur Vorschläge mit Bestätigung, gerechnet wird im Code.
 
-- [ ] **Phase 29: Generative Antworten im KI-Assistenten.** Frage in eigenen Worten stellen; die KI antwortet mit Text und unseren eigenen Komponenten (Kennzahl-Kacheln, Linien- und Säulendiagramme, Tabellen, Leerstand-Kreis, kleine Was-wäre-wenn-Regler) in den zentralen Farben. Die KI wählt nur Komponenten und Datenabfragen aus einem festen Katalog; alle Zahlen kommen aus der Datenbank bzw. unseren Rechenfunktionen, mit Quelle und Stichtag, nie von der KI. Eigene, schlanke Lösung statt OpenUI (Begründung im PR).
-- [ ] **Phase 30: Absender bei Dokumenten.** Feld „Absender“ (Bank, Hausverwaltung, Gutachter, Steuerberater, Behörde, Mieter, Sonstige) mit Name, Filter und Anzeige in Dateien und Checkliste.
-- [ ] **Phase 31: Zentraler Posteingang mit KI-Zuordnung.** Ein Eingang je Mandant statt Import je Gesellschaft. Jedes Dokument wird gelesen (inkl. Texterkennung); erkannt werden Dokumenttyp, Absender und Stichtag, zugeordnet wird zu Gesellschaft, Haus oder Kredit über IBAN, Darlehensnummer, Adresse oder Gesellschaftsname, mit Begründung („zugeordnet zu Haus X, weil IBAN …“). Einheitlicher Name, Originalname bleibt. Nichts wird ohne Bestätigung übernommen; bei unsicherer Zuordnung oder unbekanntem Absender kein Vorschlag zur Schnellübernahme. Korrekturen werden als Zuordnungsregeln gelernt. Prüfung von Dateityp und Größe, alles im Änderungsprotokoll.
-- [ ] **Phase 32: Upload-Seite je Mandant.** Eigene Seite zum Hochladen per Drag & Drop für Hausverwaltung, Bank oder Gutachter, ohne Zugriff auf den Rest der App: persönlicher, widerrufbarer Upload-Link mit Ablaufdatum oder Login mit Rolle „nur hochladen“. Alles landet im Posteingang.
-- [ ] **Phase 33: E-Mail-Eingang.** Eine Import-Adresse je Mandant; Anhänge und Mailtext landen im Posteingang. Mails unbekannter Absender kommen in Quarantäne. Lokal mit einem Test-Mailserver in Docker und Testmails; der echte Empfang wird in der Produktionsreife eingerichtet.
-- [ ] **Phase 34: Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
-- [ ] **Phase 35: Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
-- [ ] **Phase 36: Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
-- [ ] **Phase 37: Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
+Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5, B7, C2, C5, danach der Rest. Der Absender kommt direkt vor dem Posteingang, weil der Eingang ihn erkennt und setzt.
+
+### Teil A: Import und KI-Assistent (höchste Priorität)
+
+- [ ] **Phase 29 (A2): Generative Antworten im KI-Assistenten.** Frage in eigenen Worten stellen; die KI antwortet mit Text und unseren eigenen Komponenten (Kennzahl-Kacheln, Linien- und Säulendiagramme, Tabellen, Leerstand-Kreis, kleine Was-wäre-wenn-Regler) in den zentralen Farben. Die KI wählt nur Komponenten und Datenabfragen aus einem festen Katalog; alle Zahlen kommen aus der Datenbank bzw. unseren Rechenfunktionen, mit Quelle und Stichtag, nie von der KI. Eigene, schlanke Lösung statt OpenUI (Begründung im PR).
+- [ ] **Phase 30 (A1): Absender bei Dokumenten.** Feld „Absender“ (Bank, Hausverwaltung, Gutachter, Steuerberater, Behörde, Mieter, Sonstige) mit Name, Filter und Anzeige in Dateien und Checkliste.
+- [ ] **Phase 31 (A1): Zentraler Posteingang mit KI-Zuordnung.** Ein Eingang je Mandant statt Import je Gesellschaft. Jedes Dokument wird gelesen (inkl. Texterkennung); erkannt werden Dokumenttyp, Absender und Stichtag, zugeordnet wird zu Gesellschaft, Haus oder Kredit über IBAN, Darlehensnummer, Adresse oder Gesellschaftsname, mit Begründung („zugeordnet zu Haus X, weil IBAN …“). Einheitlicher Name, Originalname bleibt. Nichts wird ohne Bestätigung übernommen; bei unsicherer Zuordnung kein Vorschlag zur Schnellübernahme. Korrekturen werden als Zuordnungsregeln gelernt. Prüfung von Dateityp und Größe, alles im Änderungsprotokoll.
+- [ ] **Phase 32 (A1): Upload-Seite je Mandant.** Eigene Seite zum Hochladen per Drag & Drop für Hausverwaltung, Bank oder Gutachter, ohne Zugriff auf den Rest der App: persönlicher, widerrufbarer Upload-Link mit Ablaufdatum oder Login mit Rolle „nur hochladen“. Alles landet im Posteingang.
+- [ ] **Phase 33 (A1): E-Mail-Eingang.** Eine Import-Adresse je Mandant; Anhänge und Mailtext landen im Posteingang. Mails unbekannter Absender kommen in Quarantäne. Lokal mit einem Test-Mailserver in Docker und Testmails; der echte Empfang wird in der Produktionsreife eingerichtet.
+
+### Vorgezogen aus Teil B und C
+
+- [ ] **Phase 34 (B2): Bankangebote vergleichen.** Term Sheets hochladen; die KI liest Zins, Marge, Laufzeit, Gebühren, Covenants und Sondertilgung aus (Vorschlag mit Bestätigung); Vergleich nebeneinander inkl. Gesamtkosten über die Laufzeit (im Code gerechnet).
+- [ ] **Phase 35 (B4): Sicherheiten-Register.** Grundschulden je Haus (Rang, Betrag, Gläubiger), Bürgschaften, Abtretungen, mit Quelle und Bezug zum Kredit.
+- [ ] **Phase 36 (B5): Beleihungsreserve.** Mögliche Nachfinanzierung bei frei wählbarem Ziel-LTV je Haus, Gesellschaft und Portfolio, nur aus belegter Restschuld und Verkehrswert mit Stichtag.
+- [ ] **Phase 37 (B7): Covenant-Nachweis.** Testtermine je Covenant im Fristenkalender, PDF für die Bank auf Knopfdruck mit Herleitung und Quellen.
+- [ ] **Phase 38 (C2): Ausschüttungsplanung.** Geplante Ausschüttungen mit automatischer Prüfung von Liquidität, Ausschüttungssperren und Covenants.
+- [ ] **Phase 39 (C5): Quartalsbericht.** Automatisch erzeugt, mit 4-Augen-Freigabe und eingefrorenem Stand zum Stichtag.
+
+### Danach
+
+- [ ] **Phase 40 (B1): Refinanzierungs-Cockpit.** Fälligkeiten und Zinsbindungsenden je Jahr als Diagramm (Maturity Wall), Erinnerung 18–24 Monate vorher mit Unterlagen-Checkliste (baut auf Fristenkalender und Zinsbindungsprofil auf).
+- [ ] **Phase 41 (B3): Zinsrisiko.** Gewichteter Durchschnittszins, durchschnittliche Restlaufzeit der Zinsbindung, Anteil fest/variabel/abgesichert, Mehrkosten pro Jahr bei +100 Basispunkten.
+- [ ] **Phase 42 (B6): Sondertilgungsrechte.** Erlaubt, genutzt und noch offen je Jahr, mit Frist im Kalender.
+- [ ] **Phase 43 (B8): Ankaufsprüfung.** Neues Objekt mit Kaufpreis und Finanzierung durchrechnen, mit Auswirkung auf die Kennzahlen von Gesellschaft und Portfolio.
+- [ ] **Phase 44 (C4): Gesellschafter- und Nachrangdarlehen.** Eigene Kreditart mit Rang, fließt in den Waterfall ein.
+- [ ] **Phase 45 (C1): Investorenrenditen.** IRR, Eigenkapital-Multiple und Cash-on-Cash je Investor und Gesellschaft, nur aus datierten Zahlungen.
+- [ ] **Phase 46 (C3): Kapitalabrufe.** Betrag je Gesellschafter anteilig, Eingang verfolgen.
+- [ ] **Phase 47 (C6): Plan/Ist-Vergleich.** Je Gesellschaft, mit Erklärung der Abweichungen.
+- [ ] **Phase 48 (C7): Datenraum-Export.** Alle Unterlagen eines Hauses oder einer Gesellschaft geordnet als Paket.
+- [ ] **Phase 49 (C8): Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
+- [ ] **Phase 50 (D3): Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
+- [ ] **Phase 51 (D2): Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
+- [ ] **Phase 52 (D1): Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
 
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
 
