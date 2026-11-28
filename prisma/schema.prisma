@@ -131,6 +131,7 @@ model Mitgliedschaft {
   benutzer                Benutzer                @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
   hausZuweisungen         HausZuweisung[]
   gesellschaftZuweisungen GesellschaftZuweisung[]
+  gesellschafter          Gesellschafter[]
 
   @@unique([mandantId, benutzerId])
   @@index([benutzerId])
@@ -859,42 +860,45 @@ model Massnahme {
 
 /// Dokument mit optionalem Bezug zu genau einem Objekt (Gesellschaft, Haus, ...).
 model Dokument {
-  id                String              @id @default(cuid())
-  mandantId         String
+  id                  String              @id @default(cuid())
+  mandantId           String
   /// Einheitlicher Name, z. B. "Jahresabschluss 2025 – Lindenhof Wohnen GmbH & Co. KG"
-  titel             String
+  titel               String
   /// z. B. "Kaufvertrag", "Mietvertrag", "Kreditvertrag", "Gutachten"
-  kategorie         String?
+  kategorie           String?
   /// Geschäftsjahr bzw. Jahr, auf das sich das Dokument bezieht
-  jahr              Int?
+  jahr                Int?
   /// Datum bzw. Stand des Dokuments
-  dokumentDatum     DateTime?           @db.Date
-  speicherPfad      String
+  dokumentDatum       DateTime?           @db.Date
+  speicherPfad        String
   /// Originaler Dateiname beim Hochladen (bleibt unverändert gespeichert)
-  dateiname         String
-  mimeType          String
-  groesseBytes      Int
+  dateiname           String
+  mimeType            String
+  groesseBytes        Int
   /// SHA-256 des Inhalts, um doppelte Uploads zu erkennen
-  pruefsumme        String?
+  pruefsumme          String?
   /// Wer das Dokument ausgestellt bzw. geschickt hat (Art); null = unbekannt
-  absenderArt       AbsenderArt?
+  absenderArt         AbsenderArt?
   /// Name des Absenders, z. B. "Sparkasse Hamburg"
-  absenderName      String?
+  absenderName        String?
   /// Name und Zuordnung vom Benutzer bestätigt; vorher nur Vorschlag
-  bestaetigt        Boolean             @default(false)
+  bestaetigt          Boolean             @default(false)
   /// Woher der durchsuchbare Text stammt
-  textQuelle        DokumentTextQuelle?
+  textQuelle          DokumentTextQuelle?
   /// z. B. "Texterkennung nicht installiert" oder "nur die ersten 40 Seiten erkannt"
-  textHinweis       String?
-  seitenAnzahl      Int?
-  hochgeladenVonId  String?
-  gesellschaftId    String?
-  hausId            String?
-  einheitId         String?
-  mietverhaeltnisId String?
-  kreditId          String?
-  erstelltAm        DateTime            @default(now())
-  geaendertAm       DateTime            @default(now()) @updatedAt
+  textHinweis         String?
+  seitenAnzahl        Int?
+  hochgeladenVonId    String?
+  /// Für Investoren der zugeordneten Gesellschaft freigegeben (null = nicht freigegeben)
+  investorFreigabeAm  DateTime?
+  investorFreigabeVon String?
+  gesellschaftId      String?
+  hausId              String?
+  einheitId           String?
+  mietverhaeltnisId   String?
+  kreditId            String?
+  erstelltAm          DateTime            @default(now())
+  geaendertAm         DateTime            @default(now()) @updatedAt
 
   mandant         Mandant          @relation(fields: [mandantId], references: [id], onDelete: Cascade)
   hochgeladenVon  Benutzer?        @relation(fields: [hochgeladenVonId], references: [id], onDelete: SetNull)
@@ -1177,13 +1181,16 @@ model Gesellschafter {
   /// Anteil an der Gewinnverteilung nach Vorzugsrendite in Prozent; null = laut Vertrag unbekannt
   gewinnanteilProzent Decimal? @db.Decimal(9, 6)
   notiz               String?
+  /// Zugang zum Investorenportal: Mitgliedschaft (Rolle Investor), die dieses Kapitalkonto sieht
+  mitgliedschaftId    String?
   angelegtAm          DateTime @default(now())
 
-  mandant      Mandant                @relation(fields: [mandantId], references: [id], onDelete: Cascade)
-  gesellschaft Gesellschaft           @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
-  bewegungen   Kapitalbewegung[]
-  darlehen     Kredit[]
-  abrufe       KapitalabrufPosition[]
+  mandant        Mandant                @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft   Gesellschaft           @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  mitgliedschaft Mitgliedschaft?        @relation(fields: [mitgliedschaftId], references: [id], onDelete: SetNull)
+  bewegungen     Kapitalbewegung[]
+  darlehen       Kredit[]
+  abrufe         KapitalabrufPosition[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
