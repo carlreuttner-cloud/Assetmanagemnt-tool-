@@ -807,6 +807,10 @@ model Dokument {
   groesseBytes      Int
   /// SHA-256 des Inhalts, um doppelte Uploads zu erkennen
   pruefsumme        String?
+  /// Wer das Dokument ausgestellt bzw. geschickt hat (Art); null = unbekannt
+  absenderArt       AbsenderArt?
+  /// Name des Absenders, z. B. "Sparkasse Hamburg"
+  absenderName      String?
   /// Name und Zuordnung vom Benutzer bestätigt; vorher nur Vorschlag
   bestaetigt        Boolean             @default(false)
   /// Woher der durchsuchbare Text stammt
@@ -846,6 +850,20 @@ enum DokumentTextQuelle {
 }
 
 /// Durchsuchbarer Text je Seite (aus der Textebene oder per OCR), für die Volltextsuche mit Seitenangabe.
+/// Absender eines Dokuments (wer es ausgestellt oder geschickt hat).
+enum AbsenderArt {
+  BANK
+  HAUSVERWALTUNG
+  GUTACHTER
+  STEUERBERATER
+  NOTAR
+  BEHOERDE
+  VERSICHERUNG
+  MIETER
+  GESELLSCHAFTER
+  SONSTIGE
+}
+
 model DokumentSeite {
   id         String @id @default(cuid())
   mandantId  String

@@ -9,7 +9,7 @@ import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { isoDatum } from "@/lib/datum";
 import { dokumentFilter, ladeZuordnungsKandidaten } from "@/lib/daten/dateien";
 import { MAX_OCR_SEITEN } from "@/lib/dokument-text";
-import { erkenneDatum, erkenneJahr, erkenneKategorie, erkenneObjekt, jahrbezogen, markiere, ueblicheZuordnung } from "@/lib/dokument-vorschlag";
+import { erkenneAbsender, erkenneDatum, erkenneJahr, erkenneKategorie, erkenneObjekt, jahrbezogen, markiere, ueblicheZuordnung } from "@/lib/dokument-vorschlag";
 import { einParam } from "@/lib/filter";
 import { formatierer } from "@/lib/format";
 import { dokumentBestaetigen, dokumentLoeschen, textNeuErkennen } from "../aktionen";
@@ -87,11 +87,14 @@ export default async function DokumentSeite({ params, searchParams }: PageProps<
     const jahr = jahrbezogen(kat?.kategorie ?? null) ? erkenneJahr(volltext, d.dateiname) : null;
     const datum = jahr ? null : erkenneDatum(volltext);
     const obj = erkenneObjekt(volltext, kandidaten, ueblicheZuordnung(kat?.kategorie ?? null));
+    const banken = await kontext.db.kredit.findMany({ where: { bank: { not: null } }, distinct: ["bank"], select: { bank: true } });
+    const abs = erkenneAbsender(volltext, kat?.kategorie ?? null, banken.map((b) => b.bank!));
     const gruende = [
       kat && fuelle(td.erkanntKategorie, { wort: kat.stichwort }),
       obj && fuelle(td.erkanntObjekt, { begriff: obj.begriff }),
       jahr && fuelle(td.erkanntJahr, { jahr }),
       datum && fuelle(td.erkanntDatum, { datum: f.datum(datum) }),
+      abs && fuelle(td.erkanntAbsender[abs.grund], { art: td.absenderArten[abs.art], begriff: abs.begriff }),
     ].filter(Boolean) as string[];
     const zuordnungWert = d.gesellschaftId ? `gesellschaft:${d.gesellschaftId}` : d.hausId ? `haus:${d.hausId}` : d.kreditId ? `kredit:${d.kreditId}` : null;
     formular = (
@@ -105,7 +108,7 @@ export default async function DokumentSeite({ params, searchParams }: PageProps<
           td={td}
           aktion={dokumentBestaetigen.bind(null, d.id)}
           objekte={kandidaten.map(({ art, id, name }) => ({ art, id, name }))}
-          start={{ titel: d.titel, kategorie: d.kategorie, jahr: d.jahr, datum: isoDatum(d.dokumentDatum), zuordnung: zuordnungWert }}
+          start={{ titel: d.titel, kategorie: d.kategorie, jahr: d.jahr, datum: isoDatum(d.dokumentDatum), zuordnung: zuordnungWert, absenderArt: d.absenderArt, absenderName: d.absenderName }}
         />
       </Karte>
     );
@@ -139,6 +142,7 @@ export default async function DokumentSeite({ params, searchParams }: PageProps<
             [td.name, d.titel],
             [td.originalname, d.dateiname],
             [td.kategorie, d.kategorie ?? "–"],
+            [td.absender, d.absenderArt ? [td.absenderArten[d.absenderArt], d.absenderName].filter(Boolean).join(": ") : d.absenderName ?? td.keinAbsender],
             [td.zuordnung, zuordnung ? <Link href={zuordnung.href} className="hover:underline">{zuordnung.text}</Link> : "–"],
             [td.jahr, d.jahr ?? "–"],
             [td.datum, d.dokumentDatum ? f.datum(d.dokumentDatum) : "–"],
