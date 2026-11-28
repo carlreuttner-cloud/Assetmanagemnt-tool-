@@ -98,6 +98,8 @@ model Mandant {
   energieausweise         Energieausweis[]
   energieverbraeuche      Energieverbrauch[]
   bauteile                Bauteil[]
+  briefvorlagen           Briefvorlage[]
+  briefserien             Briefserie[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -898,6 +900,8 @@ model Dokument {
   /// Für Investoren der zugeordneten Gesellschaft freigegeben (null = nicht freigegeben)
   investorFreigabeAm  DateTime?
   investorFreigabeVon String?
+  /// Serienbrief, aus dem das Dokument erzeugt wurde
+  briefserieId        String?
   gesellschaftId      String?
   hausId              String?
   einheitId           String?
@@ -910,6 +914,7 @@ model Dokument {
   hochgeladenVon  Benutzer?        @relation(fields: [hochgeladenVonId], references: [id], onDelete: SetNull)
   gesellschaft    Gesellschaft?    @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
   haus            Haus?            @relation(fields: [hausId], references: [id], onDelete: SetNull)
+  briefserie      Briefserie?      @relation(fields: [briefserieId], references: [id], onDelete: SetNull)
   einheit         Einheit?         @relation(fields: [einheitId], references: [id], onDelete: SetNull)
   mietverhaeltnis Mietverhaeltnis? @relation(fields: [mietverhaeltnisId], references: [id], onDelete: SetNull)
   kredit          Kredit?          @relation(fields: [kreditId], references: [id], onDelete: SetNull)
@@ -2020,4 +2025,51 @@ model Bauteil {
 
   @@index([mandantId])
   @@index([hausId])
+}
+
+enum BriefvorlageArt {
+  MIETERHOEHUNG
+  ALLGEMEIN
+}
+
+/// Vorlage für Serienbriefe an Mieter; Platzhalter in der Form {{name}}.
+model Briefvorlage {
+  id          String          @id @default(cuid())
+  mandantId   String
+  name        String
+  art         BriefvorlageArt
+  betreff     String
+  text        String
+  erstelltVon String?
+  erstelltAm  DateTime        @default(now())
+  geaendertAm DateTime        @updatedAt
+
+  mandant  Mandant      @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  serien   Briefserie[]
+
+  @@index([mandantId])
+}
+
+/// Erstellter Serienbrief: Vorlagenstand und Parameter werden festgehalten, die Briefe liegen als
+/// Dokumente beim jeweiligen Mietverhältnis.
+model Briefserie {
+  id             String          @id @default(cuid())
+  mandantId      String
+  briefvorlageId String?
+  art            BriefvorlageArt
+  titel          String
+  /// Briefdatum
+  datum          DateTime        @db.Date
+  betreff        String
+  text           String
+  /// Erhöhung in Prozent (nur Mieterhöhung)
+  prozent        Decimal?        @db.Decimal(6, 2)
+  erstelltVon    String?
+  erstelltAm     DateTime        @default(now())
+
+  mandant      Mandant       @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  briefvorlage Briefvorlage? @relation(fields: [briefvorlageId], references: [id], onDelete: SetNull)
+  dokumente    Dokument[]
+
+  @@index([mandantId])
 }
