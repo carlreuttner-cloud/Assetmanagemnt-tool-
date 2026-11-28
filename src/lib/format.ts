@@ -41,6 +41,9 @@ export function formatierer({ waehrung = "EUR", sprache = "de-DE" }: { waehrung?
     zahl: (wert: DezimalEingabe | null | undefined, stellen = 0) => (wert == null ? leer : zahl(wert, stellen)),
     flaeche: (wert: DezimalEingabe | null | undefined) => (wert == null ? leer : `${zahl(wert, 2)} m²`),
     datum: (wert: string | Date | null | undefined) => formatDatum(wert, sprache),
+    /** Datum mit Uhrzeit (Ortszeit Deutschland), z. B. "28.11.2026, 14:05" */
+    datumZeit: (wert: Date | null | undefined) =>
+      wert == null ? leer : new Intl.DateTimeFormat(sprache, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin" }).format(wert),
     /** Wert für ein Eingabefeld in deutscher Schreibweise ohne Tausenderpunkte, z. B. "1234,56" */
     eingabe: (wert: DezimalEingabe | null | undefined, stellen?: number) => {
       if (wert == null) return "";
