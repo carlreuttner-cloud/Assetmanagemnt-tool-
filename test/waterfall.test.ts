@@ -81,4 +81,53 @@ describe("Verkaufs-Waterfall", () => {
     const ohne = rechneWaterfall(eingabe());
     expect(ohne.gesellschafter[0].offeneVorzugsrendite!.minus(e.gesellschafter[0].offeneVorzugsrendite!).toFixed()).toBe("100000");
   });
+
+  it("zahlt nachrangige Darlehen nach Rang vor den Einlagen", () => {
+    const bank = { id: "k", name: "Bank", anteilProzent: d(100), restschuld: d(5_000_000), restschuldStichtag: "2025-12-31", vorfaelligkeit: d(100_000) };
+    const e = rechneWaterfall(
+      eingabe({
+        kredite: [
+          bank,
+          { id: "m", name: "Mezzanine", art: "NACHRANGDARLEHEN", rang: 1, anteilProzent: d(100), restschuld: d(1_000_000), restschuldStichtag: "2025-12-31", vorfaelligkeit: d(0) },
+          { id: "g", name: "GesDarlehen", art: "GESELLSCHAFTERDARLEHEN", rang: 2, gesellschafterId: "b", anteilProzent: d(100), restschuld: d(300_000), restschuldStichtag: "2025-12-31", vorfaelligkeit: d(0) },
+        ],
+      }),
+    );
+    // Netto-Erlös ohne Nachrang wie bisher
+    expect(e.nettoErloes!.toFixed()).toBe("4400000");
+    expect(e.kreditabloesung!.toFixed()).toBe("5000000");
+    expect(e.stufen.nachrang!.toFixed()).toBe("1300000");
+    expect(e.stufen.rueckzahlung!.toFixed()).toBe("2500000");
+    const sponsor = e.gesellschafter.find((g) => g.id === "b")!;
+    expect(sponsor.darlehen!.toFixed()).toBe("300000");
+    expect(sponsor.gesamt!.minus(sponsor.summe!).toFixed()).toBe("300000");
+    expect(e.gesellschafter.find((g) => g.id === "a")!.darlehen!.toFixed()).toBe("0");
+    expect(e.nachrangUnterdeckung).toBe(false);
+  });
+
+  it("reicht der Erlös nicht, geht der höhere Rang vor; gleicher Rang anteilig", () => {
+    const e = rechneWaterfall(
+      eingabe({
+        kredite: [
+          { id: "k", name: "Bank", anteilProzent: d(100), restschuld: d(8_000_000), restschuldStichtag: "2025-12-31", vorfaelligkeit: d(0) },
+          { id: "m1", name: "M1", art: "NACHRANGDARLEHEN", rang: 1, anteilProzent: d(100), restschuld: d(1_000_000), restschuldStichtag: null, vorfaelligkeit: d(0) },
+          { id: "m2", name: "M2", art: "NACHRANGDARLEHEN", rang: 1, anteilProzent: d(100), restschuld: d(1_000_000), restschuldStichtag: null, vorfaelligkeit: d(0) },
+          { id: "g", name: "G", art: "GESELLSCHAFTERDARLEHEN", rang: null, gesellschafterId: "a", anteilProzent: d(100), restschuld: d(500_000), restschuldStichtag: null, vorfaelligkeit: d(0) },
+        ],
+      }),
+    );
+    // 10 Mio. − 300.000 − 8 Mio. − 200.000 = 1,5 Mio.
+    expect(e.nettoErloes!.toFixed()).toBe("1500000");
+    expect(e.kredite.filter((k) => k.nachrangig).map((k) => k.gezahlt!.toFixed())).toEqual(["750000", "750000", "0"]);
+    expect(e.nachrangUnterdeckung).toBe(true);
+    expect(e.stufen.rueckzahlung!.toFixed()).toBe("0");
+  });
+
+  it("unbekannte Restschuld eines Nachrangdarlehens verhindert die Verteilung", () => {
+    const e = rechneWaterfall(eingabe({ kredite: [{ id: "m", name: "M", art: "NACHRANGDARLEHEN", anteilProzent: d(100), restschuld: null, restschuldStichtag: null, vorfaelligkeit: d(0) }] }));
+    expect(e.nettoErloes!.toFixed()).toBe("9500000");
+    expect(e.stufen.nachrang).toBeNull();
+    expect(e.stufen.rueckzahlung).toBeNull();
+    expect(e.luecken.map((l) => l.art)).toContain("restschuld");
+  });
 });

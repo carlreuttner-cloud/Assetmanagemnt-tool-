@@ -9,6 +9,8 @@ import { monatsende, monatsNummer, plusMonate, plusTage, type IsoDatum } from ".
 
 export type BuchungsArt = "ZINS" | "TILGUNG" | "SONDERTILGUNG" | "GEBUEHR" | "AUSZAHLUNG" | "SONSTIGES";
 export type ZahlweiseArt = "MONATLICH" | "QUARTALSWEISE" | "HALBJAEHRLICH" | "JAEHRLICH";
+export type KreditArt = "BANK" | "GESELLSCHAFTERDARLEHEN" | "NACHRANGDARLEHEN";
+export const KREDITARTEN = ["BANK", "GESELLSCHAFTERDARLEHEN", "NACHRANGDARLEHEN"] as const satisfies readonly KreditArt[];
 export type TilgungsartArt = "ANNUITAET" | "RATENTILGUNG" | "ENDFAELLIG";
 
 export interface BuchungDaten {
@@ -72,6 +74,11 @@ export interface KreditDaten {
   id: string;
   gesellschaftId: string;
   bezeichnung: string;
+  /** fehlt = Bankdarlehen */
+  kreditart?: KreditArt;
+  /** Rang bei Nachrang- und Gesellschafterdarlehen (1 = zuerst) */
+  rang?: number | null;
+  gesellschafterId?: string | null;
   zinsArt: "FEST" | "VARIABEL";
   sollzins: Decimal | null;
   referenzzins: string | null;

@@ -15,9 +15,15 @@ describe("rechte", () => {
     expect(darf("HAUSVERWALTUNG", "uebersicht")).toBe(false);
     expect(startseite("HAUSVERWALTUNG")).toBe("/import");
   });
-  it("Investor darf nur lesen", () => {
+  it("Investor darf alles lesen, nichts schreiben, plus Portal", () => {
+    expect(darf("INVESTOR", "investorenportal")).toBe(true);
     expect(darf("INVESTOR", "haeuser")).toBe(true);
+    expect(darf("INVESTOR", "gesellschaften")).toBe(true);
+    expect(darf("INVESTOR", "dokumente")).toBe(true);
     expect(darf("INVESTOR", "haeuser", "schreiben")).toBe(false);
+    expect(darf("INVESTOR", "dokumente", "schreiben")).toBe(false);
     expect(darf("INVESTOR", "import")).toBe(false);
+    expect(startseite("INVESTOR")).toBe("/portal");
+    expect(darf("MITARBEITER", "investorenportal")).toBe(true);
   });
 });

@@ -12,7 +12,7 @@ import { plusMonate, type IsoDatum } from "./datum";
 import { DRINGEND_MONATE, refinanzierungsEreignis, vorbereitungAb } from "./refinanzierung";
 import type { Nutzungsart } from "./nutzungsart";
 
-export const FRIST_ARTEN = ["refinanzierung", "zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung"] as const;
+export const FRIST_ARTEN = ["refinanzierung", "kapitalabruf", "sondertilgung", "zinsbindung", "kreditende", "sicherungsende", "covenanttest", "mietende", "mieterhoehung", "energieausweis"] as const;
 
 /** Ohne Zeitraumgrenze werden Covenant-Tests so weit im Voraus gezeigt. */
 export const COVENANT_VORLAUF_MONATE = 24;
@@ -58,6 +58,15 @@ export type FristTexte = {
   /** mit {ereignis}, {datum}, {monate}, {dringend} */
   grundRefinanzierung?: string;
   ereignisse?: { zinsbindung: string; kreditende: string };
+  /** mit {bezeichnung}, {offen}, {betrag}, {anzahl} */
+  grundKapitalabruf?: string;
+  /** mit {art}, {klasse} */
+  grundEnergieausweis?: string;
+  /** mit {offen}, {datum}, {regel}, {verfall} */
+  grundSondertilgung?: string;
+  sondertilgungVerfall?: string;
+  sondertilgungUebertrag?: string;
+  sondertilgungOhneRecht?: string;
   basisLetzte: string;
   basisBeginn: string;
   gewerbe: string;
@@ -66,7 +75,14 @@ export type FristTexte = {
 };
 
 export type FristEingabe = {
-  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }>; covenants?: Array<{ kennzahl: string; bedingung: string; ersterTest: IsoDatum | null; intervallMonate: number | null }> }>;
+  kredite: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; zinsArt: "FEST" | "VARIABEL"; zinsbindungBis: IsoDatum | null; laufzeitBis: IsoDatum | null; sicherungen?: Array<{ art: string; satz: string; ende: IsoDatum }>; covenants?: Array<{ kennzahl: string; bedingung: string; ersterTest: IsoDatum | null; intervallMonate: number | null }>;
+    /** laufendes Sondertilgungsjahr mit offenem Betrag; "unbekannt", wenn das Recht nicht erfasst ist */
+    sondertilgung?: { bis: IsoDatum; offen: string; regel: string; uebertragbar: boolean } | "unbekannt" | null;
+  }>;
+  /** Kapitalabrufe mit offenem Betrag (Beträge schon formatiert) */
+  kapitalabrufe?: Array<{ id: string; bezeichnung: string; gesellschaftId: string; gesellschaft: string; faelligAm: IsoDatum; offen: string; betrag: string; offeneGesellschafter: number }>;
+  /** maßgeblicher Energieausweis je Haus mit Gültigkeitsende */
+  energieausweise?: Array<{ hausId: string; haus: string; gesellschaftId: string; gesellschaft: string; gueltigBis: IsoDatum; art: string; klasse: string }>;
   mietverhaeltnisse: Array<{
     id: string;
     mieter: string;
@@ -112,6 +128,22 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
         grundlage: fuelle(t.grundRefinanzierung, { ereignis: t.ereignisse?.[e.art] ?? e.art, datum: datum(e.datum), monate: "24", dringend: String(DRINGEND_MONATE) }),
       });
     }
+    if (k.sondertilgung === "unbekannt") {
+      if (k.zinsArt === "FEST" && k.zinsbindungBis && k.zinsbindungBis >= stichtag && t.sondertilgungOhneRecht) {
+        luecken.push({ art: "sondertilgung", titel: k.bezeichnung, unter: k.gesellschaft, href: `${href}#sondertilgung`, grund: t.sondertilgungOhneRecht });
+      }
+    } else if (k.sondertilgung && t.grundSondertilgung && imRahmen(k.sondertilgung.bis)) {
+      const st = k.sondertilgung;
+      fristen.push({
+        art: "sondertilgung",
+        datum: st.bis,
+        titel: k.bezeichnung,
+        unter: k.gesellschaft,
+        href: `${href}#sondertilgung`,
+        gesellschaftId: k.gesellschaftId,
+        grundlage: fuelle(t.grundSondertilgung, { offen: st.offen, datum: datum(st.bis), regel: st.regel, verfall: (st.uebertragbar ? t.sondertilgungUebertrag : t.sondertilgungVerfall) ?? "" }),
+      });
+    }
     for (const c of k.covenants ?? []) {
       if (!c.ersterTest || !c.intervallMonate) {
         luecken.push({ art: "covenanttest", titel: k.bezeichnung, unter: k.gesellschaft, href, grund: fuelle(t.covenantOhneTermin ?? "", { kennzahl: c.kennzahl }) });
@@ -134,6 +166,33 @@ export function sammleFristen(e: FristEingabe, stichtag: IsoDatum, bis: IsoDatum
       if (s.ende < stichtag || !imRahmen(s.ende)) continue; // abgelaufene Sicherungen sind keine Frist mehr
       fristen.push({ art: "sicherungsende", datum: s.ende, titel: k.bezeichnung, unter: k.gesellschaft, href, gesellschaftId: k.gesellschaftId, grundlage: fuelle(t.grundSicherungsende ?? "", { art: s.art, satz: s.satz }) });
     }
+  }
+
+  for (const a of e.kapitalabrufe ?? []) {
+    if (!t.grundKapitalabruf || !imRahmen(a.faelligAm)) continue;
+    fristen.push({
+      art: "kapitalabruf",
+      datum: a.faelligAm,
+      titel: a.bezeichnung,
+      unter: a.gesellschaft,
+      href: `/kapitalabrufe/${a.id}`,
+      gesellschaftId: a.gesellschaftId,
+      grundlage: fuelle(t.grundKapitalabruf, { bezeichnung: a.bezeichnung, offen: a.offen, betrag: a.betrag, anzahl: String(a.offeneGesellschafter) }),
+    });
+  }
+
+  // Abgelaufene Ausweise bleiben als „fällig“ sichtbar: für vermietete Gebäude ist ein gültiger Ausweis Pflicht.
+  for (const a of e.energieausweise ?? []) {
+    if (!t.grundEnergieausweis || !imRahmen(a.gueltigBis)) continue;
+    fristen.push({
+      art: "energieausweis",
+      datum: a.gueltigBis,
+      titel: a.haus,
+      unter: a.gesellschaft,
+      href: `/energie/${a.hausId}`,
+      gesellschaftId: a.gesellschaftId,
+      grundlage: fuelle(t.grundEnergieausweis, { art: a.art, klasse: a.klasse }),
+    });
   }
 
   for (const m of e.mietverhaeltnisse) {
