@@ -24,7 +24,7 @@ export type DbKontext = {
 /** Modelle ohne eigene Spalte `mandantId`. */
 const OHNE_MANDANT = new Set(["Mandant", "Benutzer"]);
 /** Modelle, deren Änderungen nicht protokolliert werden. */
-const OHNE_PROTOKOLL = new Set(["Aenderungsprotokoll", "Mandant", "Benutzer", "KiAnalyse", "KiVorschlag", "Lesezeichen", "DokumentSeite"]);
+const OHNE_PROTOKOLL = new Set(["Aenderungsprotokoll", "Mandant", "Benutzer", "KiAnalyse", "KiVorschlag", "KiFrage", "Lesezeichen", "DokumentSeite"]);
 
 /** Fremdschlüssel, deren Ziel zum selben Mandanten gehören muss. */
 const FREMDSCHLUESSEL: Record<string, string> = {
@@ -36,12 +36,24 @@ const FREMDSCHLUESSEL: Record<string, string> = {
   kreditId: "kredit",
   tilgungsplanId: "tilgungsplan",
   mitgliedschaftId: "mitgliedschaft",
+  bauteilId: "bauteil",
+  briefvorlageId: "briefvorlage",
+  briefserieId: "briefserie",
   verkehrswertId: "verkehrswert",
   vorgabeId: "dokumentvorgabe",
   gesellschafterId: "gesellschafter",
   portfolioId: "portfolio",
   dokumentId: "dokument",
   massnahmeId: "massnahme",
+  uploadLinkId: "uploadLink",
+  eingangMailId: "eingangMail",
+  sicherheitId: "sicherheit",
+  abrufId: "kapitalabruf",
+  abrufPositionId: "kapitalabrufPosition",
+  planjahrId: "planjahr",
+  standId: "mieterstand",
+  hausverwaltungId: "hausverwaltung",
+  importvorgangId: "importvorgang",
 };
 /** Gleiche Prüfung für die Relationsschreibweise `haus: { connect: { id } }`. */
 const RELATIONEN: Record<string, string> = Object.fromEntries(

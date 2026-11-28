@@ -8,6 +8,7 @@ import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
 import { alsDbDatum, isoDatum, istIsoDatum, type IsoDatum } from "@/lib/datum";
 import { erlaubt } from "@/lib/daten/portfolio";
 import { ladeMieterBestand } from "@/lib/daten/import";
+import { legeStandAn, standZeilenAusListe } from "@/lib/daten/mieterstand";
 import { dezimal, zuText } from "@/lib/geld";
 import { EingabeFehler, fuehreAus } from "@/lib/formular";
 import { dekodiere } from "@/lib/import/csv";
@@ -99,7 +100,7 @@ export async function mieterlisteUebernehmen(_v: { fehler?: string; ok?: string 
     const text = String(fd.get("text") ?? "");
     const dateiname = String(fd.get("dateiname") ?? "mieterliste.csv").slice(0, 200);
     if (!text) throw new EingabeFehler(t.importe.keineDatei);
-    const { haus, plan } = await planeMieterliste(kontext, String(fd.get("hausId") ?? ""), text, stand);
+    const { haus, liste, plan } = await planeMieterliste(kontext, String(fd.get("hausId") ?? ""), text, stand);
 
     // Mehrfach genannte neue Mieter (z. B. Wohnung und Stellplatz) nur einmal anlegen
     const neueMieter = new Map<string, string>();
@@ -156,9 +157,13 @@ export async function mieterlisteUebernehmen(_v: { fehler?: string; ok?: string 
     }
 
     const anzahl = zaehle(plan.zeilen);
-    await db.importvorgang.create({
+    const vorgang = await db.importvorgang.create({
       data: { art: "MIETERLISTE", dateiname, benutzerId: kontext.benutzer.id, hausId: haus.id, stand: alsDbDatum(stand), ergebnis: anzahl } as never,
     });
+    // Jede übernommene Liste wird zusätzlich als eigener Stand gespeichert (nie überschrieben).
+    const fehlerZeilen = new Set(plan.zeilen.filter((z) => z.aktion === "fehler").map((z) => z.zeile));
+    const zeilen = await standZeilenAusListe(db, haus.id, liste.zeilen.filter((z) => !fehlerZeilen.has(z.zeile)), stand);
+    await legeStandAn(db, { hausId: haus.id, stichtag: stand, art: "VOLLSTAENDIG", quelle: dateiname, importvorgangId: vorgang.id, erstelltVon: kontext.benutzer.name }, zeilen);
     refresh();
     return { ok: fuelle(t.importe.uebernommen, { zusammenfassung: zusammenfassung(anzahl, t) }) };
   });
