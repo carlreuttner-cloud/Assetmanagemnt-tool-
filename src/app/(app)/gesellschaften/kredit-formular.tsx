@@ -1,4 +1,5 @@
 import { Formular } from "@/components/formular";
+import { Begriff } from "@/components/herleitung";
 import { Auswahl, Feld, Felder, Textfeld } from "@/components/ui";
 import type { Texte } from "@/i18n";
 import type { Formatierer } from "@/lib/format";
@@ -12,6 +13,9 @@ export type KreditFormularDaten = {
   gesellschaftId: string;
   bezeichnung: string;
   bank: string | null;
+  kreditart: "BANK" | "GESELLSCHAFTERDARLEHEN" | "NACHRANGDARLEHEN";
+  rang: number | null;
+  gesellschafterId: string | null;
   kreditnummer: string | null;
   iban: string | null;
   ursprungsbetrag: Dez;
@@ -37,6 +41,7 @@ export function KreditFormular({
   gesellschaftId,
   gesellschaften,
   haeuser,
+  gesellschafter = [],
 }: {
   t: Texte;
   f: Formatierer;
@@ -44,6 +49,8 @@ export function KreditFormular({
   gesellschaftId: string;
   gesellschaften: { id: string; name: string }[];
   haeuser: { id: string; bezeichnung: string }[];
+  /** Gesellschafter der Gesellschaft (Darlehensgeber bei Gesellschafterdarlehen) */
+  gesellschafter?: { id: string; name: string }[];
 }) {
   const k = t.kredite;
   const optionen = <T extends Record<string, string>>(werte: T) => Object.entries(werte).map(([wert, text]) => ({ wert, text }));
@@ -60,6 +67,11 @@ export function KreditFormular({
           pflicht
         />
         <Feld name="bank" label={k.bank} wert={kredit?.bank} />
+        <Auswahl name="kreditart" label={<Begriff k="Nachrangdarlehen" t={t}>{k.kreditart}</Begriff>} wert={kredit?.kreditart ?? "BANK"} optionen={optionen(t.kreditarten)} pflicht />
+        <Feld name="rang" label={k.rang} typ="number" wert={kredit?.rang != null ? String(kredit.rang) : undefined} hinweis={k.rangHinweis} />
+        {gesellschafter.length > 0 && (
+          <Auswahl name="gesellschafterId" label={k.darlehensgeber} wert={kredit?.gesellschafterId ?? undefined} optionen={gesellschafter.map((g) => ({ wert: g.id, text: g.name }))} leerText="–" hinweis={k.darlehensgeberHinweis} />
+        )}
         <Feld name="kreditnummer" label={k.kreditnummer} wert={kredit?.kreditnummer} />
         <Feld name="iban" label={k.iban} wert={kredit?.iban} />
         <Feld name="ursprungsbetrag" label={k.ursprungsbetrag} wert={f.eingabe(kredit?.ursprungsbetrag, 2)} inputMode="decimal" pflicht />

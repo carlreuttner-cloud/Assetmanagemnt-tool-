@@ -27,7 +27,7 @@ export type Sicherheit = "hoch" | "mittel" | "niedrig";
 
 /** Begründung als i18n-Schlüssel (`t.eingang.gruende`) mit Werten. */
 export type Grund = {
-  schluessel: "regel" | "iban" | "kennung" | "adresse" | "name" | "ueblich" | "kategorie" | "jahr" | "datum" | "absender" | "absenderRegel" | "uploadLink" | "ki" | "kiAbweichung" | "konkurrenz" | "keinObjekt";
+  schluessel: "regel" | "iban" | "kennung" | "adresse" | "name" | "ueblich" | "kategorie" | "jahr" | "datum" | "absender" | "absenderRegel" | "uploadLink" | "mailAbsender" | "ki" | "kiAbweichung" | "konkurrenz" | "keinObjekt";
   werte: Record<string, string>;
 };
 

@@ -78,8 +78,10 @@ export type Aufnahme = {
   dateiname: string;
   quelle: "HOCHLADEN" | "UPLOAD_LINK" | "EMAIL";
   hochgeladenVonId?: string | null;
-  /** Upload-Link, über den die Datei kam; seine Absenderart gilt, wenn im Text keine erkannt wird */
-  uploadLink?: { id: string; name: string; absenderArt: AbsenderArt | null } | null;
+  uploadLinkId?: string | null;
+  eingangMailId?: string | null;
+  /** Absender aus Upload-Link oder bekanntem Mail-Absender; gilt, wenn im Text keiner erkannt wird */
+  absenderVorgabe?: { art: AbsenderArt; name: string; grund: "uploadLink" | "mailAbsender" } | null;
   absenderAdresse?: string | null;
   absenderHinweis?: string | null;
   betreff?: string | null;
@@ -118,10 +120,10 @@ export async function nimmAuf(db: Db, mandant: { id: string; sprache: string }, 
   }
   const volltext = [a.betreff, a.mailtext, ...text.seiten.map((s) => s.replace(/\u0000/g, ""))].filter(Boolean).join("\n");
   const vorschlag = await erstelleVorschlag(db, t, { text: volltext, dateiname: name, absenderAdresse: a.absenderAdresse ?? null });
-  if (a.uploadLink?.absenderArt && !vorschlag.absenderArt) {
-    vorschlag.absenderArt = a.uploadLink.absenderArt;
-    vorschlag.absenderName = a.uploadLink.name;
-    vorschlag.gruende.push({ schluessel: "uploadLink", werte: { wert: a.uploadLink.name } });
+  if (a.absenderVorgabe && !vorschlag.absenderArt) {
+    vorschlag.absenderArt = a.absenderVorgabe.art;
+    vorschlag.absenderName = a.absenderVorgabe.name;
+    vorschlag.gruende.push({ schluessel: a.absenderVorgabe.grund, werte: { wert: a.absenderVorgabe.name } });
   }
   const neu = await db.eingang.create({
     data: {
@@ -142,7 +144,8 @@ export async function nimmAuf(db: Db, mandant: { id: string; sprache: string }, 
       mailtext: a.mailtext ?? null,
       vorschlag: vorschlag as never,
       hochgeladenVonId: a.hochgeladenVonId ?? null,
-      uploadLinkId: a.uploadLink?.id ?? null,
+      uploadLinkId: a.uploadLinkId ?? null,
+      eingangMailId: a.eingangMailId ?? null,
     } as never,
     select: { id: true },
   });

@@ -48,7 +48,8 @@ export function Formular({
         // Selbst absenden, damit React die Eingaben bei einem Fehler nicht leert.
         e.preventDefault();
         if (bestaetigen && !window.confirm(bestaetigen)) return;
-        const daten = new FormData(e.currentTarget);
+        // Mit dem auslösenden Knopf, damit name/value eines zweiten Knopfs mitgeschickt werden
+        const daten = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
         startTransition(() => ausfuehren(daten));
       }}
     >
