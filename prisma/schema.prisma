@@ -93,6 +93,8 @@ model Mandant {
   dokumentSeiten          DokumentSeite[]
   kapitalabrufe           Kapitalabruf[]
   kapitalabrufPositionen  KapitalabrufPosition[]
+  planjahre               Planjahr[]
+  planerklaerungen        Planerklaerung[]
 }
 
 /// Ein Benutzer kann über Mitgliedschaften zu mehreren Mandanten gehören.
@@ -219,6 +221,7 @@ model Gesellschaft {
   sicherheiten      Sicherheit[]
   quartalsberichte  Quartalsbericht[]
   kapitalabrufe     Kapitalabruf[]
+  planjahre         Planjahr[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -1836,4 +1839,61 @@ model KapitalabrufPosition {
   eingaenge      Kapitalbewegung[]
 
   @@index([mandantId, abrufId])
+}
+
+enum PlanStatus {
+  ENTWURF
+  BESCHLOSSEN
+}
+
+/// Plan (Budget) einer Gesellschaft für ein Geschäftsjahr; Posten wie in der GuV. Das Ist kommt aus dem Geschäftsjahr gleichen Jahres.
+model Planjahr {
+  id             String     @id @default(cuid())
+  mandantId      String
+  gesellschaftId String
+  jahr           Int
+  status         PlanStatus @default(ENTWURF)
+  /// z. B. „Budget 2025, Gesellschafterbeschluss vom 12.12.2024“
+  quelle         String?
+  beschlossenAm  DateTime?  @db.Date
+
+  umsatzerloese        Decimal? @db.Decimal(14, 2)
+  sonstigeErtraege     Decimal? @db.Decimal(14, 2)
+  materialaufwand      Decimal? @db.Decimal(14, 2)
+  personalaufwand      Decimal? @db.Decimal(14, 2)
+  sonstigeAufwendungen Decimal? @db.Decimal(14, 2)
+  abschreibungen       Decimal? @db.Decimal(14, 2)
+  zinsertraege         Decimal? @db.Decimal(14, 2)
+  zinsaufwendungen     Decimal? @db.Decimal(14, 2)
+  steuern              Decimal? @db.Decimal(14, 2)
+  jahresergebnis       Decimal? @db.Decimal(14, 2)
+
+  notiz       String?
+  erstelltVon String?
+  angelegtAm  DateTime @default(now())
+  geaendertAm DateTime @updatedAt
+
+  mandant      Mandant          @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft     @relation(fields: [gesellschaftId], references: [id], onDelete: Cascade)
+  erklaerungen Planerklaerung[]
+
+  @@unique([gesellschaftId, jahr])
+  @@index([mandantId])
+}
+
+/// Erklärung einer Abweichung zwischen Plan und Ist für eine Zeile (GuV-Posten oder Kennzahl wie EBITDA).
+model Planerklaerung {
+  id          String   @id @default(cuid())
+  mandantId   String
+  planjahrId  String
+  zeile       String
+  text        String
+  erstelltVon String?
+  geaendertAm DateTime @updatedAt
+
+  mandant  Mandant  @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  planjahr Planjahr @relation(fields: [planjahrId], references: [id], onDelete: Cascade)
+
+  @@unique([planjahrId, zeile])
+  @@index([mandantId])
 }

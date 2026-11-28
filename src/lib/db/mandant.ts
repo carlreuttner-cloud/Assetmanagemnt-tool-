@@ -47,6 +47,7 @@ const FREMDSCHLUESSEL: Record<string, string> = {
   sicherheitId: "sicherheit",
   abrufId: "kapitalabruf",
   abrufPositionId: "kapitalabrufPosition",
+  planjahrId: "planjahr",
 };
 /** Gleiche Prüfung für die Relationsschreibweise `haus: { connect: { id } }`. */
 const RELATIONEN: Record<string, string> = Object.fromEntries(
