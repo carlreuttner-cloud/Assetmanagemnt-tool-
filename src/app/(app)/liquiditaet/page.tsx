@@ -8,10 +8,12 @@ import { fuelle, texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { darf } from "@/lib/auth/rechte";
 import { formatMonat, heute, monatsNummer } from "@/lib/datum";
+import { ladeInstandhaltung } from "@/lib/daten/instandhaltung";
 import { ladeLiquiditaet } from "@/lib/daten/liquiditaet";
 import { ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { formatierer } from "@/lib/format";
 import { dezimal, type Decimal } from "@/lib/geld";
+import { planjahr } from "@/lib/instandhaltung";
 import type { LiquiditaetMonat, MonatStatus } from "@/lib/liquiditaet";
 import { LiquiditaetUebersicht } from "./uebersicht";
 import { kontostandHinzufuegen, kontostandLoeschen, mindestliquiditaetSpeichern, planpositionHinzufuegen, planpositionLoeschen } from "./aktionen";
@@ -68,6 +70,10 @@ export default async function LiquiditaetSeite({ searchParams }: PageProps<"/liq
     );
   }
   const plan = g.plan;
+  const planEndeJahr = Number(plan.ende.slice(0, 4));
+  const offeneInstandhaltung = darf(kontext.rolle, "haeuser")
+    ? (await ladeInstandhaltung(kontext, { gesellschaftId: g.id })).haeuser.flatMap((h) => h.bauteile).filter((b) => !b.uebernommen && (planjahr(b, Number(stichtag.slice(0, 4))) ?? Infinity) <= planEndeJahr)
+    : [];
   const kreditName = new Map(basis.kredite.map((k) => [k.id, k.bezeichnung]));
   const massnahmeName = (id: string) => g.massnahmen.get(id)?.bezeichnung ?? id;
   const position = new Map(g.positionen.map((p) => [p.id, p]));
@@ -437,6 +443,14 @@ export default async function LiquiditaetSeite({ searchParams }: PageProps<"/liq
 
         <Karte titel={tl.planpositionen}>
           <p className="mb-3 text-sm text-slate-600">{tl.planpositionenHinweis}</p>
+          {offeneInstandhaltung.length > 0 && (
+            <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800" data-instandhaltung-hinweis>
+              {fuelle(t.instandhaltung.liquiditaetHinweis, { anzahl: offeneInstandhaltung.length, jahr: planEndeJahr })}{" "}
+              <Link href={`/instandhaltung?gesellschaft=${g.id}&faellig=1`} className="underline">
+                {t.instandhaltung.liquiditaetLink}
+              </Link>
+            </p>
+          )}
           {g.positionen.length === 0 ? (
             <Leer>{tl.keinePositionen}</Leer>
           ) : (

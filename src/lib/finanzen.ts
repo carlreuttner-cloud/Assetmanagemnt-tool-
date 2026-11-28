@@ -53,7 +53,7 @@ export type JahresDaten = {
 } & Record<Posten, Decimal | null>;
 
 /** Summe mit Vorzeichen; null, sobald ein Teil fehlt. */
-function rechne(teile: Array<[1 | -1, Decimal | null]>): Decimal | null {
+export function rechne(teile: Array<[1 | -1, Decimal | null]>): Decimal | null {
   let s = dezimal(0);
   for (const [v, w] of teile) {
     if (w === null) return null;

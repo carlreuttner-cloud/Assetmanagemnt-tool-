@@ -5,12 +5,14 @@ import { notFound, redirect } from "next/navigation";
 import { fuelle, texte, type Texte } from "@/i18n";
 import { pruefeZugriff } from "@/lib/auth/kontext";
 import { sichtbarkeit } from "@/lib/auth/sichtbarkeit";
-import { alsDbDatum, plusTage } from "@/lib/datum";
+import { TEST_INTERVALLE } from "@/lib/covenant-nachweis";
+import { alsDbDatum, heute, plusTage } from "@/lib/datum";
+import { baueCovenantNachweis } from "@/lib/daten/covenant-nachweis";
 import { erlaubt, ladeRechengrundlage } from "@/lib/daten/portfolio";
 import { dezimal, zuText } from "@/lib/geld";
 import { ALLE_POSTEN } from "@/lib/finanzen";
 import { EingabeFehler, formularLeser, fuehreAus, type AktionsErgebnis } from "@/lib/formular";
-import { berechneTilgungsplan, restschuld, type TilgungsartArt, type ZahlweiseArt } from "@/lib/kredit";
+import { berechneTilgungsplan, KREDITARTEN, restschuld, type TilgungsartArt, type ZahlweiseArt } from "@/lib/kredit";
 
 const ZINSARTEN = ["FEST", "VARIABEL"] as const;
 const ZAHLWEISEN = ["MONATLICH", "QUARTALSWEISE", "HALBJAEHRLICH", "JAEHRLICH"] as const satisfies readonly ZahlweiseArt[];
@@ -19,6 +21,8 @@ const VERGLEICHE = ["HOECHSTENS", "MINDESTENS"] as const;
 const FOLGEN = ["COVENANT", "AUSSCHUETTUNGSSPERRE"] as const;
 const ABSCHLUSS_QUELLEN = ["JAHRESABSCHLUSS", "BWA", "SONSTIGE"] as const;
 const ABSCHLUSS_STATUS = ["ENDGUELTIG", "ENTWURF"] as const;
+const ST_RECHTE = ["UNBEKANNT", "KEINES", "PROZENT", "BETRAG"] as const;
+const ST_JAHRE = ["KALENDERJAHR", "VERTRAGSJAHR"] as const;
 const BUCHUNGSARTEN = ["ZINS", "TILGUNG", "SONDERTILGUNG", "GEBUEHR", "AUSZAHLUNG", "SONSTIGES"] as const;
 
 async function schreibKontext() {
@@ -79,10 +83,21 @@ export async function kreditSpeichern(id: string | null, _v: AktionsErgebnis, fd
     if (zinsArt === "FEST" && !sollzins) throw new EingabeFehler(k.sollzinsFehlt);
     if (zinsArt === "VARIABEL" && (!referenzzins || !marge)) throw new EingabeFehler(k.referenzFehlt);
 
+    const gesellschaftId = f.pflicht("gesellschaftId", k.gesellschaft);
+    const kreditart = f.auswahl("kreditart", k.kreditart, KREDITARTEN);
+    const rangText = f.text("rang");
+    const rang = kreditart === "BANK" || !rangText ? null : Number(rangText);
+    if (rang !== null && (!Number.isInteger(rang) || rang < 1)) throw new EingabeFehler(k.rangFehlt);
+    const gesellschafterWahl = kreditart === "GESELLSCHAFTERDARLEHEN" ? f.text("gesellschafterId") : null;
+    // Darlehensgeber nur aus derselben Gesellschaft
+    const gesellschafterId = gesellschafterWahl && (await db.gesellschafter.findFirst({ where: { id: gesellschafterWahl, gesellschaftId }, select: { id: true } })) ? gesellschafterWahl : null;
     const daten = {
-      gesellschaftId: f.pflicht("gesellschaftId", k.gesellschaft),
+      gesellschaftId,
       bezeichnung: f.pflicht("bezeichnung", k.bezeichnung),
       bank: f.text("bank"),
+      kreditart,
+      rang,
+      gesellschafterId,
       kreditnummer: f.text("kreditnummer"),
       iban: f.text("iban")?.replace(/\s/g, "").toUpperCase() ?? null,
       ursprungsbetrag: zuText(f.betrag("ursprungsbetrag", k.ursprungsbetrag))!,
@@ -166,12 +181,71 @@ export async function covenantHinzufuegen(kreditId: string, _v: AktionsErgebnis,
         vergleich: VERGLEICHE.find((v) => v === vergleich) ?? null,
         schwellenwert: zuText(f.zahlOptional("schwellenwert", t.kredite.schwellenwert)),
         pruefrhythmus: f.text("pruefrhythmus"),
+        ...testTermin(f, t),
         beschreibung: f.text("beschreibung"),
       } as never,
     });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });
+}
+
+/** Testtermine eines Covenants: erster Termin und Abstand in Monaten (beides oder nichts). */
+function testTermin(f: ReturnType<typeof formularLeser>, t: Texte) {
+  const erster = f.datumOptional("ersterTest", t.kredite.ersterTest);
+  const intervall = TEST_INTERVALLE.find((m) => String(m) === f.text("testIntervallMonate")) ?? null;
+  if ((erster === null) !== (intervall === null)) throw new EingabeFehler(t.kredite.testBeides);
+  return { ersterTest: erster ? alsDbDatum(erster) : null, testIntervallMonate: intervall };
+}
+
+export async function covenantTestSetzen(id: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db, t, sprache } = await schreibKontext();
+    await db.covenant.update({ where: { id }, data: testTermin(formularLeser(fd, sprache), t) });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+/** Sondertilgungsrecht laut Vertrag; ohne Prozent oder Betrag nur „unbekannt“ oder „keines“. */
+export async function sondertilgungSetzen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  return fuehreAus(async () => {
+    const { db, t, sprache } = await schreibKontext();
+    const ts = t.sondertilgung;
+    const f = formularLeser(fd, sprache);
+    const recht = f.auswahl("recht", ts.recht, ST_RECHTE);
+    const wert = recht === "PROZENT" ? f.prozentOptional("wert", ts.wert) : recht === "BETRAG" ? f.betragOptional("wert", ts.wert) : null;
+    if ((recht === "PROZENT" || recht === "BETRAG") && (!wert || !wert.greaterThan(0))) throw new EingabeFehler(ts.wertFehlt);
+    const bis = f.datumOptional("bis", ts.bis);
+    await db.kredit.update({
+      where: { id: kreditId },
+      data: {
+        sondertilgungRecht: recht,
+        sondertilgungWert: zuText(wert),
+        sondertilgungJahr: f.auswahl("jahr", ts.jahr, ST_JAHRE),
+        sondertilgungUebertragbar: fd.get("uebertragbar") === "on",
+        sondertilgungBis: bis ? alsDbDatum(bis) : null,
+      },
+    });
+    refresh();
+    return { ok: t.allgemein.gespeichert };
+  });
+}
+
+/** Friert den Nachweis zum Stichtag ein und öffnet das PDF. */
+export async function covenantNachweisErstellen(kreditId: string, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
+  const { kontext, db, t, sprache } = await schreibKontext();
+  const ergebnis = await fuehreAus(async () => {
+    const stichtag = formularLeser(fd, sprache).datumOptional("stichtag", t.covenantNachweis.stichtag);
+    if (!stichtag || stichtag > heute()) throw new EingabeFehler(t.covenantNachweis.stichtagUngueltig);
+    const inhalt = await baueCovenantNachweis(kontext, kreditId, stichtag);
+    if (!inhalt) notFound();
+    if (inhalt.covenants.length === 0) throw new EingabeFehler(t.covenantNachweis.keineCovenants);
+    const n = await db.covenantNachweis.create({ data: { kreditId, stichtag: alsDbDatum(stichtag), inhalt: inhalt as never, erstelltVon: kontext.benutzer.name } as never, select: { id: true } });
+    return { ok: n.id };
+  });
+  if (ergebnis.ok && !ergebnis.fehler) redirect(`/api/covenant-nachweis/${ergebnis.ok}`);
+  return ergebnis;
 }
 
 export async function covenantLoeschen(id: string): Promise<AktionsErgebnis> {
@@ -417,11 +491,20 @@ export async function gesellschafterSpeichern(gesellschaftId: string, _v: Aktion
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, gesellschaftId, f.text("mitgliedschaftId"), t),
       } as never,
     });
     refresh();
     return { ok: t.allgemein.gespeichert };
   });
+}
+
+/** Zugang zum Investorenportal: nur Investoren, die der Gesellschaft zugewiesen sind. */
+async function portalZugang(db: Awaited<ReturnType<typeof schreibKontext>>["db"], gesellschaftId: string, mitgliedschaftId: string | null, t: Texte): Promise<string | null> {
+  if (!mitgliedschaftId) return null;
+  const m = await db.mitgliedschaft.findFirst({ where: { id: mitgliedschaftId, rolle: "INVESTOR", gesellschaftZuweisungen: { some: { gesellschaftId } } }, select: { id: true } });
+  if (!m) throw new EingabeFehler(t.waterfall.portalUngueltig);
+  return m.id;
 }
 
 export async function gesellschafterAendern(ort: { id: string; gesellschaftId: string }, _v: AktionsErgebnis, fd: FormData): Promise<AktionsErgebnis> {
@@ -439,6 +522,7 @@ export async function gesellschafterAendern(ort: { id: string; gesellschaftId: s
         beteiligungProzent: zuText(f.prozentOptional("beteiligungProzent", tw.beteiligung)),
         gewinnanteilProzent: zuText(f.prozentOptional("gewinnanteilProzent", tw.gewinnanteil)),
         notiz: f.text("notiz"),
+        mitgliedschaftId: await portalZugang(db, ort.gesellschaftId, f.text("mitgliedschaftId"), t),
       },
     });
     refresh();

@@ -18,6 +18,9 @@ Frei erfundener, aber realistischer Datensatz, damit alle Fenster und Grafiken m
 | Mieter | je Haus 2 bis 4 Altmieter deutlich unter dem Hausdurchschnitt pro m², 2 bis 4 mit Rückstand (Ist-Miete 0 oder Teilzahlung), teils eine Mietminderung, unterschiedliche Daten der letzten Mieterhöhung |
 | Kredite | 25, davon 7 variabel (3M- oder 6M-Euribor plus Marge, Zinsfloor 0 %), 18 fest; LTV je Haus 53 bis 68 % |
 | Buchungen | 24 Monate (11/2024 bis 10/2026), je Zahlung eine Zins- und eine Tilgungsabbuchung mit Kontostand danach; 2 Kredite zahlen vierteljährlich |
+| Stände der Mieterliste | je Haus 6 Monatsstände (die letzten 6 Monatsenden) mit Mieterhöhungen, Minderungen, Mieterwechseln, neuem und beendetem Leerstand, Flächenkorrekturen; in einem Stand fehlen Werte (unbekannt) |
+| Hausverwaltungen | 3 (Hanse, Elbufer, Mittelweg), ein Wechsel Hanse → Elbufer vor drei Monaten, ein Haus ohne Hausverwaltung |
+| Alte Leerstandslisten | `leerstandslisten/`: eine Liste mit Spalten Objekt und Stichtag über drei Häuser und drei Stichtage (mit einem unbekannten Haus und einer unbekannten Einheit), eine Meldung mit Zwischenzeilen „Objekt: …“ und „Stand: …“; Import unter Import → Leerstandsliste |
 | IBANs | gültige Prüfziffer, aber Bankleitzahl `9999…`, die es in Deutschland nicht gibt |
 
 Die Kennzahlen je Haus (Miete, Faktor, Leerstand, Restschuld, LTV) stehen in [`uebersicht-haeuser.csv`](uebersicht-haeuser.csv), alle Kredite in [`uebersicht-kredite.csv`](uebersicht-kredite.csv). Damit lässt sich prüfen, ob die App später dieselben Werte anzeigt.
