@@ -69,6 +69,7 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
       buchungen: { orderBy: [{ datum: "desc" }] },
       tilgungsplaene: { orderBy: { version: "desc" }, include: { zeilen: { orderBy: { faelligAm: "asc" } } } },
       zinssicherungen: { orderBy: { beginn: "asc" } },
+      sicherheiten: { include: { sicherheit: { include: { haeuser: { select: { haus: { select: { bezeichnung: true } } } } } } } },
     },
   });
   if (!kredit) notFound();
@@ -447,6 +448,33 @@ export default async function KreditSeite({ params, searchParams }: PageProps<"/
               </tbody>
             </Tabelle>
           )}
+        </Karte>
+
+        <Karte titel={<span id="sicherheiten">{t.sicherheiten.aufKreditseite}</span>}>
+          {kredit.sicherheiten.length === 0 ? (
+            <Leer>{t.sicherheiten.keineZumKredit}</Leer>
+          ) : (
+            <ul className="space-y-1 text-sm" data-kredit-sicherheiten>
+              {kredit.sicherheiten.map(({ sicherheit: s }) => (
+                <li key={s.id} className={s.geloeschtAm ? "text-slate-400 line-through" : ""}>
+                  {t.sicherheiten.arten[s.art]}
+                  {s.rang ? ` · ${t.sicherheiten.spalten.rang} ${s.rang}` : ""} · {s.glaeubiger}
+                  {s.betrag !== null ? ` · ${f.betragGanz(s.betrag)}` : ""}
+                  {s.haeuser.length > 0 ? ` · ${s.haeuser.map((h) => h.haus.bezeichnung).join(", ")}` : ""}
+                  <span className="text-xs text-slate-500">
+                    {" "}
+                    ({t.sicherheiten.quellen[s.quelle]}
+                    {s.stand ? `, ${f.datum(s.stand)}` : ""})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-sm">
+            <Link href="/sicherheiten" className="text-sky-700 hover:underline">
+              {t.navigation.sicherheiten} →
+            </Link>
+          </p>
         </Karte>
       </div>
 

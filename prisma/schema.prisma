@@ -71,6 +71,9 @@ model Mandant {
   mailAbsender            MailAbsender[]
   eingangMails            EingangMail[]
   bankangebote            Bankangebot[]
+  sicherheiten            Sicherheit[]
+  sicherheitHaeuser       SicherheitHaus[]
+  sicherheitKredite       SicherheitKredit[]
   aenderungsprotokoll     Aenderungsprotokoll[]
   importvorgaenge         Importvorgang[]
   szenarien               Szenario[]
@@ -209,6 +212,7 @@ model Gesellschaft {
   kontostaende      Bankkontostand[]
   planpositionen    Planposition[]
   bankangebote      Bankangebot[]
+  sicherheiten      Sicherheit[]
 
   @@index([mandantId])
   @@index([portfolioId])
@@ -245,6 +249,7 @@ model Haus {
   zuweisungen       HausZuweisung[]
   importe           Importvorgang[]
   dokumentnachweise Dokumentnachweis[]
+  sicherheiten      SicherheitHaus[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -517,6 +522,7 @@ model Kredit {
   dokumentnachweise Dokumentnachweis[]
   zinssicherungen   Zinssicherung[]
   bankangebote      Bankangebot[]
+  sicherheiten      SicherheitKredit[]
 
   @@index([mandantId])
   @@index([gesellschaftId])
@@ -852,6 +858,7 @@ model Dokument {
   @@index([mandantId])
   @@index([mandantId, bestaetigt])
   bankangebote    Bankangebot[]
+  sicherheiten    Sicherheit[]
 }
 
 enum DokumentTextQuelle {
@@ -1504,6 +1511,89 @@ model EingangMail {
   eingaenge Eingang[]
 
   @@index([mandantId, empfangenAm])
+}
+
+enum SicherheitArt {
+  GRUNDSCHULD
+  HYPOTHEK
+  BUERGSCHAFT
+  ABTRETUNG_MIETEN
+  ABTRETUNG_SONSTIGE
+  VERPFAENDUNG
+  PATRONATSERKLAERUNG
+  SONSTIGE
+}
+
+enum SicherheitQuelle {
+  GRUNDBUCHAUSZUG
+  SICHERUNGSVERTRAG
+  BANKBESTAETIGUNG
+  SONSTIGE
+}
+
+/// Kreditsicherheit: Grundschuld (je Haus, mit Rang), Bürgschaft, Abtretung usw.,
+/// mit Quelle und Stand. Gesamtgrundschulden lasten auf mehreren Häusern.
+model Sicherheit {
+  id             String            @id @default(cuid())
+  mandantId      String
+  art            SicherheitArt
+  /// Gläubiger, meist die Bank
+  glaeubiger     String
+  /// Nominalbetrag (Grundschuld, Bürgschaft); bei Abtretungen oft leer
+  betrag         Decimal?          @db.Decimal(14, 2)
+  /// Rang in Abteilung III (1 = erstrangig)
+  rang           Int?
+  /// z. B. „Grundbuch von Lindenhof, Blatt 1234, Abt. III lfd. Nr. 2“
+  fundstelle     String?
+  /// Sicherungsgeber, z. B. bürgende Gesellschaft oder Person
+  sicherungsgeber String?
+  gesellschaftId String?
+  eingetragenAm  DateTime?         @db.Date
+  gueltigBis     DateTime?         @db.Date
+  /// Gelöscht bzw. freigegeben am (bleibt zur Nachvollziehbarkeit erhalten)
+  geloeschtAm    DateTime?         @db.Date
+  quelle         SicherheitQuelle  @default(SONSTIGE)
+  /// Stand der Angabe laut Quelle
+  stand          DateTime?         @db.Date
+  dokumentId     String?
+  notiz          String?
+  erstelltAm     DateTime          @default(now())
+  geaendertAm    DateTime          @updatedAt
+
+  mandant      Mandant            @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  gesellschaft Gesellschaft?      @relation(fields: [gesellschaftId], references: [id], onDelete: SetNull)
+  dokument     Dokument?          @relation(fields: [dokumentId], references: [id], onDelete: SetNull)
+  haeuser      SicherheitHaus[]
+  kredite      SicherheitKredit[]
+
+  @@index([mandantId])
+}
+
+model SicherheitHaus {
+  id           String     @id @default(cuid())
+  mandantId    String
+  sicherheitId String
+  hausId       String
+
+  mandant    Mandant    @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  sicherheit Sicherheit @relation(fields: [sicherheitId], references: [id], onDelete: Cascade)
+  haus       Haus       @relation(fields: [hausId], references: [id], onDelete: Cascade)
+
+  @@unique([sicherheitId, hausId])
+}
+
+/// Welche Kredite eine Sicherheit sichert (Zweckerklärung)
+model SicherheitKredit {
+  id           String     @id @default(cuid())
+  mandantId    String
+  sicherheitId String
+  kreditId     String
+
+  mandant    Mandant    @relation(fields: [mandantId], references: [id], onDelete: Cascade)
+  sicherheit Sicherheit @relation(fields: [sicherheitId], references: [id], onDelete: Cascade)
+  kredit     Kredit     @relation(fields: [kreditId], references: [id], onDelete: Cascade)
+
+  @@unique([sicherheitId, kreditId])
 }
 
 enum AngebotStatus {

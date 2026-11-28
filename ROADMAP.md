@@ -69,7 +69,7 @@ Reihenfolge laut Carl: zuerst Teil A (Eingang und KI-Assistent), dann B2, B4, B5
 ### Vorgezogen aus Teil B und C
 
 - [x] **Phase 34 (B2): Bankangebote vergleichen.** Term Sheets hochladen; die KI liest Zins, Marge, Laufzeit, Gebühren, Covenants und Sondertilgung aus (Vorschlag mit Bestätigung); Vergleich nebeneinander inkl. Gesamtkosten über die Laufzeit (im Code gerechnet).
-- [ ] **Phase 35 (B4): Sicherheiten-Register.** Grundschulden je Haus (Rang, Betrag, Gläubiger), Bürgschaften, Abtretungen, mit Quelle und Bezug zum Kredit.
+- [x] **Phase 35 (B4): Sicherheiten-Register.** Grundschulden je Haus (Rang, Betrag, Gläubiger), Bürgschaften, Abtretungen, mit Quelle und Bezug zum Kredit.
 - [ ] **Phase 36 (B5): Beleihungsreserve.** Mögliche Nachfinanzierung bei frei wählbarem Ziel-LTV je Haus, Gesellschaft und Portfolio, nur aus belegter Restschuld und Verkehrswert mit Stichtag.
 - [ ] **Phase 37 (B7): Covenant-Nachweis.** Testtermine je Covenant im Fristenkalender, PDF für die Bank auf Knopfdruck mit Herleitung und Quellen.
 - [ ] **Phase 38 (C2): Ausschüttungsplanung.** Geplante Ausschüttungen mit automatischer Prüfung von Liquidität, Ausschüttungssperren und Covenants.

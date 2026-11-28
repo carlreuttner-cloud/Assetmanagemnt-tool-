@@ -14,6 +14,7 @@ import { baueNachweise, TEST_VORGABEN } from "./testdaten/dokumente";
 import { euribor, monatsanfang, monatsNummer } from "./testdaten/hilfen";
 import { legeTestdokumenteAn } from "./testdaten/dateien";
 import { baueBankangebote } from "./testdaten/bankangebote";
+import { baueSicherheiten } from "./testdaten/sicherheiten";
 import { baueMassnahmen } from "./testdaten/massnahmen";
 import { baueLiquiditaet } from "./testdaten/liquiditaet";
 import { baueZinssicherungen } from "./testdaten/zinssicherungen";
@@ -69,6 +70,7 @@ async function main() {
   await legeTestdokumenteAn(db, mandantId, admin.id);
 
   await baueBankangebote(db, mandantId, admin.id);
+  await baueSicherheiten(db, mandantId);
 
   // E-Mail-Eingang: feste Import-Adresse für Testmails und eine bekannte Bank (Domain)
   await db.mailPostfach.create({ data: { mandantId, kennung: "demo-eingang" } });
