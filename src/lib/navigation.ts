@@ -25,6 +25,7 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "gesellschaften", pfad: "/kapitalkonten", textSchluessel: "kapitalkonten" },
       { bereich: "gesellschaften", pfad: "/renditen", textSchluessel: "renditen" },
       { bereich: "gesellschaften", pfad: "/kapitalabrufe", textSchluessel: "kapitalabrufe" },
+      { bereich: "gesellschaften", pfad: "/plan-ist", textSchluessel: "planIst" },
       { bereich: "uebersicht", pfad: "/fristen", textSchluessel: "fristen" },
       { bereich: "berichte", pfad: "/berichte", textSchluessel: "berichte" },
     ],
@@ -35,9 +36,13 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "haeuser", pfad: "/haeuser", textSchluessel: "haeuser" },
       { bereich: "haeuser", pfad: "/einheiten", textSchluessel: "einheiten", auch: ["/haeuser/einheiten"] },
       { bereich: "mieter", pfad: "/mieter", textSchluessel: "mieter" },
+      { bereich: "mieter", pfad: "/serienbriefe", textSchluessel: "serienbriefe" },
       { bereich: "haeuser", pfad: "/gewerbe", textSchluessel: "gewerbe" },
       { bereich: "haeuser", pfad: "/stellplaetze", textSchluessel: "stellplaetze" },
       { bereich: "haeuser", pfad: "/investitionen", textSchluessel: "investitionen" },
+      { bereich: "haeuser", pfad: "/energie", textSchluessel: "energie" },
+      { bereich: "haeuser", pfad: "/instandhaltung", textSchluessel: "instandhaltung" },
+      { bereich: "haeuser", pfad: "/hausverwaltungen", textSchluessel: "hausverwaltungen" },
     ],
   },
   {
@@ -65,6 +70,7 @@ export const NAVIGATION: NavGruppe[] = [
     reiter: [
       { bereich: "dokumente", pfad: "/posteingang", textSchluessel: "posteingang", aktion: "schreiben" },
       { bereich: "dokumente", pfad: "/dokumente", textSchluessel: "dokumente" },
+      { bereich: "dokumente", pfad: "/datenraum", textSchluessel: "datenraum", aktion: "schreiben" },
       { bereich: "import", pfad: "/import", textSchluessel: "import" },
     ],
   },
@@ -74,6 +80,10 @@ export const NAVIGATION: NavGruppe[] = [
       { bereich: "kiAssistent", pfad: "/ki-fragen", textSchluessel: "kiFragen" },
       { bereich: "kiAssistent", pfad: "/ki-assistent", textSchluessel: "kiAssistent" },
     ],
+  },
+  {
+    schluessel: "portal",
+    reiter: [{ bereich: "investorenportal", pfad: "/portal", textSchluessel: "portal" }],
   },
 ];
 

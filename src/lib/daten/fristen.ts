@@ -30,7 +30,8 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
   const stichtag = heute();
   const mitKrediten = darf(kontext.rolle, "gesellschaften");
   const mitMietern = darf(kontext.rolle, "mieter");
-  const [gesellschaften, kredite, mvs, abrufe] = await Promise.all([
+  const mitHaeusern = darf(kontext.rolle, "haeuser");
+  const [gesellschaften, kredite, mvs, abrufe, ausweise] = await Promise.all([
     kontext.db.gesellschaft.findMany({ where: { id: erlaubt(sicht.gesellschaftIds) }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     mitKrediten
       ? kontext.db.kredit.findMany({
@@ -60,8 +61,28 @@ export async function ladeFristEingabe(kontext: Kontext): Promise<FristEingabe &
         })
       : [],
     mitKrediten ? ladeKapitalabrufe(kontext) : [],
+    mitHaeusern
+      ? kontext.db.haus.findMany({
+          where: { id: erlaubt(sicht.hausIds), energieausweise: { some: { gueltigBis: { not: null } } } },
+          select: {
+            id: true,
+            bezeichnung: true,
+            gesellschaft: { select: { id: true, name: true } },
+            energieausweise: { where: { gueltigBis: { not: null } }, orderBy: { gueltigBis: "desc" }, take: 1, select: { gueltigBis: true, art: true, energieklasse: true } },
+          },
+        })
+      : [],
   ]);
   return {
+    energieausweise: ausweise.map((h) => ({
+      hausId: h.id,
+      haus: h.bezeichnung,
+      gesellschaftId: h.gesellschaft.id,
+      gesellschaft: h.gesellschaft.name,
+      gueltigBis: isoDatum(h.energieausweise[0].gueltigBis)!,
+      art: t.energie.arten[h.energieausweise[0].art],
+      klasse: h.energieausweise[0].energieklasse ?? t.energie.unbekannteKlasse,
+    })),
     kapitalabrufe: abrufe
       .filter((a) => a.stand.offen.greaterThan(0))
       .map((a) => ({

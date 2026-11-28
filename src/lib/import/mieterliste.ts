@@ -35,6 +35,7 @@ export const MIETERLISTE_SPALTEN = {
   rueckstand: ["rueckstand", "mietrueckstand", "offen", "offenerbetrag"],
   letzteMieterhoehung: ["letztemieterhoehung", "mieterhoehung", "letzteerhoehung"],
   erwarteteMiete: ["erwartetemiete", "zielmiete", "marktmiete", "angebotsmiete"],
+  nebenkosten: ["nebenkosten", "nk", "nkvorauszahlung", "nebenkostenvorauszahlung", "betriebskosten", "bkvorauszahlung", "vorauszahlung"],
 } as const;
 
 export type ListenFeld = keyof typeof MIETERLISTE_SPALTEN;
@@ -52,6 +53,8 @@ export interface ListenZeile {
   rueckstand: Decimal | null;
   letzteMieterhoehung: IsoDatum | null;
   erwarteteMiete: Decimal | null;
+  /** Nebenkostenvorauszahlung je Monat (nur für die Stände der Mieterliste) */
+  nebenkosten: Decimal | null;
   /** Spalte mit unlesbarem Wert, z. B. "sollMiete" */
   fehlerFeld: ListenFeld | null;
 }
@@ -119,6 +122,7 @@ export function leseMieterliste(daten: Uint8Array | string): Mieterliste {
       rueckstand: zahl("rueckstand"),
       letzteMieterhoehung: datum("letzteMieterhoehung"),
       erwarteteMiete: zahl("erwarteteMiete"),
+      nebenkosten: zahl("nebenkosten"),
       fehlerFeld,
     });
   });
