@@ -36,6 +36,7 @@ const FREMDSCHLUESSEL: Record<string, string> = {
   kreditId: "kredit",
   tilgungsplanId: "tilgungsplan",
   mitgliedschaftId: "mitgliedschaft",
+  bauteilId: "bauteil",
   verkehrswertId: "verkehrswert",
   vorgabeId: "dokumentvorgabe",
   gesellschafterId: "gesellschafter",
