@@ -52,6 +52,20 @@ Reihenfolge: zuerst die neue Navigation mit Portfolios, weil alle weiteren Seite
 - [x] **Phase 27: Auswahl per Dropdown, Liquidität je Gesellschaft.** In der Finanzierung Gesellschaften und Tilgungspläne per Auswahlliste statt Klickleiste (40+ Gesellschaften); Liquiditätsplanung je Gesellschaft wählbar, nicht nur gesamt.
 - [x] **Phase 28: Excel-Export mit Auswahl.** Vor dem Export Tabellen und Spalten auswählen; die KI kann die Auswahl prüfen und Hinweise geben. Layout der Excel-Vorlagen folgt später separat.
 
+## Erweiterungen (ab 28.11.)
+
+Das Produkt wird verkauft: Ideen aus fremden Projekten werden nur nachgebaut, kein fremder Quellcode übernommen. Vorrang haben der KI-Assistent mit Diagrammen und der zentrale Eingang. Der Absender (Punkt 3) kommt direkt vor dem Eingang, weil der Eingang ihn erkennt und setzt.
+
+- [ ] **Phase 29: Generative Antworten im KI-Assistenten.** Frage in eigenen Worten stellen; die KI antwortet mit Text und unseren eigenen Komponenten (Kennzahl-Kacheln, Linien- und Säulendiagramme, Tabellen, Leerstand-Kreis, kleine Was-wäre-wenn-Regler) in den zentralen Farben. Die KI wählt nur Komponenten und Datenabfragen aus einem festen Katalog; alle Zahlen kommen aus der Datenbank bzw. unseren Rechenfunktionen, mit Quelle und Stichtag, nie von der KI. Eigene, schlanke Lösung statt OpenUI (Begründung im PR).
+- [ ] **Phase 30: Absender bei Dokumenten.** Feld „Absender“ (Bank, Hausverwaltung, Gutachter, Steuerberater, Behörde, Mieter, Sonstige) mit Name, Filter und Anzeige in Dateien und Checkliste.
+- [ ] **Phase 31: Zentraler Posteingang mit KI-Zuordnung.** Ein Eingang je Mandant statt Import je Gesellschaft. Jedes Dokument wird gelesen (inkl. Texterkennung); erkannt werden Dokumenttyp, Absender und Stichtag, zugeordnet wird zu Gesellschaft, Haus oder Kredit über IBAN, Darlehensnummer, Adresse oder Gesellschaftsname, mit Begründung („zugeordnet zu Haus X, weil IBAN …“). Einheitlicher Name, Originalname bleibt. Nichts wird ohne Bestätigung übernommen; bei unsicherer Zuordnung oder unbekanntem Absender kein Vorschlag zur Schnellübernahme. Korrekturen werden als Zuordnungsregeln gelernt. Prüfung von Dateityp und Größe, alles im Änderungsprotokoll.
+- [ ] **Phase 32: Upload-Seite je Mandant.** Eigene Seite zum Hochladen per Drag & Drop für Hausverwaltung, Bank oder Gutachter, ohne Zugriff auf den Rest der App: persönlicher, widerrufbarer Upload-Link mit Ablaufdatum oder Login mit Rolle „nur hochladen“. Alles landet im Posteingang.
+- [ ] **Phase 33: E-Mail-Eingang.** Eine Import-Adresse je Mandant; Anhänge und Mailtext landen im Posteingang. Mails unbekannter Absender kommen in Quarantäne. Lokal mit einem Test-Mailserver in Docker und Testmails; der echte Empfang wird in der Produktionsreife eingerichtet.
+- [ ] **Phase 34: Energie und ESG je Haus.** Energieausweis (Art, Energieklasse, Kennwert, Ablaufdatum) mit Frist im Fristenkalender, Verbräuche je Jahr mit Quelle.
+- [ ] **Phase 35: Instandhaltungsplan.** Bauteile je Haus (Dach, Heizung, Aufzug, Fassade …) mit Zyklus, letzter Erneuerung und geplanten Kosten; fällige Maßnahmen fließen als Planposition in die Liquiditätsplanung.
+- [ ] **Phase 36: Serienbriefe.** Vorlagen mit Platzhaltern, z. B. Mieterhöhungsschreiben für alle Mieter, bei denen eine Erhöhung möglich ist; Vorschau je Empfänger, Ausgabe als PDF, Ablage beim Mietverhältnis.
+- [ ] **Phase 37: Investorenportal.** Investoren sehen nur ihre Berichte, ihr Kapitalkonto und ausdrücklich freigegebene Dokumente.
+
 ## Phase „Produktionsreife“: Pflicht, bevor echte Daten verwendet werden
 
 Kommt nach Phase 25, oder früher, sobald echte Daten eingegeben werden sollen.
@@ -64,4 +78,5 @@ Bis diese Phase abgeschlossen ist, werden **keine echten Mieter-, Kredit- oder G
 - [ ] **Dateispeicher:** Ablage für Fotos und Dokumente (S3-kompatibel in Deutschland oder gesichertes Volume), Zugriff nur über die App mit Mandanten- und Rechteprüfung, Größen- und Typprüfung beim Hochladen.
 - [ ] **Geheimnisse:** eigenes `AUTH_SECRET` und Datenbank-Passwort auf dem Server, nicht im Repository; Demo-Zugänge entfernt.
 - [ ] **KI-Analyse:** Auftragsverarbeitungsvertrag mit Anthropic prüfen und abschließen, erst danach `ANTHROPIC_API_KEY` auf dem Server setzen.
+- [ ] **E-Mail-Empfang:** echtes Postfach bzw. Mail-Dienst in der EU für die Import-Adressen (eigene Subdomain mit MX-Eintrag), SPF/DKIM/DMARC-Prüfung eingehender Mails, Virenprüfung der Anhänge.
 - [ ] **Server:** Hetzner (Standort Deutschland), Firewall, automatische Sicherheitsupdates, Datenbank nicht öffentlich erreichbar.
